@@ -22,11 +22,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.publisher.PublisherProbe;
 
@@ -42,7 +41,7 @@ import static org.mockito.BDDMockito.given;
  * @author Eric Deandrea
  * @since 5.1
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class DelegatingServerLogoutHandlerTests {
 
 	@Mock
@@ -61,37 +60,43 @@ public class DelegatingServerLogoutHandlerTests {
 	@Mock
 	private Authentication authentication;
 
-	@Before
-	public void setup() {
+	private void givenDelegate1WillReturn() {
 		given(this.delegate1.logout(any(WebFilterExchange.class), any(Authentication.class)))
-				.willReturn(this.delegate1Result.mono());
+			.willReturn(this.delegate1Result.mono());
+	}
+
+	private void givenDelegate2WillReturn() {
 		given(this.delegate2.logout(any(WebFilterExchange.class), any(Authentication.class)))
-				.willReturn(this.delegate2Result.mono());
+			.willReturn(this.delegate2Result.mono());
 	}
 
 	@Test
 	public void constructorWhenNullVargsThenIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new DelegatingServerLogoutHandler((ServerLogoutHandler[]) null))
-				.withMessage("delegates cannot be null or empty").withNoCause();
+			.isThrownBy(() -> new DelegatingServerLogoutHandler((ServerLogoutHandler[]) null))
+			.withMessage("delegates cannot be null or empty")
+			.withNoCause();
 	}
 
 	@Test
 	public void constructorWhenNullListThenIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new DelegatingServerLogoutHandler((List<ServerLogoutHandler>) null))
-				.withMessage("delegates cannot be null or empty").withNoCause();
+			.isThrownBy(() -> new DelegatingServerLogoutHandler((List<ServerLogoutHandler>) null))
+			.withMessage("delegates cannot be null or empty")
+			.withNoCause();
 	}
 
 	@Test
 	public void constructorWhenEmptyThenIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new DelegatingServerLogoutHandler(new ServerLogoutHandler[0]))
-				.withMessage("delegates cannot be null or empty").withNoCause();
+			.isThrownBy(() -> new DelegatingServerLogoutHandler(new ServerLogoutHandler[0]))
+			.withMessage("delegates cannot be null or empty")
+			.withNoCause();
 	}
 
 	@Test
 	public void logoutWhenSingleThenExecuted() {
+		givenDelegate1WillReturn();
 		DelegatingServerLogoutHandler handler = new DelegatingServerLogoutHandler(this.delegate1);
 		handler.logout(this.exchange, this.authentication).block();
 		this.delegate1Result.assertWasSubscribed();
@@ -99,6 +104,8 @@ public class DelegatingServerLogoutHandlerTests {
 
 	@Test
 	public void logoutWhenMultipleThenExecuted() {
+		givenDelegate1WillReturn();
+		givenDelegate2WillReturn();
 		DelegatingServerLogoutHandler handler = new DelegatingServerLogoutHandler(this.delegate1, this.delegate2);
 		handler.logout(this.exchange, this.authentication).block();
 		this.delegate1Result.assertWasSubscribed();
@@ -109,8 +116,8 @@ public class DelegatingServerLogoutHandlerTests {
 	public void logoutSequential() throws Exception {
 		AtomicBoolean slowDone = new AtomicBoolean();
 		CountDownLatch latch = new CountDownLatch(1);
-		ServerLogoutHandler slow = (exchange, authentication) -> Mono.delay(Duration.ofMillis(100))
-				.doOnSuccess((__) -> slowDone.set(true)).then();
+		ServerLogoutHandler slow = (exchange,
+				authentication) -> Mono.delay(Duration.ofMillis(100)).doOnSuccess((__) -> slowDone.set(true)).then();
 		ServerLogoutHandler second = (exchange, authentication) -> Mono.fromRunnable(() -> {
 			latch.countDown();
 			assertThat(slowDone.get()).describedAs("ServerLogoutHandler should be executed sequentially").isTrue();

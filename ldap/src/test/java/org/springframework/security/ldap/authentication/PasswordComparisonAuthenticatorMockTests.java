@@ -22,7 +22,7 @@ import javax.naming.directory.BasicAttributes;
 import javax.naming.directory.DirContext;
 import javax.naming.directory.SearchControls;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.ldap.core.support.BaseLdapPathContextSource;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -52,8 +52,9 @@ public class PasswordComparisonAuthenticatorMockTests {
 		// Setup a single return value (i.e. success)
 		final NamingEnumeration searchResults = new BasicAttributes("", null).getAll();
 		given(dirCtx.search(eq("cn=Bob,ou=people"), eq("(userPassword={0})"), any(Object[].class),
-				any(SearchControls.class))).willReturn(searchResults);
-		authenticator.authenticate(new UsernamePasswordAuthenticationToken("Bob", "bobspassword"));
+				any(SearchControls.class)))
+			.willReturn(searchResults);
+		authenticator.authenticate(UsernamePasswordAuthenticationToken.unauthenticated("Bob", "bobspassword"));
 	}
 
 }

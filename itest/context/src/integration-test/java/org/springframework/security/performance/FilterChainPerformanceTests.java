@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,13 +19,12 @@ package org.springframework.security.performance;
 import java.util.Arrays;
 import java.util.List;
 
-import javax.servlet.http.HttpSession;
-
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import jakarta.servlet.http.HttpSession;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -40,7 +39,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.util.StopWatch;
 
 /**
@@ -48,7 +47,7 @@ import org.springframework.util.StopWatch;
  * @since 2.0
  */
 @ContextConfiguration(locations = { "/filter-chain-performance-app-context.xml" })
-@RunWith(SpringJUnit4ClassRunner.class)
+@ExtendWith(SpringExtension.class)
 public class FilterChainPerformanceTests {
 
 	// Adjust as required
@@ -58,7 +57,7 @@ public class FilterChainPerformanceTests {
 
 	private static StopWatch sw = new StopWatch("Filter Chain Performance Tests");
 
-	private final UsernamePasswordAuthenticationToken user = new UsernamePasswordAuthenticationToken("bob",
+	private final UsernamePasswordAuthenticationToken user = UsernamePasswordAuthenticationToken.authenticated("bob",
 			"bobspassword", createRoles(N_AUTHORITIES));
 
 	private HttpSession session;
@@ -71,7 +70,7 @@ public class FilterChainPerformanceTests {
 	@Qualifier("fcpFullStack")
 	private FilterChainProxy fullStack;
 
-	@Before
+	@BeforeEach
 	public void createAuthenticatedSession() {
 		this.session = new MockHttpSession();
 		SecurityContextHolder.getContext().setAuthentication(this.user);
@@ -80,12 +79,12 @@ public class FilterChainPerformanceTests {
 		SecurityContextHolder.clearContext();
 	}
 
-	@After
+	@AfterEach
 	public void clearContext() {
 		SecurityContextHolder.clearContext();
 	}
 
-	@AfterClass
+	@AfterAll
 	public static void dumpStopWatch() {
 		System.out.println(sw.prettyPrint());
 	}
@@ -129,8 +128,9 @@ public class FilterChainPerformanceTests {
 		StopWatch sw = new StopWatch("Scaling with nAuthorities");
 		for (int user = 0; user < N_AUTHORITIES / 10; user++) {
 			int nAuthorities = (user != 0) ? user * 10 : 1;
-			SecurityContextHolder.getContext().setAuthentication(
-					new UsernamePasswordAuthenticationToken("bob", "bobspassword", createRoles(nAuthorities)));
+			SecurityContextHolder.getContext()
+				.setAuthentication(UsernamePasswordAuthenticationToken.authenticated("bob", "bobspassword",
+						createRoles(nAuthorities)));
 			this.session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
 					SecurityContextHolder.getContext());
 			SecurityContextHolder.clearContext();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,14 @@ import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.ldap.AuthenticationException;
 import org.springframework.ldap.core.support.AbstractContextSource;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
  * @author Luke Taylor
  * @author Eddú Meléndez
  */
-@RunWith(SpringRunner.class)
+@ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = ApacheDsContainerConfig.class)
 public class DefaultSpringSecurityContextSourceTests {
 
@@ -54,7 +54,17 @@ public class DefaultSpringSecurityContextSourceTests {
 
 	@Test
 	public void supportsSpacesInUrl() {
-		new DefaultSpringSecurityContextSource("ldap://myhost:10389/dc=spring%20framework,dc=org");
+		DefaultSpringSecurityContextSource contextSource = new DefaultSpringSecurityContextSource(
+				"ldap://myhost:10389/dc=spring%20framework,dc=org");
+		assertThat(contextSource.getBaseLdapPathAsString()).isEqualTo("dc=spring framework,dc=org");
+	}
+
+	// gh-9742
+	@Test
+	public void constructorWhenUrlEncodedSpacesWithPlusCharacterThenBaseDnIsProperlyDecoded() {
+		DefaultSpringSecurityContextSource contextSource = new DefaultSpringSecurityContextSource(
+				"ldap://blah:123/dc=spring+framework,dc=org ldap://blah:456/dc=spring+framework,dc=org");
+		assertThat(contextSource.getBaseLdapPathAsString()).isEqualTo("dc=spring framework,dc=org");
 	}
 
 	@Test
@@ -65,7 +75,7 @@ public class DefaultSpringSecurityContextSourceTests {
 		ctxSrc.setPassword("password");
 		ctxSrc.afterPropertiesSet();
 		assertThat(ctxSrc.getAuthenticatedEnvForTest("manager", "password"))
-				.containsKey(AbstractContextSource.SUN_LDAP_POOLING_FLAG);
+			.containsKey(AbstractContextSource.SUN_LDAP_POOLING_FLAG);
 	}
 
 	@Test
@@ -76,7 +86,7 @@ public class DefaultSpringSecurityContextSourceTests {
 		ctxSrc.setPassword("password");
 		ctxSrc.afterPropertiesSet();
 		assertThat(ctxSrc.getAuthenticatedEnvForTest("user", "password"))
-				.doesNotContainKey(AbstractContextSource.SUN_LDAP_POOLING_FLAG);
+			.doesNotContainKey(AbstractContextSource.SUN_LDAP_POOLING_FLAG);
 	}
 
 	// SEC-1145. Confirms that there is no issue here with pooling.
@@ -86,14 +96,16 @@ public class DefaultSpringSecurityContextSourceTests {
 		// com.sun.jndi.ldap.LdapPoolManager.showStats(System.out);
 		// com.sun.jndi.ldap.LdapPoolManager.showStats(System.out);
 		// Now get it gain, with wrong password. Should fail.
-		assertThatExceptionOfType(AuthenticationException.class).isThrownBy(() -> this.contextSource
-				.getContext("uid=Bob,ou=people,dc=springframework,dc=org", "wrongpassword").close());
+		assertThatExceptionOfType(AuthenticationException.class).isThrownBy(
+				() -> this.contextSource.getContext("uid=Bob,ou=people,dc=springframework,dc=org", "wrongpassword")
+					.close());
 	}
 
 	@Test
 	public void serverUrlWithSpacesIsSupported() {
 		DefaultSpringSecurityContextSource contextSource = new DefaultSpringSecurityContextSource(
 				this.contextSource.getUrls()[0] + "ou=space%20cadets,dc=springframework,dc=org");
+		assertThat(contextSource.getBaseLdapPathAsString()).isEqualTo("ou=space cadets,dc=springframework,dc=org");
 		contextSource.afterPropertiesSet();
 		contextSource.getContext("uid=space cadet,ou=space cadets,dc=springframework,dc=org", "spacecadetspassword");
 	}
@@ -109,7 +121,7 @@ public class DefaultSpringSecurityContextSourceTests {
 	}
 
 	@Test
-	public void instantiationSuceedsWithProperServerList() {
+	public void instantiationSucceedsWithProperServerList() {
 		List<String> serverUrls = new ArrayList<>();
 		serverUrls.add("ldap://foo:789");
 		serverUrls.add("ldap://bar:389");
@@ -123,7 +135,7 @@ public class DefaultSpringSecurityContextSourceTests {
 
 	// SEC-2308
 	@Test
-	public void instantiationSuceedsWithEmtpyBaseDn() {
+	public void instantiationSucceedsWithEmptyBaseDn() {
 		String baseDn = "";
 		List<String> serverUrls = new ArrayList<>();
 		serverUrls.add("ldap://foo:789");
@@ -135,6 +147,18 @@ public class DefaultSpringSecurityContextSourceTests {
 		assertThat(ctxSrc.isPooled()).isTrue();
 	}
 
+	// gh-9742
+	@Test
+	public void constructorWhenServerListWithSpacesInBaseDnThenSuccess() {
+		List<String> serverUrls = new ArrayList<>();
+		serverUrls.add("ldap://ad1.example.org:789");
+		serverUrls.add("ldap://ad2.example.org:389");
+		serverUrls.add("ldaps://ad3.example.org:636");
+		DefaultSpringSecurityContextSource contextSource = new DefaultSpringSecurityContextSource(serverUrls,
+				"dc=spring framework,dc=org");
+		assertThat(contextSource.getBaseLdapPathAsString()).isEqualTo("dc=spring framework,dc=org");
+	}
+
 	@Test
 	public void instantiationFailsWithIncorrectServerUrl() {
 		List<String> serverUrls = new ArrayList<>();
@@ -143,7 +167,7 @@ public class DefaultSpringSecurityContextSourceTests {
 		// this url should be rejected because the root DN goes into a separate parameter
 		serverUrls.add("ldap://bar:389/dc=foobar,dc=org");
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new DefaultSpringSecurityContextSource(serverUrls, "dc=springframework,dc=org"));
+			.isThrownBy(() -> new DefaultSpringSecurityContextSource(serverUrls, "dc=springframework,dc=org"));
 	}
 
 	static class EnvExposingDefaultSpringSecurityContextSource extends DefaultSpringSecurityContextSource {

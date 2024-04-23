@@ -23,9 +23,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.util.context.Context;
 
 import org.springframework.http.HttpHeaders;
@@ -44,7 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Josh Cummings
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class ServletBearerExchangeFilterFunctionTests {
 
 	private ServletBearerExchangeFilterFunction function = new ServletBearerExchangeFilterFunction();
@@ -74,23 +74,24 @@ public class ServletBearerExchangeFilterFunctionTests {
 	public void filterWhenAuthenticatedWithOtherTokenThenAuthorizationHeaderNull() {
 		TestingAuthenticationToken token = new TestingAuthenticationToken("user", "pass");
 		ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://example.com")).build();
-		this.function.filter(request, this.exchange).subscriberContext(context(token)).block();
+		this.function.filter(request, this.exchange).contextWrite(context(token)).block();
 		assertThat(this.exchange.getRequest().headers().getFirst(HttpHeaders.AUTHORIZATION)).isNull();
 	}
 
 	@Test
 	public void filterWhenAuthenticatedThenAuthorizationHeader() {
 		ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://example.com")).build();
-		this.function.filter(request, this.exchange).subscriberContext(context(this.authentication)).block();
+		this.function.filter(request, this.exchange).contextWrite(context(this.authentication)).block();
 		assertThat(this.exchange.getRequest().headers().getFirst(HttpHeaders.AUTHORIZATION))
-				.isEqualTo("Bearer " + this.accessToken.getTokenValue());
+			.isEqualTo("Bearer " + this.accessToken.getTokenValue());
 	}
 
 	@Test
 	public void filterWhenExistingAuthorizationThenSingleAuthorizationHeader() {
 		ClientRequest request = ClientRequest.create(HttpMethod.GET, URI.create("https://example.com"))
-				.header(HttpHeaders.AUTHORIZATION, "Existing").build();
-		this.function.filter(request, this.exchange).subscriberContext(context(this.authentication)).block();
+			.header(HttpHeaders.AUTHORIZATION, "Existing")
+			.build();
+		this.function.filter(request, this.exchange).contextWrite(context(this.authentication)).block();
 		HttpHeaders headers = this.exchange.getRequest().headers();
 		assertThat(headers.get(HttpHeaders.AUTHORIZATION)).containsOnly("Bearer " + this.accessToken.getTokenValue());
 	}

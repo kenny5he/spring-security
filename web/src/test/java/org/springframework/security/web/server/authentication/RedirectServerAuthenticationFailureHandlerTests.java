@@ -16,10 +16,12 @@
 
 package org.springframework.security.web.server.authentication;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import java.util.Collections;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.publisher.PublisherProbe;
 
@@ -41,7 +43,7 @@ import static org.mockito.BDDMockito.given;
  * @author Rob Winch
  * @since 5.0
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class RedirectServerAuthenticationFailureHandlerTests {
 
 	private WebFilterExchange exchange;
@@ -95,7 +97,7 @@ public class RedirectServerAuthenticationFailureHandlerTests {
 
 	private WebFilterExchange createExchange() {
 		return new WebFilterExchange(MockServerWebExchange.from(MockServerHttpRequest.get("/").build()),
-				new DefaultWebFilterChain((e) -> Mono.empty()));
+				new DefaultWebFilterChain((e) -> Mono.empty(), Collections.emptyList()));
 	}
 
 }

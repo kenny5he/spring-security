@@ -18,14 +18,13 @@ package org.springframework.security.web.authentication;
 
 import java.util.LinkedHashMap;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.security.authentication.AccountExpiredException;
 import org.springframework.security.authentication.AccountStatusException;
@@ -35,7 +34,7 @@ import org.springframework.security.core.AuthenticationException;
 
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 /**
  * Test class for
@@ -44,7 +43,7 @@ import static org.mockito.Mockito.verifyZeroInteractions;
  * @author Kazuki shimizu
  * @since 4.0
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class DelegatingAuthenticationFailureHandlerTests {
 
 	@Mock
@@ -66,7 +65,7 @@ public class DelegatingAuthenticationFailureHandlerTests {
 
 	private DelegatingAuthenticationFailureHandler handler;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.handlers = new LinkedHashMap<>();
 	}
@@ -77,7 +76,7 @@ public class DelegatingAuthenticationFailureHandlerTests {
 		this.handler = new DelegatingAuthenticationFailureHandler(this.handlers, this.defaultHandler);
 		AuthenticationException exception = new AccountExpiredException("");
 		this.handler.onAuthenticationFailure(this.request, this.response, exception);
-		verifyZeroInteractions(this.handler1, this.handler2);
+		verifyNoMoreInteractions(this.handler1, this.handler2);
 		verify(this.defaultHandler).onAuthenticationFailure(this.request, this.response, exception);
 	}
 
@@ -88,7 +87,7 @@ public class DelegatingAuthenticationFailureHandlerTests {
 		this.handler = new DelegatingAuthenticationFailureHandler(this.handlers, this.defaultHandler);
 		AuthenticationException exception = new BadCredentialsException("");
 		this.handler.onAuthenticationFailure(this.request, this.response, exception);
-		verifyZeroInteractions(this.handler2, this.defaultHandler);
+		verifyNoMoreInteractions(this.handler2, this.defaultHandler);
 		verify(this.handler1).onAuthenticationFailure(this.request, this.response, exception);
 	}
 
@@ -100,30 +99,30 @@ public class DelegatingAuthenticationFailureHandlerTests {
 		this.handler = new DelegatingAuthenticationFailureHandler(this.handlers, this.defaultHandler);
 		AuthenticationException exception = new CredentialsExpiredException("");
 		this.handler.onAuthenticationFailure(this.request, this.response, exception);
-		verifyZeroInteractions(this.handler1, this.defaultHandler);
+		verifyNoMoreInteractions(this.handler1, this.defaultHandler);
 		verify(this.handler2).onAuthenticationFailure(this.request, this.response, exception);
 	}
 
 	@Test
 	public void handlersIsNull() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new DelegatingAuthenticationFailureHandler(null, this.defaultHandler))
-				.withMessage("handlers cannot be null or empty");
+			.isThrownBy(() -> new DelegatingAuthenticationFailureHandler(null, this.defaultHandler))
+			.withMessage("handlers cannot be null or empty");
 	}
 
 	@Test
 	public void handlersIsEmpty() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new DelegatingAuthenticationFailureHandler(this.handlers, this.defaultHandler))
-				.withMessage("handlers cannot be null or empty");
+			.isThrownBy(() -> new DelegatingAuthenticationFailureHandler(this.handlers, this.defaultHandler))
+			.withMessage("handlers cannot be null or empty");
 	}
 
 	@Test
 	public void defaultHandlerIsNull() {
 		this.handlers.put(BadCredentialsException.class, this.handler1);
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new DelegatingAuthenticationFailureHandler(this.handlers, null))
-				.withMessage("defaultHandler cannot be null");
+			.isThrownBy(() -> new DelegatingAuthenticationFailureHandler(this.handlers, null))
+			.withMessage("defaultHandler cannot be null");
 	}
 
 }

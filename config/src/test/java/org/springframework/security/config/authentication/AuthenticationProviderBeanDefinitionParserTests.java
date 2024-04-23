@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ package org.springframework.security.config.authentication;
 
 import java.util.List;
 
-import org.junit.After;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.parsing.BeanDefinitionParsingException;
 import org.springframework.context.support.AbstractXmlApplicationContext;
@@ -42,9 +42,10 @@ public class AuthenticationProviderBeanDefinitionParserTests {
 
 	private AbstractXmlApplicationContext appContext;
 
-	private UsernamePasswordAuthenticationToken bob = new UsernamePasswordAuthenticationToken("bob", "bobspassword");
+	private UsernamePasswordAuthenticationToken bob = UsernamePasswordAuthenticationToken.unauthenticated("bob",
+			"bobspassword");
 
-	@After
+	@AfterEach
 	public void closeAppContext() {
 		if (this.appContext != null) {
 			this.appContext.close();
@@ -160,7 +161,7 @@ public class AuthenticationProviderBeanDefinitionParserTests {
 
 	private AuthenticationProvider getProvider() {
 		List<AuthenticationProvider> providers = ((ProviderManager) this.appContext
-				.getBean(BeanIds.AUTHENTICATION_MANAGER)).getProviders();
+			.getBean(BeanIds.AUTHENTICATION_MANAGER)).getProviders();
 		return providers.get(0);
 	}
 

@@ -16,7 +16,7 @@
 
 package org.springframework.security.web.access.intercept;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -65,7 +65,7 @@ public class RequestKeyTests {
 	@Test
 	public void keysWithNullUrlFailsAssertion() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new RequestKey(null, null))
-				.withMessage("url cannot be null");
+			.withMessage("url cannot be null");
 	}
 
 }

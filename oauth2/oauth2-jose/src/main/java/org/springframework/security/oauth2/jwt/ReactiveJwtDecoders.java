@@ -16,17 +16,9 @@
 
 package org.springframework.security.oauth2.jwt;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.net.URL;
 import java.util.Map;
-import java.util.Set;
-
-import com.nimbusds.jose.jwk.source.RemoteJWKSet;
-import com.nimbusds.jose.proc.SecurityContext;
 
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
-import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.util.Assert;
 
 /**
@@ -60,7 +52,7 @@ public final class ReactiveJwtDecoders {
 	public static ReactiveJwtDecoder fromOidcIssuerLocation(String oidcIssuerLocation) {
 		Assert.hasText(oidcIssuerLocation, "oidcIssuerLocation cannot be empty");
 		Map<String, Object> configuration = JwtDecoderProviderConfigurationUtils
-				.getConfigurationForOidcIssuerLocation(oidcIssuerLocation);
+			.getConfigurationForOidcIssuerLocation(oidcIssuerLocation);
 		return withProviderConfiguration(configuration, oidcIssuerLocation);
 	}
 
@@ -96,7 +88,7 @@ public final class ReactiveJwtDecoders {
 	public static ReactiveJwtDecoder fromIssuerLocation(String issuer) {
 		Assert.hasText(issuer, "issuer cannot be empty");
 		Map<String, Object> configuration = JwtDecoderProviderConfigurationUtils
-				.getConfigurationForIssuerLocation(issuer);
+			.getConfigurationForIssuerLocation(issuer);
 		return withProviderConfiguration(configuration, issuer);
 	}
 
@@ -115,22 +107,11 @@ public final class ReactiveJwtDecoders {
 		JwtDecoderProviderConfigurationUtils.validateIssuer(configuration, issuer);
 		OAuth2TokenValidator<Jwt> jwtValidator = JwtValidators.createDefaultWithIssuer(issuer);
 		String jwkSetUri = configuration.get("jwks_uri").toString();
-		RemoteJWKSet<SecurityContext> jwkSource = new RemoteJWKSet<>(url(jwkSetUri));
-		Set<SignatureAlgorithm> signatureAlgorithms = JwtDecoderProviderConfigurationUtils
-				.getSignatureAlgorithms(jwkSource);
 		NimbusReactiveJwtDecoder jwtDecoder = NimbusReactiveJwtDecoder.withJwkSetUri(jwkSetUri)
-				.jwsAlgorithms((algs) -> algs.addAll(signatureAlgorithms)).build();
+			.jwtProcessorCustomizer(ReactiveJwtDecoderProviderConfigurationUtils::addJWSAlgorithms)
+			.build();
 		jwtDecoder.setJwtValidator(jwtValidator);
 		return jwtDecoder;
-	}
-
-	private static URL url(String url) {
-		try {
-			return new URL(url);
-		}
-		catch (IOException ex) {
-			throw new UncheckedIOException(ex);
-		}
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@
 
 package org.springframework.security.config.method;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.annotation.BusinessService;
@@ -40,7 +40,7 @@ public class Jsr250AnnotationDrivenBeanDefinitionParserTests {
 
 	private BusinessService target;
 
-	@Before
+	@BeforeEach
 	public void loadContext() {
 		// @formatter:off
 		this.appContext = new InMemoryXmlApplicationContext(
@@ -51,7 +51,7 @@ public class Jsr250AnnotationDrivenBeanDefinitionParserTests {
 		this.target = (BusinessService) this.appContext.getBean("target");
 	}
 
-	@After
+	@AfterEach
 	public void closeAppContext() {
 		if (this.appContext != null) {
 			this.appContext.close();
@@ -62,37 +62,37 @@ public class Jsr250AnnotationDrivenBeanDefinitionParserTests {
 	@Test
 	public void targetShouldPreventProtectedMethodInvocationWithNoContext() {
 		assertThatExceptionOfType(AuthenticationCredentialsNotFoundException.class)
-				.isThrownBy(() -> this.target.someUserMethod1());
+			.isThrownBy(() -> this.target.someUserMethod1());
 	}
 
 	@Test
 	public void permitAllShouldBeDefaultAttribute() {
-		UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken("Test", "Password",
-				AuthorityUtils.createAuthorityList("ROLE_USER"));
+		UsernamePasswordAuthenticationToken token = UsernamePasswordAuthenticationToken.authenticated("Test",
+				"Password", AuthorityUtils.createAuthorityList("ROLE_USER"));
 		SecurityContextHolder.getContext().setAuthentication(token);
 		this.target.someOther(0);
 	}
 
 	@Test
 	public void targetShouldAllowProtectedMethodInvocationWithCorrectRole() {
-		UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken("Test", "Password",
-				AuthorityUtils.createAuthorityList("ROLE_USER"));
+		UsernamePasswordAuthenticationToken token = UsernamePasswordAuthenticationToken.authenticated("Test",
+				"Password", AuthorityUtils.createAuthorityList("ROLE_USER"));
 		SecurityContextHolder.getContext().setAuthentication(token);
 		this.target.someUserMethod1();
 	}
 
 	@Test
 	public void targetShouldPreventProtectedMethodInvocationWithIncorrectRole() {
-		UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken("Test", "Password",
-				AuthorityUtils.createAuthorityList("ROLE_SOMEOTHERROLE"));
+		UsernamePasswordAuthenticationToken token = UsernamePasswordAuthenticationToken.authenticated("Test",
+				"Password", AuthorityUtils.createAuthorityList("ROLE_SOMEOTHERROLE"));
 		SecurityContextHolder.getContext().setAuthentication(token);
 		assertThatExceptionOfType(AccessDeniedException.class).isThrownBy(this.target::someAdminMethod);
 	}
 
 	@Test
 	public void hasAnyRoleAddsDefaultPrefix() {
-		UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken("Test", "Password",
-				AuthorityUtils.createAuthorityList("ROLE_USER"));
+		UsernamePasswordAuthenticationToken token = UsernamePasswordAuthenticationToken.authenticated("Test",
+				"Password", AuthorityUtils.createAuthorityList("ROLE_USER"));
 		SecurityContextHolder.getContext().setAuthentication(token);
 		this.target.rolesAllowedUser();
 	}

@@ -16,7 +16,7 @@
 
 package org.springframework.security.web.authentication.logout;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -37,14 +37,14 @@ public class ForwardLogoutSuccessHandlerTests {
 	public void invalidTargetUrl() {
 		String targetUrl = "not.valid";
 		assertThatIllegalArgumentException().isThrownBy(() -> new ForwardLogoutSuccessHandler(targetUrl))
-				.withMessage("'" + targetUrl + "' is not a valid target URL");
+			.withMessage("'" + targetUrl + "' is not a valid target URL");
 	}
 
 	@Test
 	public void emptyTargetUrl() {
 		String targetUrl = " ";
 		assertThatIllegalArgumentException().isThrownBy(() -> new ForwardLogoutSuccessHandler(targetUrl))
-				.withMessage("'" + targetUrl + "' is not a valid target URL");
+			.withMessage("'" + targetUrl + "' is not a valid target URL");
 	}
 
 	@Test

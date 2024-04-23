@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,8 @@ package org.springframework.security.config.web.server;
 
 import java.net.URI;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import reactor.core.publisher.Mono;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +29,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthorizationCodeAuthenticationToken;
@@ -39,6 +39,7 @@ import org.springframework.security.oauth2.client.registration.InMemoryReactiveC
 import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
 import org.springframework.security.oauth2.client.registration.TestClientRegistrations;
 import org.springframework.security.oauth2.client.web.server.ServerAuthorizationRequestRepository;
+import org.springframework.security.oauth2.client.web.server.ServerOAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.server.ServerOAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.TestOAuth2AccessTokens;
@@ -53,7 +54,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.authentication.ServerAuthenticationConverter;
 import org.springframework.security.web.server.savedrequest.ServerRequestCache;
-import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -69,12 +70,11 @@ import static org.mockito.Mockito.verify;
  * @author Parikshit Dutta
  * @since 5.1
  */
-@RunWith(SpringRunner.class)
+@ExtendWith({ SpringExtension.class, SpringTestContextExtension.class })
 @SecurityTestExecutionListeners
 public class OAuth2ClientSpecTests {
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	private WebTestClient client;
 
@@ -94,11 +94,11 @@ public class OAuth2ClientSpecTests {
 	public void registeredOAuth2AuthorizedClientWhenAuthenticatedThenRedirects() {
 		this.spring.register(Config.class, AuthorizedClientController.class).autowire();
 		ReactiveClientRegistrationRepository repository = this.spring.getContext()
-				.getBean(ReactiveClientRegistrationRepository.class);
+			.getBean(ReactiveClientRegistrationRepository.class);
 		ServerOAuth2AuthorizedClientRepository authorizedClientRepository = this.spring.getContext()
-				.getBean(ServerOAuth2AuthorizedClientRepository.class);
+			.getBean(ServerOAuth2AuthorizedClientRepository.class);
 		given(repository.findByRegistrationId(any()))
-				.willReturn(Mono.just(TestClientRegistrations.clientRegistration().build()));
+			.willReturn(Mono.just(TestClientRegistrations.clientRegistration().build()));
 		given(authorizedClientRepository.loadAuthorizedClient(any(), any(), any())).willReturn(Mono.empty());
 		// @formatter:off
 		this.client.get()
@@ -112,11 +112,11 @@ public class OAuth2ClientSpecTests {
 	public void registeredOAuth2AuthorizedClientWhenAnonymousThenRedirects() {
 		this.spring.register(Config.class, AuthorizedClientController.class).autowire();
 		ReactiveClientRegistrationRepository repository = this.spring.getContext()
-				.getBean(ReactiveClientRegistrationRepository.class);
+			.getBean(ReactiveClientRegistrationRepository.class);
 		ServerOAuth2AuthorizedClientRepository authorizedClientRepository = this.spring.getContext()
-				.getBean(ServerOAuth2AuthorizedClientRepository.class);
+			.getBean(ServerOAuth2AuthorizedClientRepository.class);
 		given(repository.findByRegistrationId(any()))
-				.willReturn(Mono.just(TestClientRegistrations.clientRegistration().build()));
+			.willReturn(Mono.just(TestClientRegistrations.clientRegistration().build()));
 		given(authorizedClientRepository.loadAuthorizedClient(any(), any(), any())).willReturn(Mono.empty());
 		// @formatter:off
 		this.client.get()
@@ -128,24 +128,29 @@ public class OAuth2ClientSpecTests {
 
 	@Test
 	public void oauth2ClientWhenCustomObjectsThenUsed() {
-		this.spring.register(ClientRegistrationConfig.class, OAuth2ClientCustomConfig.class,
-				AuthorizedClientController.class).autowire();
+		this.spring
+			.register(ClientRegistrationConfig.class, OAuth2ClientCustomConfig.class, AuthorizedClientController.class)
+			.autowire();
 		OAuth2ClientCustomConfig config = this.spring.getContext().getBean(OAuth2ClientCustomConfig.class);
 		ServerAuthenticationConverter converter = config.authenticationConverter;
 		ReactiveAuthenticationManager manager = config.manager;
 		ServerAuthorizationRequestRepository<OAuth2AuthorizationRequest> authorizationRequestRepository = config.authorizationRequestRepository;
+		ServerOAuth2AuthorizationRequestResolver resolver = config.resolver;
 		ServerRequestCache requestCache = config.requestCache;
 		OAuth2AuthorizationRequest authorizationRequest = TestOAuth2AuthorizationRequests.request()
-				.redirectUri("/authorize/oauth2/code/registration-id").build();
+			.redirectUri("/authorize/oauth2/code/registration-id")
+			.build();
 		OAuth2AuthorizationResponse authorizationResponse = TestOAuth2AuthorizationResponses.success()
-				.redirectUri("/authorize/oauth2/code/registration-id").build();
+			.redirectUri("/authorize/oauth2/code/registration-id")
+			.build();
 		OAuth2AuthorizationExchange authorizationExchange = new OAuth2AuthorizationExchange(authorizationRequest,
 				authorizationResponse);
 		OAuth2AccessToken accessToken = TestOAuth2AccessTokens.noScopes();
 		OAuth2AuthorizationCodeAuthenticationToken result = new OAuth2AuthorizationCodeAuthenticationToken(
 				this.registration, authorizationExchange, accessToken);
 		given(authorizationRequestRepository.loadAuthorizationRequest(any()))
-				.willReturn(Mono.just(authorizationRequest));
+			.willReturn(Mono.just(authorizationRequest));
+		given(resolver.resolve(any())).willReturn(Mono.empty());
 		given(converter.convert(any())).willReturn(Mono.just(new TestingAuthenticationToken("a", "b", "c")));
 		given(manager.authenticate(any())).willReturn(Mono.just(result));
 		given(requestCache.getRedirectUri(any())).willReturn(Mono.just(URI.create("/saved-request")));
@@ -163,29 +168,34 @@ public class OAuth2ClientSpecTests {
 		verify(converter).convert(any());
 		verify(manager).authenticate(any());
 		verify(requestCache).getRedirectUri(any());
+		verify(resolver).resolve(any());
 	}
 
 	@Test
 	public void oauth2ClientWhenCustomObjectsInLambdaThenUsed() {
-		this.spring.register(ClientRegistrationConfig.class, OAuth2ClientInLambdaCustomConfig.class,
-				AuthorizedClientController.class).autowire();
+		this.spring
+			.register(ClientRegistrationConfig.class, OAuth2ClientInLambdaCustomConfig.class,
+					AuthorizedClientController.class)
+			.autowire();
 		OAuth2ClientInLambdaCustomConfig config = this.spring.getContext()
-				.getBean(OAuth2ClientInLambdaCustomConfig.class);
+			.getBean(OAuth2ClientInLambdaCustomConfig.class);
 		ServerAuthenticationConverter converter = config.authenticationConverter;
 		ReactiveAuthenticationManager manager = config.manager;
 		ServerAuthorizationRequestRepository<OAuth2AuthorizationRequest> authorizationRequestRepository = config.authorizationRequestRepository;
 		ServerRequestCache requestCache = config.requestCache;
 		OAuth2AuthorizationRequest authorizationRequest = TestOAuth2AuthorizationRequests.request()
-				.redirectUri("/authorize/oauth2/code/registration-id").build();
+			.redirectUri("/authorize/oauth2/code/registration-id")
+			.build();
 		OAuth2AuthorizationResponse authorizationResponse = TestOAuth2AuthorizationResponses.success()
-				.redirectUri("/authorize/oauth2/code/registration-id").build();
+			.redirectUri("/authorize/oauth2/code/registration-id")
+			.build();
 		OAuth2AuthorizationExchange authorizationExchange = new OAuth2AuthorizationExchange(authorizationRequest,
 				authorizationResponse);
 		OAuth2AccessToken accessToken = TestOAuth2AccessTokens.noScopes();
 		OAuth2AuthorizationCodeAuthenticationToken result = new OAuth2AuthorizationCodeAuthenticationToken(
 				this.registration, authorizationExchange, accessToken);
 		given(authorizationRequestRepository.loadAuthorizationRequest(any()))
-				.willReturn(Mono.just(authorizationRequest));
+			.willReturn(Mono.just(authorizationRequest));
 		given(converter.convert(any())).willReturn(Mono.just(new TestingAuthenticationToken("a", "b", "c")));
 		given(manager.authenticate(any())).willReturn(Mono.just(result));
 		given(requestCache.getRedirectUri(any())).willReturn(Mono.just(URI.create("/saved-request")));
@@ -205,6 +215,7 @@ public class OAuth2ClientSpecTests {
 		verify(requestCache).getRedirectUri(any());
 	}
 
+	@Configuration
 	@EnableWebFlux
 	@EnableWebFluxSecurity
 	static class Config {
@@ -240,6 +251,7 @@ public class OAuth2ClientSpecTests {
 
 	}
 
+	@Configuration
 	@EnableWebFlux
 	@EnableWebFluxSecurity
 	static class ClientRegistrationConfig {
@@ -263,6 +275,8 @@ public class OAuth2ClientSpecTests {
 		ServerAuthorizationRequestRepository<OAuth2AuthorizationRequest> authorizationRequestRepository = mock(
 				ServerAuthorizationRequestRepository.class);
 
+		ServerOAuth2AuthorizationRequestResolver resolver = mock(ServerOAuth2AuthorizationRequestResolver.class);
+
 		ServerRequestCache requestCache = mock(ServerRequestCache.class);
 
 		@Bean
@@ -273,6 +287,7 @@ public class OAuth2ClientSpecTests {
 					.authenticationConverter(this.authenticationConverter)
 					.authenticationManager(this.manager)
 					.authorizationRequestRepository(this.authorizationRequestRepository)
+					.authorizationRequestResolver(this.resolver)
 					.and()
 				.requestCache((c) -> c.requestCache(this.requestCache));
 			// @formatter:on

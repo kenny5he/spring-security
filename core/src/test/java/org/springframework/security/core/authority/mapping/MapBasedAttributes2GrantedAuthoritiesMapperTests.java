@@ -22,7 +22,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -46,7 +46,7 @@ public class MapBasedAttributes2GrantedAuthoritiesMapperTests {
 	public void testAfterPropertiesSetEmptyMap() throws Exception {
 		MapBasedAttributes2GrantedAuthoritiesMapper mapper = new MapBasedAttributes2GrantedAuthoritiesMapper();
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> mapper.setAttributes2grantedAuthoritiesMap(new HashMap()));
+			.isThrownBy(() -> mapper.setAttributes2grantedAuthoritiesMap(new HashMap()));
 	}
 
 	@Test
@@ -206,8 +206,8 @@ public class MapBasedAttributes2GrantedAuthoritiesMapperTests {
 		}
 		Collection expectedColl = Arrays.asList(expectedGas);
 		assertThat(resultColl.containsAll(expectedColl))
-				.withFailMessage("Role collections should match; result: " + resultColl + ", expected: " + expectedColl)
-				.isTrue();
+			.withFailMessage("Role collections should match; result: " + resultColl + ", expected: " + expectedColl)
+			.isTrue();
 	}
 
 }

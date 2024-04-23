@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,11 +42,10 @@ public interface ClaimAccessor {
 	/**
 	 * Returns the claim value as a {@code T} type. The claim value is expected to be of
 	 * type {@code T}.
-	 *
-	 * @since 5.2
 	 * @param claim the name of the claim
 	 * @param <T> the type of the claim value
 	 * @return the claim value
+	 * @since 5.2
 	 */
 	@SuppressWarnings("unchecked")
 	default <T> T getClaim(String claim) {
@@ -66,19 +65,6 @@ public interface ClaimAccessor {
 	}
 
 	/**
-	 * Returns {@code true} if the claim exists in {@link #getClaims()}, otherwise
-	 * {@code false}.
-	 * @param claim the name of the claim
-	 * @return {@code true} if the claim exists, otherwise {@code false}
-	 * @deprecated Use
-	 * {@link org.springframework.security.oauth2.core.ClaimAccessor#hasClaim} instead.
-	 */
-	@Deprecated
-	default Boolean containsClaim(String claim) {
-		return hasClaim(claim);
-	}
-
-	/**
 	 * Returns the claim value as a {@code String} or {@code null} if it does not exist or
 	 * is equal to {@code null}.
 	 * @param claim the name of the claim
@@ -91,13 +77,23 @@ public interface ClaimAccessor {
 	}
 
 	/**
-	 * Returns the claim value as a {@code Boolean} or {@code null} if it does not exist.
+	 * Returns the claim value as a {@code Boolean} or {@code null} if the claim does not
+	 * exist.
 	 * @param claim the name of the claim
-	 * @return the claim value or {@code null} if it does not exist
+	 * @return the claim value or {@code null} if the claim does not exist
+	 * @throws IllegalArgumentException if the claim value cannot be converted to a
+	 * {@code Boolean}
+	 * @throws NullPointerException if the claim value is {@code null}
 	 */
 	default Boolean getClaimAsBoolean(String claim) {
-		return !hasClaim(claim) ? null
-				: ClaimConversionService.getSharedInstance().convert(getClaims().get(claim), Boolean.class);
+		if (!hasClaim(claim)) {
+			return null;
+		}
+		Object claimValue = getClaims().get(claim);
+		Boolean convertedValue = ClaimConversionService.getSharedInstance().convert(claimValue, Boolean.class);
+		Assert.notNull(convertedValue,
+				() -> "Unable to convert claim '" + claim + "' of type '" + claimValue.getClass() + "' to Boolean.");
+		return convertedValue;
 	}
 
 	/**
@@ -111,7 +107,7 @@ public interface ClaimAccessor {
 		}
 		Object claimValue = getClaims().get(claim);
 		Instant convertedValue = ClaimConversionService.getSharedInstance().convert(claimValue, Instant.class);
-		Assert.isTrue(convertedValue != null,
+		Assert.notNull(convertedValue,
 				() -> "Unable to convert claim '" + claim + "' of type '" + claimValue.getClass() + "' to Instant.");
 		return convertedValue;
 	}
@@ -127,17 +123,19 @@ public interface ClaimAccessor {
 		}
 		Object claimValue = getClaims().get(claim);
 		URL convertedValue = ClaimConversionService.getSharedInstance().convert(claimValue, URL.class);
-		Assert.isTrue(convertedValue != null,
+		Assert.notNull(convertedValue,
 				() -> "Unable to convert claim '" + claim + "' of type '" + claimValue.getClass() + "' to URL.");
 		return convertedValue;
 	}
 
 	/**
-	 * Returns the claim value as a {@code Map<String, Object>} or {@code null} if it does
-	 * not exist or cannot be assigned to a {@code Map}.
+	 * Returns the claim value as a {@code Map<String, Object>} or {@code null} if the
+	 * claim does not exist.
 	 * @param claim the name of the claim
-	 * @return the claim value or {@code null} if it does not exist or cannot be assigned
-	 * to a {@code Map}
+	 * @return the claim value or {@code null} if the claim does not exist
+	 * @throws IllegalArgumentException if the claim value cannot be converted to a
+	 * {@code Map}
+	 * @throws NullPointerException if the claim value is {@code null}
 	 */
 	@SuppressWarnings("unchecked")
 	default Map<String, Object> getClaimAsMap(String claim) {
@@ -149,18 +147,20 @@ public interface ClaimAccessor {
 				TypeDescriptor.valueOf(Object.class));
 		Object claimValue = getClaims().get(claim);
 		Map<String, Object> convertedValue = (Map<String, Object>) ClaimConversionService.getSharedInstance()
-				.convert(claimValue, sourceDescriptor, targetDescriptor);
-		Assert.isTrue(convertedValue != null,
+			.convert(claimValue, sourceDescriptor, targetDescriptor);
+		Assert.notNull(convertedValue,
 				() -> "Unable to convert claim '" + claim + "' of type '" + claimValue.getClass() + "' to Map.");
 		return convertedValue;
 	}
 
 	/**
-	 * Returns the claim value as a {@code List<String>} or {@code null} if it does not
-	 * exist or cannot be assigned to a {@code List}.
+	 * Returns the claim value as a {@code List<String>} or {@code null} if the claim does
+	 * not exist.
 	 * @param claim the name of the claim
-	 * @return the claim value or {@code null} if it does not exist or cannot be assigned
-	 * to a {@code List}
+	 * @return the claim value or {@code null} if the claim does not exist
+	 * @throws IllegalArgumentException if the claim value cannot be converted to a
+	 * {@code List}
+	 * @throws NullPointerException if the claim value is {@code null}
 	 */
 	@SuppressWarnings("unchecked")
 	default List<String> getClaimAsStringList(String claim) {
@@ -171,9 +171,9 @@ public interface ClaimAccessor {
 		final TypeDescriptor targetDescriptor = TypeDescriptor.collection(List.class,
 				TypeDescriptor.valueOf(String.class));
 		Object claimValue = getClaims().get(claim);
-		List<String> convertedValue = (List<String>) ClaimConversionService.getSharedInstance().convert(claimValue,
-				sourceDescriptor, targetDescriptor);
-		Assert.isTrue(convertedValue != null,
+		List<String> convertedValue = (List<String>) ClaimConversionService.getSharedInstance()
+			.convert(claimValue, sourceDescriptor, targetDescriptor);
+		Assert.notNull(convertedValue,
 				() -> "Unable to convert claim '" + claim + "' of type '" + claimValue.getClass() + "' to List.");
 		return convertedValue;
 	}

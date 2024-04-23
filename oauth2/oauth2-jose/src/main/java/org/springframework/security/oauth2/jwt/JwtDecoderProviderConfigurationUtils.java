@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,14 +31,19 @@ import com.nimbusds.jose.jwk.JWKSelector;
 import com.nimbusds.jose.jwk.KeyType;
 import com.nimbusds.jose.jwk.KeyUse;
 import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.proc.JWSKeySelector;
+import com.nimbusds.jose.proc.JWSVerificationKeySelector;
 import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
 
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.util.Assert;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -61,6 +66,15 @@ final class JwtDecoderProviderConfigurationUtils {
 
 	private static final RestTemplate rest = new RestTemplate();
 
+	static {
+		int connectTimeout = Integer.parseInt(System.getProperty("sun.net.client.defaultConnectTimeout", "30000"));
+		int readTimeout = Integer.parseInt(System.getProperty("sun.net.client.defaultReadTimeout", "30000"));
+		SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+		requestFactory.setConnectTimeout(connectTimeout);
+		requestFactory.setReadTimeout(readTimeout);
+		rest.setRequestFactory(requestFactory);
+	}
+
 	private static final ParameterizedTypeReference<Map<String, Object>> STRING_OBJECT_MAP = new ParameterizedTypeReference<Map<String, Object>>() {
 	};
 
@@ -68,12 +82,16 @@ final class JwtDecoderProviderConfigurationUtils {
 	}
 
 	static Map<String, Object> getConfigurationForOidcIssuerLocation(String oidcIssuerLocation) {
-		return getConfiguration(oidcIssuerLocation, oidc(URI.create(oidcIssuerLocation)));
+		return getConfiguration(oidcIssuerLocation, rest, oidc(URI.create(oidcIssuerLocation)));
+	}
+
+	static Map<String, Object> getConfigurationForIssuerLocation(String issuer, RestOperations rest) {
+		URI uri = URI.create(issuer);
+		return getConfiguration(issuer, rest, oidc(uri), oidcRfc8414(uri), oauth(uri));
 	}
 
 	static Map<String, Object> getConfigurationForIssuerLocation(String issuer) {
-		URI uri = URI.create(issuer);
-		return getConfiguration(issuer, oidc(uri), oidcRfc8414(uri), oauth(uri));
+		return getConfigurationForIssuerLocation(issuer, rest);
 	}
 
 	static void validateIssuer(Map<String, Object> configuration, String issuer) {
@@ -82,15 +100,28 @@ final class JwtDecoderProviderConfigurationUtils {
 				+ "\" provided in the configuration did not " + "match the requested issuer \"" + issuer + "\"");
 	}
 
-	static Set<SignatureAlgorithm> getSignatureAlgorithms(JWKSource<SecurityContext> jwkSource) {
-		JWKMatcher jwkMatcher = new JWKMatcher.Builder().publicOnly(true).keyUses(KeyUse.SIGNATURE, null)
-				.keyTypes(KeyType.RSA, KeyType.EC).build();
+	static <C extends SecurityContext> void addJWSAlgorithms(ConfigurableJWTProcessor<C> jwtProcessor) {
+		JWSKeySelector<C> selector = jwtProcessor.getJWSKeySelector();
+		if (selector instanceof JWSVerificationKeySelector) {
+			JWKSource<C> jwkSource = ((JWSVerificationKeySelector<C>) selector).getJWKSource();
+			Set<JWSAlgorithm> algorithms = getJWSAlgorithms(jwkSource);
+			selector = new JWSVerificationKeySelector<>(algorithms, jwkSource);
+			jwtProcessor.setJWSKeySelector(selector);
+		}
+	}
+
+	static <C extends SecurityContext> Set<JWSAlgorithm> getJWSAlgorithms(JWKSource<C> jwkSource) {
+		JWKMatcher jwkMatcher = new JWKMatcher.Builder().publicOnly(true)
+			.keyUses(KeyUse.SIGNATURE, null)
+			.keyTypes(KeyType.RSA, KeyType.EC)
+			.build();
 		Set<JWSAlgorithm> jwsAlgorithms = new HashSet<>();
 		try {
 			List<? extends JWK> jwks = jwkSource.get(new JWKSelector(jwkMatcher), null);
 			for (JWK jwk : jwks) {
 				if (jwk.getAlgorithm() != null) {
-					jwsAlgorithms.add((JWSAlgorithm) jwk.getAlgorithm());
+					JWSAlgorithm jwsAlgorithm = JWSAlgorithm.parse(jwk.getAlgorithm().getName());
+					jwsAlgorithms.add(jwsAlgorithm);
 				}
 				else {
 					if (jwk.getKeyType() == KeyType.RSA) {
@@ -105,6 +136,12 @@ final class JwtDecoderProviderConfigurationUtils {
 		catch (KeySourceException ex) {
 			throw new IllegalStateException(ex);
 		}
+		Assert.notEmpty(jwsAlgorithms, "Failed to find any algorithms from the JWK set");
+		return jwsAlgorithms;
+	}
+
+	static Set<SignatureAlgorithm> getSignatureAlgorithms(JWKSource<SecurityContext> jwkSource) {
+		Set<JWSAlgorithm> jwsAlgorithms = getJWSAlgorithms(jwkSource);
 		Set<SignatureAlgorithm> signatureAlgorithms = new HashSet<>();
 		for (JWSAlgorithm jwsAlgorithm : jwsAlgorithms) {
 			SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.from(jwsAlgorithm.getName());
@@ -112,7 +149,6 @@ final class JwtDecoderProviderConfigurationUtils {
 				signatureAlgorithms.add(signatureAlgorithm);
 			}
 		}
-		Assert.notEmpty(signatureAlgorithms, "Failed to find any algorithms from the JWK set");
 		return signatureAlgorithms;
 	}
 
@@ -123,7 +159,7 @@ final class JwtDecoderProviderConfigurationUtils {
 		return "(unavailable)";
 	}
 
-	private static Map<String, Object> getConfiguration(String issuer, URI... uris) {
+	private static Map<String, Object> getConfiguration(String issuer, RestOperations rest, URI... uris) {
 		String errorMessage = "Unable to resolve the Configuration with the provided Issuer of " + "\"" + issuer + "\"";
 		for (URI uri : uris) {
 			try {

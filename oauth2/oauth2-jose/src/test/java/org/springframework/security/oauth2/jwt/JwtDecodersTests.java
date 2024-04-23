@@ -30,9 +30,9 @@ import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -92,14 +92,14 @@ public class JwtDecodersTests {
 
 	private String issuer;
 
-	@Before
+	@BeforeEach
 	public void setup() throws Exception {
 		this.server = new MockWebServer();
 		this.server.start();
 		this.issuer = createIssuerFromServer() + "path";
 	}
 
-	@After
+	@AfterEach
 	public void cleanup() throws Exception {
 		this.server.shutdown();
 	}
@@ -168,7 +168,7 @@ public class JwtDecodersTests {
 	public void issuerWhenResponseIsNonCompliantThenThrowsRuntimeException() {
 		prepareConfigurationResponse("{ \"missing_required_keys\" : \"and_values\" }");
 		assertThatExceptionOfType(RuntimeException.class)
-				.isThrownBy(() -> JwtDecoders.fromOidcIssuerLocation(this.issuer));
+			.isThrownBy(() -> JwtDecoders.fromOidcIssuerLocation(this.issuer));
 	}
 
 	@Test
@@ -307,7 +307,6 @@ public class JwtDecodersTests {
 
 	private void prepareConfigurationResponse(String body) {
 		this.server.enqueue(response(body));
-		this.server.enqueue(response(JWK_SET));
 		this.server.enqueue(response(JWK_SET));
 	}
 

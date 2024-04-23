@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ package org.springframework.security.config;
  * Contains all the element names used by Spring Security 3 namespace support.
  *
  * @author Ben Alex
+ * @author Evgeniy Cheban
  */
 public abstract class Elements {
 
@@ -71,12 +72,6 @@ public abstract class Elements {
 
 	public static final String FORM_LOGIN = "form-login";
 
-	public static final String OPENID_LOGIN = "openid-login";
-
-	public static final String OPENID_ATTRIBUTE_EXCHANGE = "attribute-exchange";
-
-	public static final String OPENID_ATTRIBUTE = "openid-attribute";
-
 	public static final String BASIC_AUTH = "http-basic";
 
 	public static final String REMEMBER_ME = "remember-me";
@@ -86,6 +81,8 @@ public abstract class Elements {
 	public static final String FILTER_CHAIN = "filter-chain";
 
 	public static final String GLOBAL_METHOD_SECURITY = "global-method-security";
+
+	public static final String METHOD_SECURITY = "method-security";
 
 	public static final String PASSWORD_ENCODER = "password-encoder";
 
@@ -132,5 +129,13 @@ public abstract class Elements {
 	public static final String OAUTH2_CLIENT = "oauth2-client";
 
 	public static final String CLIENT_REGISTRATIONS = "client-registrations";
+
+	public static final String PASSWORD_MANAGEMENT = "password-management";
+
+	public static final String RELYING_PARTY_REGISTRATIONS = "relying-party-registrations";
+
+	public static final String SAML2_LOGIN = "saml2-login";
+
+	public static final String SAML2_LOGOUT = "saml2-logout";
 
 }

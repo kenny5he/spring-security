@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,11 +66,6 @@ public class WebClientReactiveAuthorizationCodeTokenResponseClient
 	}
 
 	@Override
-	Set<String> defaultScopes(OAuth2AuthorizationCodeGrantRequest grantRequest) {
-		return grantRequest.getAuthorizationExchange().getAuthorizationRequest().getScopes();
-	}
-
-	@Override
 	BodyInserters.FormInserter<String> populateTokenRequestBody(OAuth2AuthorizationCodeGrantRequest grantRequest,
 			BodyInserters.FormInserter<String> body) {
 		super.populateTokenRequestBody(grantRequest, body);
@@ -82,7 +77,7 @@ public class WebClientReactiveAuthorizationCodeTokenResponseClient
 			body.with(OAuth2ParameterNames.REDIRECT_URI, redirectUri);
 		}
 		String codeVerifier = authorizationExchange.getAuthorizationRequest()
-				.getAttribute(PkceParameterNames.CODE_VERIFIER);
+			.getAttribute(PkceParameterNames.CODE_VERIFIER);
 		if (codeVerifier != null) {
 			body.with(PkceParameterNames.CODE_VERIFIER, codeVerifier);
 		}

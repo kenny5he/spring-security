@@ -16,9 +16,9 @@
 
 package org.springframework.security.ldap.authentication;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.ldap.core.DirContextOperations;
@@ -30,7 +30,7 @@ import org.springframework.security.ldap.ApacheDsContainerConfig;
 import org.springframework.security.ldap.DefaultSpringSecurityContextSource;
 import org.springframework.security.ldap.search.FilterBasedLdapUserSearch;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -41,7 +41,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
  * @author Luke Taylor
  * @author Eddú Meléndez
  */
-@RunWith(SpringRunner.class)
+@ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = ApacheDsContainerConfig.class)
 public class BindAuthenticatorTests {
 
@@ -52,18 +52,18 @@ public class BindAuthenticatorTests {
 
 	private Authentication bob;
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		this.authenticator = new BindAuthenticator(this.contextSource);
 		this.authenticator.setMessageSource(new SpringSecurityMessageSource());
-		this.bob = new UsernamePasswordAuthenticationToken("bob", "bobspassword");
+		this.bob = UsernamePasswordAuthenticationToken.unauthenticated("bob", "bobspassword");
 
 	}
 
 	@Test
 	public void emptyPasswordIsRejected() {
-		assertThatExceptionOfType(BadCredentialsException.class)
-				.isThrownBy(() -> this.authenticator.authenticate(new UsernamePasswordAuthenticationToken("jen", "")));
+		assertThatExceptionOfType(BadCredentialsException.class).isThrownBy(
+				() -> this.authenticator.authenticate(UsernamePasswordAuthenticationToken.unauthenticated("jen", "")));
 	}
 
 	@Test
@@ -72,14 +72,15 @@ public class BindAuthenticatorTests {
 
 		DirContextOperations user = this.authenticator.authenticate(this.bob);
 		assertThat(user.getStringAttribute("uid")).isEqualTo("bob");
-		this.authenticator.authenticate(new UsernamePasswordAuthenticationToken("mouse, jerry", "jerryspassword"));
+		this.authenticator
+			.authenticate(UsernamePasswordAuthenticationToken.unauthenticated("mouse, jerry", "jerryspassword"));
 	}
 
 	@Test
 	public void testAuthenticationWithInvalidUserNameFails() {
 		this.authenticator.setUserDnPatterns(new String[] { "uid={0},ou=people" });
 		assertThatExceptionOfType(BadCredentialsException.class).isThrownBy(() -> this.authenticator
-				.authenticate(new UsernamePasswordAuthenticationToken("nonexistentsuser", "password")));
+			.authenticate(UsernamePasswordAuthenticationToken.unauthenticated("nonexistentsuser", "password")));
 	}
 
 	@Test
@@ -93,14 +94,18 @@ public class BindAuthenticatorTests {
 		assertThat(result.getStringAttribute("cn")).isEqualTo("Bob Hamilton");
 		// SEC-1444
 		this.authenticator.setUserSearch(new FilterBasedLdapUserSearch("ou=people", "(cn={0})", this.contextSource));
-		this.authenticator.authenticate(new UsernamePasswordAuthenticationToken("mouse, jerry", "jerryspassword"));
-		this.authenticator.authenticate(new UsernamePasswordAuthenticationToken("slash/guy", "slashguyspassword"));
+		this.authenticator
+			.authenticate(UsernamePasswordAuthenticationToken.unauthenticated("mouse, jerry", "jerryspassword"));
+		this.authenticator
+			.authenticate(UsernamePasswordAuthenticationToken.unauthenticated("slash/guy", "slashguyspassword"));
 		// SEC-1661
-		this.authenticator.setUserSearch(
-				new FilterBasedLdapUserSearch("ou=\\\"quoted people\\\"", "(cn={0})", this.contextSource));
-		this.authenticator.authenticate(new UsernamePasswordAuthenticationToken("quote\"guy", "quoteguyspassword"));
+		this.authenticator
+			.setUserSearch(new FilterBasedLdapUserSearch("ou=\\\"quoted people\\\"", "(cn={0})", this.contextSource));
+		this.authenticator
+			.authenticate(UsernamePasswordAuthenticationToken.unauthenticated("quote\"guy", "quoteguyspassword"));
 		this.authenticator.setUserSearch(new FilterBasedLdapUserSearch("", "(cn={0})", this.contextSource));
-		this.authenticator.authenticate(new UsernamePasswordAuthenticationToken("quote\"guy", "quoteguyspassword"));
+		this.authenticator
+			.authenticate(UsernamePasswordAuthenticationToken.unauthenticated("quote\"guy", "quoteguyspassword"));
 	}
 
 	/*
@@ -127,8 +132,8 @@ public class BindAuthenticatorTests {
 	@Test
 	public void testAuthenticationWithWrongPasswordFails() {
 		this.authenticator.setUserDnPatterns(new String[] { "uid={0},ou=people" });
-		assertThatExceptionOfType(BadCredentialsException.class).isThrownBy(
-				() -> this.authenticator.authenticate(new UsernamePasswordAuthenticationToken("bob", "wrongpassword")));
+		assertThatExceptionOfType(BadCredentialsException.class).isThrownBy(() -> this.authenticator
+			.authenticate(UsernamePasswordAuthenticationToken.unauthenticated("bob", "wrongpassword")));
 	}
 
 	@Test

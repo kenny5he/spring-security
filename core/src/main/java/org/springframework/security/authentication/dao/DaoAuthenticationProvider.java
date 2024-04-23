@@ -20,6 +20,8 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authentication.password.CompromisedPasswordChecker;
+import org.springframework.security.authentication.password.CompromisedPasswordException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -40,8 +42,9 @@ import org.springframework.util.Assert;
 public class DaoAuthenticationProvider extends AbstractUserDetailsAuthenticationProvider {
 
 	/**
-	 * The plaintext password used to perform PasswordEncoder#matches(CharSequence,
-	 * String)} on when the user is not found to avoid SEC-2056.
+	 * The plaintext password used to perform
+	 * {@link PasswordEncoder#matches(CharSequence, String)} on when the user is not found
+	 * to avoid SEC-2056.
 	 */
 	private static final String USER_NOT_FOUND_PASSWORD = "userNotFoundPassword";
 
@@ -59,8 +62,19 @@ public class DaoAuthenticationProvider extends AbstractUserDetailsAuthentication
 
 	private UserDetailsPasswordService userDetailsPasswordService;
 
+	private CompromisedPasswordChecker compromisedPasswordChecker;
+
 	public DaoAuthenticationProvider() {
-		setPasswordEncoder(PasswordEncoderFactories.createDelegatingPasswordEncoder());
+		this(PasswordEncoderFactories.createDelegatingPasswordEncoder());
+	}
+
+	/**
+	 * Creates a new instance using the provided {@link PasswordEncoder}
+	 * @param passwordEncoder the {@link PasswordEncoder} to use. Cannot be null.
+	 * @since 6.0.3
+	 */
+	public DaoAuthenticationProvider(PasswordEncoder passwordEncoder) {
+		setPasswordEncoder(passwordEncoder);
 	}
 
 	@Override
@@ -70,13 +84,13 @@ public class DaoAuthenticationProvider extends AbstractUserDetailsAuthentication
 		if (authentication.getCredentials() == null) {
 			this.logger.debug("Failed to authenticate since no credentials provided");
 			throw new BadCredentialsException(this.messages
-					.getMessage("AbstractUserDetailsAuthenticationProvider.badCredentials", "Bad credentials"));
+				.getMessage("AbstractUserDetailsAuthenticationProvider.badCredentials", "Bad credentials"));
 		}
 		String presentedPassword = authentication.getCredentials().toString();
 		if (!this.passwordEncoder.matches(presentedPassword, userDetails.getPassword())) {
 			this.logger.debug("Failed to authenticate since password does not match stored value");
 			throw new BadCredentialsException(this.messages
-					.getMessage("AbstractUserDetailsAuthenticationProvider.badCredentials", "Bad credentials"));
+				.getMessage("AbstractUserDetailsAuthenticationProvider.badCredentials", "Bad credentials"));
 		}
 	}
 
@@ -112,10 +126,15 @@ public class DaoAuthenticationProvider extends AbstractUserDetailsAuthentication
 	@Override
 	protected Authentication createSuccessAuthentication(Object principal, Authentication authentication,
 			UserDetails user) {
+		String presentedPassword = authentication.getCredentials().toString();
+		boolean isPasswordCompromised = this.compromisedPasswordChecker != null
+				&& this.compromisedPasswordChecker.check(presentedPassword).isCompromised();
+		if (isPasswordCompromised) {
+			throw new CompromisedPasswordException("The provided password is compromised, please change your password");
+		}
 		boolean upgradeEncoding = this.userDetailsPasswordService != null
 				&& this.passwordEncoder.upgradeEncoding(user.getPassword());
 		if (upgradeEncoding) {
-			String presentedPassword = authentication.getCredentials().toString();
 			String newPassword = this.passwordEncoder.encode(presentedPassword);
 			user = this.userDetailsPasswordService.updatePassword(user, newPassword);
 		}
@@ -162,6 +181,16 @@ public class DaoAuthenticationProvider extends AbstractUserDetailsAuthentication
 
 	public void setUserDetailsPasswordService(UserDetailsPasswordService userDetailsPasswordService) {
 		this.userDetailsPasswordService = userDetailsPasswordService;
+	}
+
+	/**
+	 * Sets the {@link CompromisedPasswordChecker} to be used before creating a successful
+	 * authentication. Defaults to {@code null}.
+	 * @param compromisedPasswordChecker the {@link CompromisedPasswordChecker} to use
+	 * @since 6.3
+	 */
+	public void setCompromisedPasswordChecker(CompromisedPasswordChecker compromisedPasswordChecker) {
+		this.compromisedPasswordChecker = compromisedPasswordChecker;
 	}
 
 }

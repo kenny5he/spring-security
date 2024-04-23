@@ -19,13 +19,12 @@ package org.springframework.security.web.authentication.session;
 import java.util.Arrays;
 import java.util.Collections;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.security.core.Authentication;
 
@@ -39,7 +38,7 @@ import static org.mockito.Mockito.verify;
  * @author Rob Winch
  *
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class CompositeSessionAuthenticationStrategyTests {
 
 	@Mock
@@ -86,11 +85,11 @@ public class CompositeSessionAuthenticationStrategyTests {
 	@Test
 	public void delegateShortCircuits() {
 		willThrow(new SessionAuthenticationException("oops")).given(this.strategy1)
-				.onAuthentication(this.authentication, this.request, this.response);
+			.onAuthentication(this.authentication, this.request, this.response);
 		CompositeSessionAuthenticationStrategy strategy = new CompositeSessionAuthenticationStrategy(
 				Arrays.asList(this.strategy1, this.strategy2));
 		assertThatExceptionOfType(SessionAuthenticationException.class)
-				.isThrownBy(() -> strategy.onAuthentication(this.authentication, this.request, this.response));
+			.isThrownBy(() -> strategy.onAuthentication(this.authentication, this.request, this.response));
 		verify(this.strategy1).onAuthentication(this.authentication, this.request, this.response);
 		verify(this.strategy2, times(0)).onAuthentication(this.authentication, this.request, this.response);
 	}

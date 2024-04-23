@@ -67,7 +67,7 @@ import org.springframework.util.Assert;
  * </pre>
  *
  * <p>
- * The loginContextName should coincide with a given index in the loginConfig specifed.
+ * The loginContextName should coincide with a given index in the loginConfig specified.
  * The loginConfig file used in the JUnit tests appears as the following...
  *
  * <pre>
@@ -224,7 +224,7 @@ public class JaasAuthenticationProvider extends AbstractJaasAuthenticationProvid
 	 * Publishes the {@link JaasAuthenticationFailedEvent}. Can be overridden by
 	 * subclasses for different functionality
 	 * @param token The authentication token being processed
-	 * @param ase The excetion that caused the authentication failure
+	 * @param ase The exception that caused the authentication failure
 	 */
 	@Override
 	protected void publishFailureEvent(UsernamePasswordAuthenticationToken token, AuthenticationException ase) {

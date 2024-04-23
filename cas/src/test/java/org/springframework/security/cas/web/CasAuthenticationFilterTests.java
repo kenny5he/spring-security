@@ -1,5 +1,5 @@
 /*
- * Copyright 2004, 2005, 2006 Acegi Technology Pty Limited
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,16 @@
 
 package org.springframework.security.cas.web;
 
-import javax.servlet.FilterChain;
+import java.io.IOException;
 
-import org.jasig.cas.client.proxy.ProxyGrantingTicketStorage;
-import org.junit.After;
-import org.junit.Test;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpSession;
+import org.apereo.cas.client.proxy.ProxyGrantingTicketStorage;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
+import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -32,17 +36,24 @@ import org.springframework.security.cas.ServiceProperties;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
+import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.verifyZeroInteractions;
 
 /**
  * Tests {@link CasAuthenticationFilter}.
@@ -52,7 +63,7 @@ import static org.mockito.Mockito.verifyZeroInteractions;
  */
 public class CasAuthenticationFilterTests {
 
-	@After
+	@AfterEach
 	public void tearDown() {
 		SecurityContextHolder.clearContext();
 	}
@@ -129,13 +140,14 @@ public class CasAuthenticationFilterTests {
 		assertThat(filter.requiresAuthentication(request, response)).isFalse();
 		request.setParameter(properties.getArtifactParameter(), "value");
 		assertThat(filter.requiresAuthentication(request, response)).isTrue();
-		SecurityContextHolder.getContext().setAuthentication(new AnonymousAuthenticationToken("key", "principal",
-				AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS")));
+		SecurityContextHolder.getContext()
+			.setAuthentication(new AnonymousAuthenticationToken("key", "principal",
+					AuthorityUtils.createAuthorityList("ROLE_ANONYMOUS")));
 		assertThat(filter.requiresAuthentication(request, response)).isTrue();
 		SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("un", "principal"));
 		assertThat(filter.requiresAuthentication(request, response)).isTrue();
 		SecurityContextHolder.getContext()
-				.setAuthentication(new TestingAuthenticationToken("un", "principal", "ROLE_ANONYMOUS"));
+			.setAuthentication(new TestingAuthenticationToken("un", "principal", "ROLE_ANONYMOUS"));
 		assertThat(filter.requiresAuthentication(request, response)).isFalse();
 	}
 
@@ -171,9 +183,9 @@ public class CasAuthenticationFilterTests {
 		filter.afterPropertiesSet();
 		filter.doFilter(request, response, chain);
 		assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull()
-				.withFailMessage("Authentication should not be null");
+			.withFailMessage("Authentication should not be null");
 		verify(chain).doFilter(request, response);
-		verifyZeroInteractions(successHandler);
+		verifyNoInteractions(successHandler);
 		// validate for when the filterProcessUrl matches
 		filter.setFilterProcessesUrl(request.getServletPath());
 		SecurityContextHolder.clearContext();
@@ -193,7 +205,65 @@ public class CasAuthenticationFilterTests {
 		filter.setProxyGrantingTicketStorage(mock(ProxyGrantingTicketStorage.class));
 		filter.setProxyReceptorUrl(request.getServletPath());
 		filter.doFilter(request, response, chain);
-		verifyZeroInteractions(chain);
+		verifyNoInteractions(chain);
+	}
+
+	@Test
+	public void successfulAuthenticationWhenProxyRequestThenSavesSecurityContext() throws Exception {
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		request.setParameter(ServiceProperties.DEFAULT_CAS_ARTIFACT_PARAMETER, "ticket");
+
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		CasAuthenticationFilter filter = new CasAuthenticationFilter();
+		ServiceProperties serviceProperties = new ServiceProperties();
+		serviceProperties.setAuthenticateAllArtifacts(true);
+		filter.setServiceProperties(serviceProperties);
+
+		SecurityContextRepository securityContextRepository = mock(SecurityContextRepository.class);
+		ReflectionTestUtils.setField(filter, "securityContextRepository", securityContextRepository);
+
+		filter.successfulAuthentication(request, response, new MockFilterChain(), mock(Authentication.class));
+		verify(securityContextRepository).saveContext(any(SecurityContext.class), eq(request), eq(response));
+	}
+
+	@Test
+	public void attemptAuthenticationWhenNoServiceTicketAndIsGatewayRequestThenRedirectToSavedRequestAndClearAttribute()
+			throws Exception {
+		CasAuthenticationFilter filter = new CasAuthenticationFilter();
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		HttpSession session = request.getSession(true);
+		session.setAttribute(CasGatewayAuthenticationRedirectFilter.CAS_GATEWAY_AUTHENTICATION_ATTR, true);
+
+		new HttpSessionRequestCache().saveRequest(request, response);
+
+		Authentication authn = filter.attemptAuthentication(request, response);
+		assertThat(authn).isNull();
+		assertThat(response.getStatus()).isEqualTo(302);
+		assertThat(response.getRedirectedUrl()).isEqualTo("http://localhost?continue");
+		assertThat(session.getAttribute(CasGatewayAuthenticationRedirectFilter.CAS_GATEWAY_AUTHENTICATION_ATTR))
+			.isNull();
+	}
+
+	@Test
+	void successfulAuthenticationWhenSecurityContextRepositorySetThenUses() throws ServletException, IOException {
+		SecurityContextRepository securityContextRepository = mock(SecurityContextRepository.class);
+		CasAuthenticationFilter filter = new CasAuthenticationFilter();
+		filter.setSecurityContextRepository(securityContextRepository);
+		filter.successfulAuthentication(new MockHttpServletRequest(), new MockHttpServletResponse(),
+				new MockFilterChain(), mock(Authentication.class));
+		verify(securityContextRepository).saveContext(any(SecurityContext.class), any(), any());
+	}
+
+	@Test
+	void successfulAuthenticationWhenSecurityContextHolderStrategySetThenUses() throws ServletException, IOException {
+		SecurityContextHolderStrategy securityContextRepository = mock(SecurityContextHolderStrategy.class);
+		given(securityContextRepository.createEmptyContext()).willReturn(new SecurityContextImpl());
+		CasAuthenticationFilter filter = new CasAuthenticationFilter();
+		filter.setSecurityContextHolderStrategy(securityContextRepository);
+		filter.successfulAuthentication(new MockHttpServletRequest(), new MockHttpServletResponse(),
+				new MockFilterChain(), mock(Authentication.class));
+		verify(securityContextRepository).setContext(any(SecurityContext.class));
 	}
 
 }

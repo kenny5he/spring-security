@@ -21,13 +21,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -38,7 +37,6 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.verifyZeroInteractions;
 
 /**
  * Tests for the {@code HeadersFilter}
@@ -47,7 +45,7 @@ import static org.mockito.Mockito.verifyZeroInteractions;
  * @author Rob Winch
  * @since 3.2
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class HeaderWriterFilterTests {
 
 	@Mock
@@ -79,7 +77,7 @@ public class HeaderWriterFilterTests {
 		verify(this.writer1).writeHeaders(request, response);
 		verify(this.writer2).writeHeaders(request, response);
 		HeaderWriterFilter.HeaderWriterRequest wrappedRequest = (HeaderWriterFilter.HeaderWriterRequest) filterChain
-				.getRequest();
+			.getRequest();
 		assertThat(wrappedRequest.getRequest()).isEqualTo(request); // verify the
 																	// filterChain
 																	// continued
@@ -92,7 +90,7 @@ public class HeaderWriterFilterTests {
 		MockHttpServletRequest request = new MockHttpServletRequest();
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		filter.doFilter(request, response, (request1, response1) -> {
-			verifyZeroInteractions(HeaderWriterFilterTests.this.writer1);
+			verifyNoMoreInteractions(HeaderWriterFilterTests.this.writer1);
 			response1.flushBuffer();
 			verify(HeaderWriterFilterTests.this.writer1).writeHeaders(any(HttpServletRequest.class),
 					any(HttpServletResponse.class));
@@ -107,7 +105,7 @@ public class HeaderWriterFilterTests {
 		MockHttpServletRequest mockRequest = new MockHttpServletRequest();
 		MockHttpServletResponse mockResponse = new MockHttpServletResponse();
 		filter.doFilter(mockRequest, mockResponse, (request, response) -> {
-			verifyZeroInteractions(HeaderWriterFilterTests.this.writer1);
+			verifyNoMoreInteractions(HeaderWriterFilterTests.this.writer1);
 			request.getRequestDispatcher("/").include(request, response);
 			verify(HeaderWriterFilterTests.this.writer1).writeHeaders(any(HttpServletRequest.class),
 					any(HttpServletResponse.class));
@@ -122,7 +120,7 @@ public class HeaderWriterFilterTests {
 		MockHttpServletRequest request = new MockHttpServletRequest();
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		filter.doFilter(request, response, (request1, response1) -> verify(HeaderWriterFilterTests.this.writer1)
-				.writeHeaders(any(HttpServletRequest.class), any(HttpServletResponse.class)));
+			.writeHeaders(any(HttpServletRequest.class), any(HttpServletResponse.class)));
 		verifyNoMoreInteractions(this.writer1);
 	}
 

@@ -19,7 +19,7 @@ package org.springframework.security.oauth2.server.resource.authentication;
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -54,15 +54,15 @@ public class JwtAuthenticationConverterTests {
 	@Test
 	public void whenSettingNullGrantedAuthoritiesConverter() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> this.jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(null))
-				.withMessage("jwtGrantedAuthoritiesConverter cannot be null");
+			.isThrownBy(() -> this.jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(null))
+			.withMessage("jwtGrantedAuthoritiesConverter cannot be null");
 	}
 
 	@Test
 	public void convertWithOverriddenGrantedAuthoritiesConverter() {
 		Jwt jwt = TestJwts.jwt().claim("scope", "message:read message:write").build();
 		Converter<Jwt, Collection<GrantedAuthority>> grantedAuthoritiesConverter = (token) -> Arrays
-				.asList(new SimpleGrantedAuthority("blah"));
+			.asList(new SimpleGrantedAuthority("blah"));
 		this.jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
 		AbstractAuthenticationToken authentication = this.jwtAuthenticationConverter.convert(jwt);
 		Collection<GrantedAuthority> authorities = authentication.getAuthorities();

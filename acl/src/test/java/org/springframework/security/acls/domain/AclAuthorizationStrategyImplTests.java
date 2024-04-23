@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,45 +18,55 @@ package org.springframework.security.acls.domain;
 
 import java.util.Arrays;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.security.acls.model.Acl;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
+import org.springframework.security.core.context.SecurityContextImpl;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 /**
  * @author Rob Winch
  *
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class AclAuthorizationStrategyImplTests {
+
+	SecurityContext context;
 
 	@Mock
 	Acl acl;
+
+	@Mock
+	SecurityContextHolderStrategy securityContextHolderStrategy;
 
 	GrantedAuthority authority;
 
 	AclAuthorizationStrategyImpl strategy;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.authority = new SimpleGrantedAuthority("ROLE_AUTH");
 		TestingAuthenticationToken authentication = new TestingAuthenticationToken("foo", "bar",
 				Arrays.asList(this.authority));
 		authentication.setAuthenticated(true);
-		SecurityContextHolder.getContext().setAuthentication(authentication);
+		this.context = new SecurityContextImpl(authentication);
+		SecurityContextHolder.setContext(this.context);
 	}
 
-	@After
+	@AfterEach
 	public void cleanup() {
 		SecurityContextHolder.clearContext();
 	}
@@ -74,6 +84,16 @@ public class AclAuthorizationStrategyImplTests {
 		given(this.acl.getOwner()).willReturn(new GrantedAuthoritySid("ROLE_AUTH"));
 		this.strategy = new AclAuthorizationStrategyImpl(new SimpleGrantedAuthority("ROLE_SYSTEM_ADMIN"));
 		this.strategy.securityCheck(this.acl, AclAuthorizationStrategy.CHANGE_GENERAL);
+	}
+
+	@Test
+	public void securityCheckWhenCustomSecurityContextHolderStrategyThenUses() {
+		given(this.securityContextHolderStrategy.getContext()).willReturn(this.context);
+		given(this.acl.getOwner()).willReturn(new GrantedAuthoritySid("ROLE_AUTH"));
+		this.strategy = new AclAuthorizationStrategyImpl(new SimpleGrantedAuthority("ROLE_SYSTEM_ADMIN"));
+		this.strategy.setSecurityContextHolderStrategy(this.securityContextHolderStrategy);
+		this.strategy.securityCheck(this.acl, AclAuthorizationStrategy.CHANGE_GENERAL);
+		verify(this.securityContextHolderStrategy).getContext();
 	}
 
 	@SuppressWarnings("serial")

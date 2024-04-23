@@ -19,8 +19,8 @@ package org.springframework.security.oauth2.client;
 import java.time.Duration;
 import java.time.Instant;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
 import org.springframework.security.authentication.TestingAuthenticationToken;
@@ -55,7 +55,7 @@ public class PasswordReactiveOAuth2AuthorizedClientProviderTests {
 
 	private Authentication principal;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.authorizedClientProvider = new PasswordReactiveOAuth2AuthorizedClientProvider();
 		this.accessTokenResponseClient = mock(ReactiveOAuth2AccessTokenResponseClient.class);
@@ -67,8 +67,8 @@ public class PasswordReactiveOAuth2AuthorizedClientProviderTests {
 	@Test
 	public void setAccessTokenResponseClientWhenClientIsNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> this.authorizedClientProvider.setAccessTokenResponseClient(null))
-				.withMessage("accessTokenResponseClient cannot be null");
+			.isThrownBy(() -> this.authorizedClientProvider.setAccessTokenResponseClient(null))
+			.withMessage("accessTokenResponseClient cannot be null");
 	}
 
 	@Test
@@ -233,7 +233,7 @@ public class PasswordReactiveOAuth2AuthorizedClientProviderTests {
 				.build();
 		// @formatter:on
 		OAuth2AuthorizedClient reauthorizedClient = this.authorizedClientProvider.authorize(authorizationContext)
-				.block();
+			.block();
 		assertThat(reauthorizedClient.getClientRegistration()).isSameAs(this.clientRegistration);
 		assertThat(reauthorizedClient.getPrincipalName()).isEqualTo(this.principal.getName());
 		assertThat(reauthorizedClient.getAccessToken()).isEqualTo(accessTokenResponse.getAccessToken());

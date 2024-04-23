@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,13 +57,15 @@ public class AuthenticationManagerBeanDefinitionParser implements BeanDefinition
 
 	private static final String ATT_ERASE_CREDENTIALS = "erase-credentials";
 
+	private static final String AUTHENTICATION_EVENT_PUBLISHER_BEAN_NAME = "defaultAuthenticationEventPublisher";
+
 	@Override
 	public BeanDefinition parse(Element element, ParserContext pc) {
 		String id = element.getAttribute("id");
 		if (!StringUtils.hasText(id)) {
 			if (pc.getRegistry().containsBeanDefinition(BeanIds.AUTHENTICATION_MANAGER)) {
-				pc.getReaderContext().warning("Overriding globally registered AuthenticationManager",
-						pc.extractSource(element));
+				pc.getReaderContext()
+					.warning("Overriding globally registered AuthenticationManager", pc.extractSource(element));
 			}
 			id = BeanIds.AUTHENTICATION_MANAGER;
 		}
@@ -86,17 +88,23 @@ public class AuthenticationManagerBeanDefinitionParser implements BeanDefinition
 		if ("false".equals(element.getAttribute(ATT_ERASE_CREDENTIALS))) {
 			providerManagerBldr.addPropertyValue("eraseCredentialsAfterAuthentication", false);
 		}
-		// Add the default event publisher
-		BeanDefinition publisher = new RootBeanDefinition(DefaultAuthenticationEventPublisher.class);
-		String pubId = pc.getReaderContext().generateBeanName(publisher);
-		pc.registerBeanComponent(new BeanComponentDefinition(publisher, pubId));
-		providerManagerBldr.addPropertyReference("authenticationEventPublisher", pubId);
+
+		if (!pc.getRegistry().containsBeanDefinition(AUTHENTICATION_EVENT_PUBLISHER_BEAN_NAME)) {
+			// Add the default event publisher to the context
+			BeanDefinition publisher = new RootBeanDefinition(DefaultAuthenticationEventPublisher.class);
+			pc.registerBeanComponent(new BeanComponentDefinition(publisher, AUTHENTICATION_EVENT_PUBLISHER_BEAN_NAME));
+		}
+
+		providerManagerBldr.addPropertyReference("authenticationEventPublisher",
+				AUTHENTICATION_EVENT_PUBLISHER_BEAN_NAME);
 		pc.registerBeanComponent(new BeanComponentDefinition(providerManagerBldr.getBeanDefinition(), id));
 		if (StringUtils.hasText(alias)) {
 			pc.getRegistry().registerAlias(id, alias);
 			pc.getReaderContext().fireAliasRegistered(id, alias, pc.extractSource(element));
 		}
-		if (!BeanIds.AUTHENTICATION_MANAGER.equals(id)) {
+		if (!BeanIds.AUTHENTICATION_MANAGER.equals(id)
+				&& !pc.getRegistry().containsBeanDefinition(BeanIds.AUTHENTICATION_MANAGER)
+				&& !pc.getRegistry().isAlias(BeanIds.AUTHENTICATION_MANAGER)) {
 			pc.getRegistry().registerAlias(id, BeanIds.AUTHENTICATION_MANAGER);
 			pc.getReaderContext().fireAliasRegistered(id, BeanIds.AUTHENTICATION_MANAGER, pc.extractSource(element));
 		}
@@ -116,14 +124,16 @@ public class AuthenticationManagerBeanDefinitionParser implements BeanDefinition
 			return new RuntimeBeanReference(providerId);
 		}
 		if (providerElement.getAttributes().getLength() > 1) {
-			pc.getReaderContext().error("authentication-provider element cannot be used with other attributes "
-					+ "when using 'ref' attribute", pc.extractSource(element));
+			pc.getReaderContext()
+				.error("authentication-provider element cannot be used with other attributes "
+						+ "when using 'ref' attribute", pc.extractSource(element));
 		}
 		NodeList providerChildren = providerElement.getChildNodes();
 		for (int i = 0; i < providerChildren.getLength(); i++) {
 			if (providerChildren.item(i) instanceof Element) {
-				pc.getReaderContext().error("authentication-provider element cannot have child elements when used "
-						+ "with 'ref' attribute", pc.extractSource(element));
+				pc.getReaderContext()
+					.error("authentication-provider element cannot have child elements when used "
+							+ "with 'ref' attribute", pc.extractSource(element));
 			}
 		}
 		return new RuntimeBeanReference(ref);

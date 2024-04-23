@@ -20,20 +20,19 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Locale;
 
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletResponse;
-
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class OnCommittedResponseWrapperTests {
 
 	private static final String NL = "\r\n";
@@ -51,7 +50,7 @@ public class OnCommittedResponseWrapperTests {
 
 	boolean committed;
 
-	@Before
+	@BeforeEach
 	public void setup() throws Exception {
 		this.response = new OnCommittedResponseWrapper(this.delegate) {
 			@Override
@@ -59,18 +58,26 @@ public class OnCommittedResponseWrapperTests {
 				OnCommittedResponseWrapperTests.this.committed = true;
 			}
 		};
+	}
+
+	private void givenGetWriterThenReturn() throws IOException {
 		given(this.delegate.getWriter()).willReturn(this.writer);
+	}
+
+	private void givenGetOutputStreamThenReturn() throws IOException {
 		given(this.delegate.getOutputStream()).willReturn(this.out);
 	}
 
 	@Test
 	public void printWriterHashCode() throws Exception {
+		givenGetWriterThenReturn();
 		int expected = this.writer.hashCode();
 		assertThat(this.response.getWriter().hashCode()).isEqualTo(expected);
 	}
 
 	@Test
 	public void printWriterCheckError() throws Exception {
+		givenGetWriterThenReturn();
 		boolean expected = true;
 		given(this.writer.checkError()).willReturn(expected);
 		assertThat(this.response.getWriter().checkError()).isEqualTo(expected);
@@ -78,6 +85,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterWriteInt() throws Exception {
+		givenGetWriterThenReturn();
 		int expected = 1;
 		this.response.getWriter().write(expected);
 		verify(this.writer).write(expected);
@@ -85,6 +93,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterWriteCharIntInt() throws Exception {
+		givenGetWriterThenReturn();
 		char[] buff = new char[0];
 		int off = 2;
 		int len = 3;
@@ -94,6 +103,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterWriteChar() throws Exception {
+		givenGetWriterThenReturn();
 		char[] buff = new char[0];
 		this.response.getWriter().write(buff);
 		verify(this.writer).write(buff);
@@ -101,6 +111,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterWriteStringIntInt() throws Exception {
+		givenGetWriterThenReturn();
 		String s = "";
 		int off = 2;
 		int len = 3;
@@ -110,6 +121,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterWriteString() throws Exception {
+		givenGetWriterThenReturn();
 		String s = "";
 		this.response.getWriter().write(s);
 		verify(this.writer).write(s);
@@ -117,6 +129,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintBoolean() throws Exception {
+		givenGetWriterThenReturn();
 		boolean b = true;
 		this.response.getWriter().print(b);
 		verify(this.writer).print(b);
@@ -124,6 +137,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintChar() throws Exception {
+		givenGetWriterThenReturn();
 		char c = 1;
 		this.response.getWriter().print(c);
 		verify(this.writer).print(c);
@@ -131,6 +145,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintInt() throws Exception {
+		givenGetWriterThenReturn();
 		int i = 1;
 		this.response.getWriter().print(i);
 		verify(this.writer).print(i);
@@ -138,6 +153,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintLong() throws Exception {
+		givenGetWriterThenReturn();
 		long l = 1;
 		this.response.getWriter().print(l);
 		verify(this.writer).print(l);
@@ -145,6 +161,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintFloat() throws Exception {
+		givenGetWriterThenReturn();
 		float f = 1;
 		this.response.getWriter().print(f);
 		verify(this.writer).print(f);
@@ -152,6 +169,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintDouble() throws Exception {
+		givenGetWriterThenReturn();
 		double x = 1;
 		this.response.getWriter().print(x);
 		verify(this.writer).print(x);
@@ -159,6 +177,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintCharArray() throws Exception {
+		givenGetWriterThenReturn();
 		char[] x = new char[0];
 		this.response.getWriter().print(x);
 		verify(this.writer).print(x);
@@ -166,6 +185,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintString() throws Exception {
+		givenGetWriterThenReturn();
 		String x = "1";
 		this.response.getWriter().print(x);
 		verify(this.writer).print(x);
@@ -173,6 +193,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintObject() throws Exception {
+		givenGetWriterThenReturn();
 		Object x = "1";
 		this.response.getWriter().print(x);
 		verify(this.writer).print(x);
@@ -180,12 +201,14 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintln() throws Exception {
+		givenGetWriterThenReturn();
 		this.response.getWriter().println();
 		verify(this.writer).println();
 	}
 
 	@Test
 	public void printWriterPrintlnBoolean() throws Exception {
+		givenGetWriterThenReturn();
 		boolean b = true;
 		this.response.getWriter().println(b);
 		verify(this.writer).println(b);
@@ -193,6 +216,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintlnChar() throws Exception {
+		givenGetWriterThenReturn();
 		char c = 1;
 		this.response.getWriter().println(c);
 		verify(this.writer).println(c);
@@ -200,6 +224,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintlnInt() throws Exception {
+		givenGetWriterThenReturn();
 		int i = 1;
 		this.response.getWriter().println(i);
 		verify(this.writer).println(i);
@@ -207,6 +232,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintlnLong() throws Exception {
+		givenGetWriterThenReturn();
 		long l = 1;
 		this.response.getWriter().println(l);
 		verify(this.writer).println(l);
@@ -214,6 +240,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintlnFloat() throws Exception {
+		givenGetWriterThenReturn();
 		float f = 1;
 		this.response.getWriter().println(f);
 		verify(this.writer).println(f);
@@ -221,6 +248,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintlnDouble() throws Exception {
+		givenGetWriterThenReturn();
 		double x = 1;
 		this.response.getWriter().println(x);
 		verify(this.writer).println(x);
@@ -228,6 +256,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintlnCharArray() throws Exception {
+		givenGetWriterThenReturn();
 		char[] x = new char[0];
 		this.response.getWriter().println(x);
 		verify(this.writer).println(x);
@@ -235,6 +264,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintlnString() throws Exception {
+		givenGetWriterThenReturn();
 		String x = "1";
 		this.response.getWriter().println(x);
 		verify(this.writer).println(x);
@@ -242,6 +272,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintlnObject() throws Exception {
+		givenGetWriterThenReturn();
 		Object x = "1";
 		this.response.getWriter().println(x);
 		verify(this.writer).println(x);
@@ -249,6 +280,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintfStringObjectVargs() throws Exception {
+		givenGetWriterThenReturn();
 		String format = "format";
 		Object[] args = new Object[] { "1" };
 		this.response.getWriter().printf(format, args);
@@ -257,6 +289,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterPrintfLocaleStringObjectVargs() throws Exception {
+		givenGetWriterThenReturn();
 		Locale l = Locale.US;
 		String format = "format";
 		Object[] args = new Object[] { "1" };
@@ -266,6 +299,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterFormatStringObjectVargs() throws Exception {
+		givenGetWriterThenReturn();
 		String format = "format";
 		Object[] args = new Object[] { "1" };
 		this.response.getWriter().format(format, args);
@@ -274,6 +308,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterFormatLocaleStringObjectVargs() throws Exception {
+		givenGetWriterThenReturn();
 		Locale l = Locale.US;
 		String format = "format";
 		Object[] args = new Object[] { "1" };
@@ -283,6 +318,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterAppendCharSequence() throws Exception {
+		givenGetWriterThenReturn();
 		String x = "a";
 		this.response.getWriter().append(x);
 		verify(this.writer).append(x);
@@ -290,6 +326,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterAppendCharSequenceIntInt() throws Exception {
+		givenGetWriterThenReturn();
 		String x = "abcdef";
 		int start = 1;
 		int end = 3;
@@ -299,6 +336,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterAppendChar() throws Exception {
+		givenGetWriterThenReturn();
 		char x = 1;
 		this.response.getWriter().append(x);
 		verify(this.writer).append(x);
@@ -307,12 +345,14 @@ public class OnCommittedResponseWrapperTests {
 	// servletoutputstream
 	@Test
 	public void outputStreamHashCode() throws Exception {
+		givenGetOutputStreamThenReturn();
 		int expected = this.out.hashCode();
 		assertThat(this.response.getOutputStream().hashCode()).isEqualTo(expected);
 	}
 
 	@Test
 	public void outputStreamWriteInt() throws Exception {
+		givenGetOutputStreamThenReturn();
 		int expected = 1;
 		this.response.getOutputStream().write(expected);
 		verify(this.out).write(expected);
@@ -320,6 +360,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamWriteByte() throws Exception {
+		givenGetOutputStreamThenReturn();
 		byte[] expected = new byte[0];
 		this.response.getOutputStream().write(expected);
 		verify(this.out).write(expected);
@@ -327,6 +368,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamWriteByteIntInt() throws Exception {
+		givenGetOutputStreamThenReturn();
 		int start = 1;
 		int end = 2;
 		byte[] expected = new byte[0];
@@ -336,6 +378,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamPrintBoolean() throws Exception {
+		givenGetOutputStreamThenReturn();
 		boolean b = true;
 		this.response.getOutputStream().print(b);
 		verify(this.out).print(b);
@@ -343,6 +386,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamPrintChar() throws Exception {
+		givenGetOutputStreamThenReturn();
 		char c = 1;
 		this.response.getOutputStream().print(c);
 		verify(this.out).print(c);
@@ -350,6 +394,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamPrintInt() throws Exception {
+		givenGetOutputStreamThenReturn();
 		int i = 1;
 		this.response.getOutputStream().print(i);
 		verify(this.out).print(i);
@@ -357,6 +402,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamPrintLong() throws Exception {
+		givenGetOutputStreamThenReturn();
 		long l = 1;
 		this.response.getOutputStream().print(l);
 		verify(this.out).print(l);
@@ -364,6 +410,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamPrintFloat() throws Exception {
+		givenGetOutputStreamThenReturn();
 		float f = 1;
 		this.response.getOutputStream().print(f);
 		verify(this.out).print(f);
@@ -371,6 +418,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamPrintDouble() throws Exception {
+		givenGetOutputStreamThenReturn();
 		double x = 1;
 		this.response.getOutputStream().print(x);
 		verify(this.out).print(x);
@@ -378,6 +426,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamPrintString() throws Exception {
+		givenGetOutputStreamThenReturn();
 		String x = "1";
 		this.response.getOutputStream().print(x);
 		verify(this.out).print(x);
@@ -385,12 +434,14 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamPrintln() throws Exception {
+		givenGetOutputStreamThenReturn();
 		this.response.getOutputStream().println();
 		verify(this.out).println();
 	}
 
 	@Test
 	public void outputStreamPrintlnBoolean() throws Exception {
+		givenGetOutputStreamThenReturn();
 		boolean b = true;
 		this.response.getOutputStream().println(b);
 		verify(this.out).println(b);
@@ -398,6 +449,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamPrintlnChar() throws Exception {
+		givenGetOutputStreamThenReturn();
 		char c = 1;
 		this.response.getOutputStream().println(c);
 		verify(this.out).println(c);
@@ -405,6 +457,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamPrintlnInt() throws Exception {
+		givenGetOutputStreamThenReturn();
 		int i = 1;
 		this.response.getOutputStream().println(i);
 		verify(this.out).println(i);
@@ -412,6 +465,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamPrintlnLong() throws Exception {
+		givenGetOutputStreamThenReturn();
 		long l = 1;
 		this.response.getOutputStream().println(l);
 		verify(this.out).println(l);
@@ -419,6 +473,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamPrintlnFloat() throws Exception {
+		givenGetOutputStreamThenReturn();
 		float f = 1;
 		this.response.getOutputStream().println(f);
 		verify(this.out).println(f);
@@ -426,6 +481,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamPrintlnDouble() throws Exception {
+		givenGetOutputStreamThenReturn();
 		double x = 1;
 		this.response.getOutputStream().println(x);
 		verify(this.out).println(x);
@@ -433,6 +489,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void outputStreamPrintlnString() throws Exception {
+		givenGetOutputStreamThenReturn();
 		String x = "1";
 		this.response.getOutputStream().println(x);
 		verify(this.out).println(x);
@@ -443,6 +500,7 @@ public class OnCommittedResponseWrapperTests {
 	// gh-3823
 	@Test
 	public void contentLengthPrintWriterWriteNullCommits() throws Exception {
+		givenGetWriterThenReturn();
 		String expected = null;
 		this.response.setContentLength(String.valueOf(expected).length() + 1);
 		this.response.getWriter().write(expected);
@@ -453,6 +511,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterWriteIntCommits() throws Exception {
+		givenGetWriterThenReturn();
 		int expected = 1;
 		this.response.setContentLength(String.valueOf(expected).length());
 		this.response.getWriter().write(expected);
@@ -461,6 +520,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterWriteIntMultiDigitCommits() throws Exception {
+		givenGetWriterThenReturn();
 		int expected = 10000;
 		this.response.setContentLength(String.valueOf(expected).length());
 		this.response.getWriter().write(expected);
@@ -469,6 +529,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPlus1PrintWriterWriteIntMultiDigitCommits() throws Exception {
+		givenGetWriterThenReturn();
 		int expected = 10000;
 		this.response.setContentLength(String.valueOf(expected).length() + 1);
 		this.response.getWriter().write(expected);
@@ -479,6 +540,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterWriteCharIntIntCommits() throws Exception {
+		givenGetWriterThenReturn();
 		char[] buff = new char[0];
 		int off = 2;
 		int len = 3;
@@ -489,6 +551,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterWriteCharCommits() throws Exception {
+		givenGetWriterThenReturn();
 		char[] buff = new char[4];
 		this.response.setContentLength(buff.length);
 		this.response.getWriter().write(buff);
@@ -497,6 +560,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterWriteStringIntIntCommits() throws Exception {
+		givenGetWriterThenReturn();
 		String s = "";
 		int off = 2;
 		int len = 3;
@@ -507,6 +571,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterWriteStringCommits() throws IOException {
+		givenGetWriterThenReturn();
 		String body = "something";
 		this.response.setContentLength(body.length());
 		this.response.getWriter().write(body);
@@ -515,6 +580,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterWriteStringContentLengthCommits() throws IOException {
+		givenGetWriterThenReturn();
 		String body = "something";
 		this.response.getWriter().write(body);
 		this.response.setContentLength(body.length());
@@ -523,6 +589,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void printWriterWriteStringDoesNotCommit() throws IOException {
+		givenGetWriterThenReturn();
 		String body = "something";
 		this.response.getWriter().write(body);
 		assertThat(this.committed).isFalse();
@@ -530,6 +597,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintBooleanCommits() throws Exception {
+		givenGetWriterThenReturn();
 		boolean b = true;
 		this.response.setContentLength(1);
 		this.response.getWriter().print(b);
@@ -538,6 +606,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintCharCommits() throws Exception {
+		givenGetWriterThenReturn();
 		char c = 1;
 		this.response.setContentLength(1);
 		this.response.getWriter().print(c);
@@ -546,6 +615,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintIntCommits() throws Exception {
+		givenGetWriterThenReturn();
 		int i = 1234;
 		this.response.setContentLength(String.valueOf(i).length());
 		this.response.getWriter().print(i);
@@ -554,6 +624,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintLongCommits() throws Exception {
+		givenGetWriterThenReturn();
 		long l = 12345;
 		this.response.setContentLength(String.valueOf(l).length());
 		this.response.getWriter().print(l);
@@ -562,6 +633,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintFloatCommits() throws Exception {
+		givenGetWriterThenReturn();
 		float f = 12345;
 		this.response.setContentLength(String.valueOf(f).length());
 		this.response.getWriter().print(f);
@@ -570,6 +642,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintDoubleCommits() throws Exception {
+		givenGetWriterThenReturn();
 		double x = 1.2345;
 		this.response.setContentLength(String.valueOf(x).length());
 		this.response.getWriter().print(x);
@@ -578,6 +651,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintCharArrayCommits() throws Exception {
+		givenGetWriterThenReturn();
 		char[] x = new char[10];
 		this.response.setContentLength(x.length);
 		this.response.getWriter().print(x);
@@ -586,6 +660,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintStringCommits() throws Exception {
+		givenGetWriterThenReturn();
 		String x = "12345";
 		this.response.setContentLength(x.length());
 		this.response.getWriter().print(x);
@@ -594,6 +669,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintObjectCommits() throws Exception {
+		givenGetWriterThenReturn();
 		Object x = "12345";
 		this.response.setContentLength(String.valueOf(x).length());
 		this.response.getWriter().print(x);
@@ -602,6 +678,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintlnCommits() throws Exception {
+		givenGetWriterThenReturn();
 		this.response.setContentLength(NL.length());
 		this.response.getWriter().println();
 		assertThat(this.committed).isTrue();
@@ -609,6 +686,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintlnBooleanCommits() throws Exception {
+		givenGetWriterThenReturn();
 		boolean b = true;
 		this.response.setContentLength(1);
 		this.response.getWriter().println(b);
@@ -617,6 +695,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintlnCharCommits() throws Exception {
+		givenGetWriterThenReturn();
 		char c = 1;
 		this.response.setContentLength(1);
 		this.response.getWriter().println(c);
@@ -625,6 +704,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintlnIntCommits() throws Exception {
+		givenGetWriterThenReturn();
 		int i = 12345;
 		this.response.setContentLength(String.valueOf(i).length());
 		this.response.getWriter().println(i);
@@ -633,6 +713,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintlnLongCommits() throws Exception {
+		givenGetWriterThenReturn();
 		long l = 12345678;
 		this.response.setContentLength(String.valueOf(l).length());
 		this.response.getWriter().println(l);
@@ -641,6 +722,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintlnFloatCommits() throws Exception {
+		givenGetWriterThenReturn();
 		float f = 1234;
 		this.response.setContentLength(String.valueOf(f).length());
 		this.response.getWriter().println(f);
@@ -649,6 +731,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintlnDoubleCommits() throws Exception {
+		givenGetWriterThenReturn();
 		double x = 1;
 		this.response.setContentLength(String.valueOf(x).length());
 		this.response.getWriter().println(x);
@@ -657,6 +740,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintlnCharArrayCommits() throws Exception {
+		givenGetWriterThenReturn();
 		char[] x = new char[20];
 		this.response.setContentLength(x.length);
 		this.response.getWriter().println(x);
@@ -665,6 +749,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintlnStringCommits() throws Exception {
+		givenGetWriterThenReturn();
 		String x = "1";
 		this.response.setContentLength(String.valueOf(x).length());
 		this.response.getWriter().println(x);
@@ -673,6 +758,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterPrintlnObjectCommits() throws Exception {
+		givenGetWriterThenReturn();
 		Object x = "1";
 		this.response.setContentLength(String.valueOf(x).length());
 		this.response.getWriter().println(x);
@@ -681,6 +767,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterAppendCharSequenceCommits() throws Exception {
+		givenGetWriterThenReturn();
 		String x = "a";
 		this.response.setContentLength(String.valueOf(x).length());
 		this.response.getWriter().append(x);
@@ -689,6 +776,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterAppendCharSequenceIntIntCommits() throws Exception {
+		givenGetWriterThenReturn();
 		String x = "abcdef";
 		int start = 1;
 		int end = 3;
@@ -699,6 +787,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPrintWriterAppendCharCommits() throws Exception {
+		givenGetWriterThenReturn();
 		char x = 1;
 		this.response.setContentLength(1);
 		this.response.getWriter().append(x);
@@ -707,6 +796,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamWriteIntCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		int expected = 1;
 		this.response.setContentLength(String.valueOf(expected).length());
 		this.response.getOutputStream().write(expected);
@@ -715,6 +805,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamWriteIntMultiDigitCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		int expected = 10000;
 		this.response.setContentLength(String.valueOf(expected).length());
 		this.response.getOutputStream().write(expected);
@@ -723,6 +814,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthPlus1OutputStreamWriteIntMultiDigitCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		int expected = 10000;
 		this.response.setContentLength(String.valueOf(expected).length() + 1);
 		this.response.getOutputStream().write(expected);
@@ -734,6 +826,7 @@ public class OnCommittedResponseWrapperTests {
 	// gh-171
 	@Test
 	public void contentLengthPlus1OutputStreamWriteByteArrayMultiDigitCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		String expected = "{\n" + "  \"parameterName\" : \"_csrf\",\n"
 				+ "  \"token\" : \"06300b65-c4aa-4c8f-8cda-39ee17f545a0\",\n" + "  \"headerName\" : \"X-CSRF-TOKEN\"\n"
 				+ "}";
@@ -746,6 +839,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintBooleanCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		boolean b = true;
 		this.response.setContentLength(1);
 		this.response.getOutputStream().print(b);
@@ -754,6 +848,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintCharCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		char c = 1;
 		this.response.setContentLength(1);
 		this.response.getOutputStream().print(c);
@@ -762,6 +857,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintIntCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		int i = 1234;
 		this.response.setContentLength(String.valueOf(i).length());
 		this.response.getOutputStream().print(i);
@@ -770,6 +866,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintLongCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		long l = 12345;
 		this.response.setContentLength(String.valueOf(l).length());
 		this.response.getOutputStream().print(l);
@@ -778,6 +875,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintFloatCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		float f = 12345;
 		this.response.setContentLength(String.valueOf(f).length());
 		this.response.getOutputStream().print(f);
@@ -786,6 +884,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintDoubleCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		double x = 1.2345;
 		this.response.setContentLength(String.valueOf(x).length());
 		this.response.getOutputStream().print(x);
@@ -794,6 +893,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintStringCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		String x = "12345";
 		this.response.setContentLength(x.length());
 		this.response.getOutputStream().print(x);
@@ -802,6 +902,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintlnCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		this.response.setContentLength(NL.length());
 		this.response.getOutputStream().println();
 		assertThat(this.committed).isTrue();
@@ -809,6 +910,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintlnBooleanCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		boolean b = true;
 		this.response.setContentLength(1);
 		this.response.getOutputStream().println(b);
@@ -817,6 +919,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintlnCharCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		char c = 1;
 		this.response.setContentLength(1);
 		this.response.getOutputStream().println(c);
@@ -825,6 +928,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintlnIntCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		int i = 12345;
 		this.response.setContentLength(String.valueOf(i).length());
 		this.response.getOutputStream().println(i);
@@ -833,6 +937,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintlnLongCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		long l = 12345678;
 		this.response.setContentLength(String.valueOf(l).length());
 		this.response.getOutputStream().println(l);
@@ -841,6 +946,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintlnFloatCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		float f = 1234;
 		this.response.setContentLength(String.valueOf(f).length());
 		this.response.getOutputStream().println(f);
@@ -849,6 +955,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintlnDoubleCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		double x = 1;
 		this.response.setContentLength(String.valueOf(x).length());
 		this.response.getOutputStream().println(x);
@@ -857,6 +964,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamPrintlnStringCommits() throws Exception {
+		givenGetOutputStreamThenReturn();
 		String x = "1";
 		this.response.setContentLength(String.valueOf(x).length());
 		this.response.getOutputStream().println(x);
@@ -872,6 +980,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void contentLengthOutputStreamWriteStringCommits() throws IOException {
+		givenGetOutputStreamThenReturn();
 		String body = "something";
 		this.response.setContentLength(body.length());
 		this.response.getOutputStream().print(body);
@@ -881,6 +990,7 @@ public class OnCommittedResponseWrapperTests {
 	// gh-7261
 	@Test
 	public void contentLengthLongOutputStreamWriteStringCommits() throws IOException {
+		givenGetOutputStreamThenReturn();
 		String body = "something";
 		this.response.setContentLengthLong(body.length());
 		this.response.getOutputStream().print(body);
@@ -889,6 +999,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void addHeaderContentLengthPrintWriterWriteStringCommits() throws Exception {
+		givenGetWriterThenReturn();
 		int expected = 1234;
 		this.response.addHeader("Content-Length", String.valueOf(String.valueOf(expected).length()));
 		this.response.getWriter().write(expected);
@@ -897,6 +1008,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void bufferSizePrintWriterWriteCommits() throws Exception {
+		givenGetWriterThenReturn();
 		String expected = "1234567890";
 		given(this.response.getBufferSize()).willReturn(expected.length());
 		this.response.getWriter().write(expected);
@@ -905,6 +1017,7 @@ public class OnCommittedResponseWrapperTests {
 
 	@Test
 	public void bufferSizeCommitsOnce() throws Exception {
+		givenGetWriterThenReturn();
 		String expected = "1234567890";
 		given(this.response.getBufferSize()).willReturn(expected.length());
 		this.response.getWriter().write(expected);

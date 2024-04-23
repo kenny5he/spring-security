@@ -18,15 +18,16 @@ package org.springframework.security.authorization;
 
 import java.util.Collections;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -36,7 +37,7 @@ import static org.mockito.BDDMockito.given;
  * @author Rob Winch
  * @since 5.0
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class AuthorityReactiveAuthorizationManagerTests {
 
 	@Mock
@@ -89,6 +90,24 @@ public class AuthorityReactiveAuthorizationManagerTests {
 	}
 
 	@Test
+	public void checkWhenHasCustomAuthorityAndAuthorizedThenReturnTrue() {
+		GrantedAuthority customGrantedAuthority = () -> "ADMIN";
+		this.authentication = new TestingAuthenticationToken("rob", "secret",
+				Collections.singletonList(customGrantedAuthority));
+		boolean granted = this.manager.check(Mono.just(this.authentication), null).block().isGranted();
+		assertThat(granted).isTrue();
+	}
+
+	@Test
+	public void checkWhenHasCustomAuthorityAndAuthenticatedAndWrongAuthoritiesThenReturnFalse() {
+		GrantedAuthority customGrantedAuthority = () -> "USER";
+		this.authentication = new TestingAuthenticationToken("rob", "secret",
+				Collections.singletonList(customGrantedAuthority));
+		boolean granted = this.manager.check(Mono.just(this.authentication), null).block().isGranted();
+		assertThat(granted).isFalse();
+	}
+
+	@Test
 	public void checkWhenHasRoleAndAuthorizedThenReturnTrue() {
 		this.manager = AuthorityReactiveAuthorizationManager.hasRole("ADMIN");
 		this.authentication = new TestingAuthenticationToken("rob", "secret", "ROLE_ADMIN");
@@ -124,37 +143,37 @@ public class AuthorityReactiveAuthorizationManagerTests {
 	@Test
 	public void hasRoleWhenNullThenException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> AuthorityReactiveAuthorizationManager.hasRole((String) null));
+			.isThrownBy(() -> AuthorityReactiveAuthorizationManager.hasRole((String) null));
 	}
 
 	@Test
 	public void hasAuthorityWhenNullThenException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> AuthorityReactiveAuthorizationManager.hasAuthority((String) null));
+			.isThrownBy(() -> AuthorityReactiveAuthorizationManager.hasAuthority((String) null));
 	}
 
 	@Test
 	public void hasAnyRoleWhenNullThenException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> AuthorityReactiveAuthorizationManager.hasAnyRole((String) null));
+			.isThrownBy(() -> AuthorityReactiveAuthorizationManager.hasAnyRole((String) null));
 	}
 
 	@Test
 	public void hasAnyAuthorityWhenNullThenException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> AuthorityReactiveAuthorizationManager.hasAnyAuthority((String) null));
+			.isThrownBy(() -> AuthorityReactiveAuthorizationManager.hasAnyAuthority((String) null));
 	}
 
 	@Test
 	public void hasAnyRoleWhenOneIsNullThenException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> AuthorityReactiveAuthorizationManager.hasAnyRole("ROLE_ADMIN", (String) null));
+			.isThrownBy(() -> AuthorityReactiveAuthorizationManager.hasAnyRole("ROLE_ADMIN", (String) null));
 	}
 
 	@Test
 	public void hasAnyAuthorityWhenOneIsNullThenException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> AuthorityReactiveAuthorizationManager.hasAnyAuthority("ADMIN", (String) null));
+			.isThrownBy(() -> AuthorityReactiveAuthorizationManager.hasAnyAuthority("ADMIN", (String) null));
 	}
 
 }

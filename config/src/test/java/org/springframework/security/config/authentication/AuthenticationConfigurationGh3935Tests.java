@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2016 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 
 package org.springframework.security.config.authentication;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -29,13 +29,12 @@ import org.springframework.security.config.annotation.authentication.builders.Au
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.authentication.configuration.GlobalAuthenticationConfigurerAdapter;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.PasswordEncodedUser;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
@@ -45,7 +44,7 @@ import static org.mockito.Mockito.verify;
 /**
  * @author Rob Winch
  */
-@RunWith(SpringJUnit4ClassRunner.class)
+@ExtendWith(SpringExtension.class)
 @ContextConfiguration
 public class AuthenticationConfigurationGh3935Tests {
 
@@ -72,13 +71,14 @@ public class AuthenticationConfigurationGh3935Tests {
 		AuthenticationManager authenticationManager = this.adapter.authenticationManager;
 		assertThat(authenticationManager).isNotNull();
 		Authentication auth = authenticationManager
-				.authenticate(new UsernamePasswordAuthenticationToken(username, password));
+			.authenticate(UsernamePasswordAuthenticationToken.unauthenticated(username, password));
 		verify(this.uds).loadUserByUsername(username);
 		assertThat(auth.getPrincipal()).isEqualTo(PasswordEncodedUser.user());
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class WebSecurity extends WebSecurityConfigurerAdapter {
+	static class WebSecurity {
 
 	}
 

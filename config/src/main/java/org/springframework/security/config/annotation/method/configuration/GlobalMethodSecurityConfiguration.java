@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,6 +73,8 @@ import org.springframework.security.config.annotation.ObjectPostProcessor;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.core.GrantedAuthorityDefaults;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 import org.springframework.util.Assert;
 
 /**
@@ -84,7 +86,11 @@ import org.springframework.util.Assert;
  * @author Eddú Meléndez
  * @since 3.2
  * @see EnableGlobalMethodSecurity
+ * @deprecated Use {@link PrePostMethodSecurityConfiguration},
+ * {@link SecuredMethodSecurityConfiguration}, or
+ * {@link Jsr250MethodSecurityConfiguration} instead
  */
+@Deprecated
 @Configuration(proxyBeanMethods = false)
 @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
 public class GlobalMethodSecurityConfiguration implements ImportAware, SmartInitializingSingleton, BeanFactoryAware {
@@ -100,6 +106,9 @@ public class GlobalMethodSecurityConfiguration implements ImportAware, SmartInit
 		}
 
 	};
+
+	private SecurityContextHolderStrategy securityContextHolderStrategy = SecurityContextHolder
+		.getContextHolderStrategy();
 
 	private DefaultMethodSecurityExpressionHandler defaultMethodExpressionHandler = new DefaultMethodSecurityExpressionHandler();
 
@@ -143,6 +152,7 @@ public class GlobalMethodSecurityConfiguration implements ImportAware, SmartInit
 		this.methodSecurityInterceptor.setAccessDecisionManager(accessDecisionManager());
 		this.methodSecurityInterceptor.setAfterInvocationManager(afterInvocationManager());
 		this.methodSecurityInterceptor.setSecurityMetadataSource(methodSecurityMetadataSource);
+		this.methodSecurityInterceptor.setSecurityContextHolderStrategy(this.securityContextHolderStrategy);
 		RunAsManager runAsManager = runAsManager();
 		if (runAsManager != null) {
 			this.methodSecurityInterceptor.setRunAsManager(runAsManager);
@@ -174,6 +184,8 @@ public class GlobalMethodSecurityConfiguration implements ImportAware, SmartInit
 		if (grantedAuthorityDefaults != null) {
 			this.defaultMethodExpressionHandler.setDefaultRolePrefix(grantedAuthorityDefaults.getRolePrefix());
 		}
+
+		this.defaultMethodExpressionHandler = this.objectPostProcessor.postProcess(this.defaultMethodExpressionHandler);
 	}
 
 	private <T> T getSingleBeanOrNull(Class<T> type) {
@@ -308,7 +320,7 @@ public class GlobalMethodSecurityConfiguration implements ImportAware, SmartInit
 	protected AuthenticationManager authenticationManager() throws Exception {
 		if (this.authenticationManager == null) {
 			DefaultAuthenticationEventPublisher eventPublisher = this.objectPostProcessor
-					.postProcess(new DefaultAuthenticationEventPublisher());
+				.postProcess(new DefaultAuthenticationEventPublisher());
 			this.auth = new AuthenticationManagerBuilder(this.objectPostProcessor);
 			this.auth.authenticationEventPublisher(eventPublisher);
 			configure(this.auth);
@@ -338,6 +350,7 @@ public class GlobalMethodSecurityConfiguration implements ImportAware, SmartInit
 	 * @return the {@link MethodSecurityMetadataSource}
 	 */
 	@Bean
+	@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
 	public MethodSecurityMetadataSource methodSecurityMetadataSource() {
 		List<MethodSecurityMetadataSource> sources = new ArrayList<>();
 		ExpressionBasedAnnotationAttributeFactory attributeFactory = new ExpressionBasedAnnotationAttributeFactory(
@@ -362,7 +375,7 @@ public class GlobalMethodSecurityConfiguration implements ImportAware, SmartInit
 		if (isJsr250Enabled) {
 			GrantedAuthorityDefaults grantedAuthorityDefaults = getSingleBeanOrNull(GrantedAuthorityDefaults.class);
 			Jsr250MethodSecurityMetadataSource jsr250MethodSecurityMetadataSource = this.context
-					.getBean(Jsr250MethodSecurityMetadataSource.class);
+				.getBean(Jsr250MethodSecurityMetadataSource.class);
 			if (grantedAuthorityDefaults != null) {
 				jsr250MethodSecurityMetadataSource.setDefaultRolePrefix(grantedAuthorityDefaults.getRolePrefix());
 			}
@@ -390,14 +403,13 @@ public class GlobalMethodSecurityConfiguration implements ImportAware, SmartInit
 	@Override
 	public final void setImportMetadata(AnnotationMetadata importMetadata) {
 		Map<String, Object> annotationAttributes = importMetadata
-				.getAnnotationAttributes(EnableGlobalMethodSecurity.class.getName());
+			.getAnnotationAttributes(EnableGlobalMethodSecurity.class.getName());
 		this.enableMethodSecurity = AnnotationAttributes.fromMap(annotationAttributes);
 	}
 
 	@Autowired(required = false)
 	public void setObjectPostProcessor(ObjectPostProcessor<Object> objectPostProcessor) {
 		this.objectPostProcessor = objectPostProcessor;
-		this.defaultMethodExpressionHandler = objectPostProcessor.postProcess(this.defaultMethodExpressionHandler);
 	}
 
 	@Autowired(required = false)
@@ -407,6 +419,12 @@ public class GlobalMethodSecurityConfiguration implements ImportAware, SmartInit
 			return;
 		}
 		this.expressionHandler = handlers.get(0);
+	}
+
+	@Autowired(required = false)
+	void setSecurityContextHolderStrategy(SecurityContextHolderStrategy securityContextHolderStrategy) {
+		Assert.notNull(securityContextHolderStrategy, "securityContextHolderStrategy cannot be null");
+		this.securityContextHolderStrategy = securityContextHolderStrategy;
 	}
 
 	@Override

@@ -17,6 +17,7 @@
 package org.springframework.security.web.jackson2;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
@@ -34,13 +35,16 @@ import org.springframework.security.web.savedrequest.DefaultSavedRequest;
  * </pre>
  *
  * @author Jitendra Singh
+ * @since 4.2
  * @see WebServletJackson2Module
  * @see org.springframework.security.jackson2.SecurityJackson2Modules
- * @since 4.2
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY)
 @JsonDeserialize(builder = DefaultSavedRequest.Builder.class)
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY, getterVisibility = JsonAutoDetect.Visibility.NONE)
 abstract class DefaultSavedRequestMixin {
+
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	String matchingRequestParameterName;
 
 }

@@ -20,8 +20,8 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
@@ -46,7 +46,7 @@ public class CsrfRequestDataValueProcessorTests {
 
 	private Map<String, String> expected = new HashMap<>();
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.expected.put(this.token.getParameterName(), this.token.getToken());
 		this.exchange.getAttributes().put(CsrfRequestDataValueProcessor.DEFAULT_CSRF_ATTR_NAME, this.token);
@@ -58,8 +58,8 @@ public class CsrfRequestDataValueProcessorTests {
 		for (Method expected : expectedMethods) {
 			assertThat(ReflectionUtils.findMethod(CsrfRequestDataValueProcessor.class, expected.getName(),
 					expected.getParameterTypes()))
-							.as("Expected to find " + expected + " defined on " + CsrfRequestDataValueProcessor.class)
-							.isNotNull();
+				.as("Expected to find " + expected + " defined on " + CsrfRequestDataValueProcessor.class)
+				.isNotNull();
 		}
 	}
 

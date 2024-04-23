@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,18 @@
 
 package org.springframework.security.oauth2.client.endpoint;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Set;
 
 import reactor.core.publisher.Mono;
 
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ReactiveHttpInputMessage;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
@@ -30,10 +35,14 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
 import org.springframework.security.oauth2.core.web.reactive.function.OAuth2BodyExtractors;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
+import org.springframework.web.reactive.function.BodyExtractor;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClient.RequestHeadersSpec;
 
 /**
  * Abstract base class for all of the {@code WebClientReactive*TokenResponseClient}s that
@@ -62,6 +71,15 @@ public abstract class AbstractWebClientReactiveOAuth2AccessTokenResponseClient<T
 
 	private WebClient webClient = WebClient.builder().build();
 
+	private Converter<T, RequestHeadersSpec<?>> requestEntityConverter = this::validatingPopulateRequest;
+
+	private Converter<T, HttpHeaders> headersConverter = this::populateTokenRequestHeaders;
+
+	private Converter<T, MultiValueMap<String, String>> parametersConverter = this::populateTokenRequestParameters;
+
+	private BodyExtractor<Mono<OAuth2AccessTokenResponse>, ReactiveHttpInputMessage> bodyExtractor = OAuth2BodyExtractors
+		.oauth2AccessTokenResponse();
+
 	AbstractWebClientReactiveOAuth2AccessTokenResponseClient() {
 	}
 
@@ -69,10 +87,7 @@ public abstract class AbstractWebClientReactiveOAuth2AccessTokenResponseClient<T
 	public Mono<OAuth2AccessTokenResponse> getTokenResponse(T grantRequest) {
 		Assert.notNull(grantRequest, "grantRequest cannot be null");
 		// @formatter:off
-		return Mono.defer(() -> this.webClient.post()
-				.uri(clientRegistration(grantRequest).getProviderDetails().getTokenUri())
-				.headers((headers) -> populateTokenRequestHeaders(grantRequest, headers))
-				.body(createTokenRequestBody(grantRequest))
+		return Mono.defer(() -> this.requestEntityConverter.convert(grantRequest)
 				.exchange()
 				.flatMap((response) -> readTokenResponse(grantRequest, response))
 		);
@@ -86,23 +101,78 @@ public abstract class AbstractWebClientReactiveOAuth2AccessTokenResponseClient<T
 	 */
 	abstract ClientRegistration clientRegistration(T grantRequest);
 
+	private RequestHeadersSpec<?> validatingPopulateRequest(T grantRequest) {
+		validateClientAuthenticationMethod(grantRequest);
+		return populateRequest(grantRequest);
+	}
+
+	private void validateClientAuthenticationMethod(T grantRequest) {
+		ClientRegistration clientRegistration = grantRequest.getClientRegistration();
+		ClientAuthenticationMethod clientAuthenticationMethod = clientRegistration.getClientAuthenticationMethod();
+		boolean supportedClientAuthenticationMethod = clientAuthenticationMethod.equals(ClientAuthenticationMethod.NONE)
+				|| clientAuthenticationMethod.equals(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+				|| clientAuthenticationMethod.equals(ClientAuthenticationMethod.CLIENT_SECRET_POST);
+		if (!supportedClientAuthenticationMethod) {
+			throw new IllegalArgumentException(String.format(
+					"This class supports `client_secret_basic`, `client_secret_post`, and `none` by default. Client [%s] is using [%s] instead. Please use a supported client authentication method, or use `set/addParametersConverter` or `set/addHeadersConverter` to supply an instance that supports [%s].",
+					clientRegistration.getRegistrationId(), clientAuthenticationMethod, clientAuthenticationMethod));
+		}
+	}
+
+	private RequestHeadersSpec<?> populateRequest(T grantRequest) {
+		return this.webClient.post()
+			.uri(clientRegistration(grantRequest).getProviderDetails().getTokenUri())
+			.headers((headers) -> {
+				HttpHeaders headersToAdd = getHeadersConverter().convert(grantRequest);
+				if (headersToAdd != null) {
+					headers.addAll(headersToAdd);
+				}
+			})
+			.body(createTokenRequestBody(grantRequest));
+	}
+
 	/**
 	 * Populates the headers for the token request.
 	 * @param grantRequest the grant request
-	 * @param headers the headers to populate
+	 * @return the headers populated for the token request
 	 */
-	private void populateTokenRequestHeaders(T grantRequest, HttpHeaders headers) {
+	private HttpHeaders populateTokenRequestHeaders(T grantRequest) {
+		HttpHeaders headers = new HttpHeaders();
 		ClientRegistration clientRegistration = clientRegistration(grantRequest);
 		headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 		headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-		if (ClientAuthenticationMethod.CLIENT_SECRET_BASIC.equals(clientRegistration.getClientAuthenticationMethod())
-				|| ClientAuthenticationMethod.BASIC.equals(clientRegistration.getClientAuthenticationMethod())) {
-			headers.setBasicAuth(clientRegistration.getClientId(), clientRegistration.getClientSecret());
+		if (ClientAuthenticationMethod.CLIENT_SECRET_BASIC.equals(clientRegistration.getClientAuthenticationMethod())) {
+			String clientId = encodeClientCredential(clientRegistration.getClientId());
+			String clientSecret = encodeClientCredential(clientRegistration.getClientSecret());
+			headers.setBasicAuth(clientId, clientSecret);
+		}
+		return headers;
+	}
+
+	private static String encodeClientCredential(String clientCredential) {
+		try {
+			return URLEncoder.encode(clientCredential, StandardCharsets.UTF_8.toString());
+		}
+		catch (UnsupportedEncodingException ex) {
+			// Will not happen since UTF-8 is a standard charset
+			throw new IllegalArgumentException(ex);
 		}
 	}
 
 	/**
-	 * Creates and returns the body for the token request.
+	 * Populates default parameters for the token request.
+	 * @param grantRequest the grant request
+	 * @return the parameters populated for the token request.
+	 */
+	private MultiValueMap<String, String> populateTokenRequestParameters(T grantRequest) {
+		MultiValueMap<String, String> parameters = new LinkedMultiValueMap<>();
+		parameters.add(OAuth2ParameterNames.GRANT_TYPE, grantRequest.getGrantType().getValue());
+		return parameters;
+	}
+
+	/**
+	 * Combine the results of {@code parametersConverter} and
+	 * {@link #populateTokenRequestBody}.
 	 *
 	 * <p>
 	 * This method pre-populates the body with some standard properties, and then
@@ -114,9 +184,8 @@ public abstract class AbstractWebClientReactiveOAuth2AccessTokenResponseClient<T
 	 * @return the body for the token request.
 	 */
 	private BodyInserters.FormInserter<String> createTokenRequestBody(T grantRequest) {
-		BodyInserters.FormInserter<String> body = BodyInserters.fromFormData(OAuth2ParameterNames.GRANT_TYPE,
-				grantRequest.getGrantType().getValue());
-		return populateTokenRequestBody(grantRequest, body);
+		MultiValueMap<String, String> parameters = getParametersConverter().convert(grantRequest);
+		return populateTokenRequestBody(grantRequest, BodyInserters.fromFormData(parameters));
 	}
 
 	/**
@@ -133,12 +202,11 @@ public abstract class AbstractWebClientReactiveOAuth2AccessTokenResponseClient<T
 	BodyInserters.FormInserter<String> populateTokenRequestBody(T grantRequest,
 			BodyInserters.FormInserter<String> body) {
 		ClientRegistration clientRegistration = clientRegistration(grantRequest);
-		if (!ClientAuthenticationMethod.CLIENT_SECRET_BASIC.equals(clientRegistration.getClientAuthenticationMethod())
-				&& !ClientAuthenticationMethod.BASIC.equals(clientRegistration.getClientAuthenticationMethod())) {
+		if (!ClientAuthenticationMethod.CLIENT_SECRET_BASIC
+			.equals(clientRegistration.getClientAuthenticationMethod())) {
 			body.with(OAuth2ParameterNames.CLIENT_ID, clientRegistration.getClientId());
 		}
-		if (ClientAuthenticationMethod.CLIENT_SECRET_POST.equals(clientRegistration.getClientAuthenticationMethod())
-				|| ClientAuthenticationMethod.POST.equals(clientRegistration.getClientAuthenticationMethod())) {
+		if (ClientAuthenticationMethod.CLIENT_SECRET_POST.equals(clientRegistration.getClientAuthenticationMethod())) {
 			body.with(OAuth2ParameterNames.CLIENT_SECRET, clientRegistration.getClientSecret());
 		}
 		Set<String> scopes = scopes(grantRequest);
@@ -169,7 +237,7 @@ public abstract class AbstractWebClientReactiveOAuth2AccessTokenResponseClient<T
 	 * no scopes.
 	 */
 	Set<String> defaultScopes(T grantRequest) {
-		return scopes(grantRequest);
+		return Collections.emptySet();
 	}
 
 	/**
@@ -179,8 +247,8 @@ public abstract class AbstractWebClientReactiveOAuth2AccessTokenResponseClient<T
 	 * @return the token response from the response body.
 	 */
 	private Mono<OAuth2AccessTokenResponse> readTokenResponse(T grantRequest, ClientResponse response) {
-		return response.body(OAuth2BodyExtractors.oauth2AccessTokenResponse())
-				.map((tokenResponse) -> populateTokenResponse(grantRequest, tokenResponse));
+		return response.body(this.bodyExtractor)
+			.map((tokenResponse) -> populateTokenResponse(grantRequest, tokenResponse));
 	}
 
 	/**
@@ -213,6 +281,124 @@ public abstract class AbstractWebClientReactiveOAuth2AccessTokenResponseClient<T
 	public void setWebClient(WebClient webClient) {
 		Assert.notNull(webClient, "webClient cannot be null");
 		this.webClient = webClient;
+	}
+
+	/**
+	 * Returns the {@link Converter} used for converting the
+	 * {@link AbstractOAuth2AuthorizationGrantRequest} instance to a {@link HttpHeaders}
+	 * used in the OAuth 2.0 Access Token Request headers.
+	 * @return the {@link Converter} used for converting the
+	 * {@link AbstractOAuth2AuthorizationGrantRequest} to {@link HttpHeaders}
+	 */
+	final Converter<T, HttpHeaders> getHeadersConverter() {
+		return this.headersConverter;
+	}
+
+	/**
+	 * Sets the {@link Converter} used for converting the
+	 * {@link AbstractOAuth2AuthorizationGrantRequest} instance to a {@link HttpHeaders}
+	 * used in the OAuth 2.0 Access Token Request headers.
+	 * @param headersConverter the {@link Converter} used for converting the
+	 * {@link AbstractOAuth2AuthorizationGrantRequest} to {@link HttpHeaders}
+	 * @since 5.6
+	 */
+	public final void setHeadersConverter(Converter<T, HttpHeaders> headersConverter) {
+		Assert.notNull(headersConverter, "headersConverter cannot be null");
+		this.headersConverter = headersConverter;
+		this.requestEntityConverter = this::populateRequest;
+	}
+
+	/**
+	 * Add (compose) the provided {@code headersConverter} to the current
+	 * {@link Converter} used for converting the
+	 * {@link AbstractOAuth2AuthorizationGrantRequest} instance to a {@link HttpHeaders}
+	 * used in the OAuth 2.0 Access Token Request headers.
+	 * @param headersConverter the {@link Converter} to add (compose) to the current
+	 * {@link Converter} used for converting the
+	 * {@link AbstractOAuth2AuthorizationGrantRequest} to a {@link HttpHeaders}
+	 * @since 5.6
+	 */
+	public final void addHeadersConverter(Converter<T, HttpHeaders> headersConverter) {
+		Assert.notNull(headersConverter, "headersConverter cannot be null");
+		Converter<T, HttpHeaders> currentHeadersConverter = this.headersConverter;
+		this.headersConverter = (authorizationGrantRequest) -> {
+			// Append headers using a Composite Converter
+			HttpHeaders headers = currentHeadersConverter.convert(authorizationGrantRequest);
+			if (headers == null) {
+				headers = new HttpHeaders();
+			}
+			HttpHeaders headersToAdd = headersConverter.convert(authorizationGrantRequest);
+			if (headersToAdd != null) {
+				headers.addAll(headersToAdd);
+			}
+			return headers;
+		};
+		this.requestEntityConverter = this::populateRequest;
+	}
+
+	/**
+	 * Returns the {@link Converter} used for converting the
+	 * {@link AbstractOAuth2AuthorizationGrantRequest} instance to a {@link MultiValueMap}
+	 * used in the OAuth 2.0 Access Token Request body.
+	 * @return the {@link Converter} used for converting the
+	 * {@link AbstractOAuth2AuthorizationGrantRequest} to {@link MultiValueMap}
+	 */
+	final Converter<T, MultiValueMap<String, String>> getParametersConverter() {
+		return this.parametersConverter;
+	}
+
+	/**
+	 * Sets the {@link Converter} used for converting the
+	 * {@link AbstractOAuth2AuthorizationGrantRequest} instance to a {@link MultiValueMap}
+	 * used in the OAuth 2.0 Access Token Request body.
+	 * @param parametersConverter the {@link Converter} used for converting the
+	 * {@link AbstractOAuth2AuthorizationGrantRequest} to {@link MultiValueMap}
+	 * @since 5.6
+	 */
+	public final void setParametersConverter(Converter<T, MultiValueMap<String, String>> parametersConverter) {
+		Assert.notNull(parametersConverter, "parametersConverter cannot be null");
+		this.parametersConverter = parametersConverter;
+		this.requestEntityConverter = this::populateRequest;
+	}
+
+	/**
+	 * Add (compose) the provided {@code parametersConverter} to the current
+	 * {@link Converter} used for converting the
+	 * {@link AbstractOAuth2AuthorizationGrantRequest} instance to a {@link MultiValueMap}
+	 * used in the OAuth 2.0 Access Token Request body.
+	 * @param parametersConverter the {@link Converter} to add (compose) to the current
+	 * {@link Converter} used for converting the
+	 * {@link AbstractOAuth2AuthorizationGrantRequest} to a {@link MultiValueMap}
+	 * @since 5.6
+	 */
+	public final void addParametersConverter(Converter<T, MultiValueMap<String, String>> parametersConverter) {
+		Assert.notNull(parametersConverter, "parametersConverter cannot be null");
+		Converter<T, MultiValueMap<String, String>> currentParametersConverter = this.parametersConverter;
+		this.parametersConverter = (authorizationGrantRequest) -> {
+			MultiValueMap<String, String> parameters = currentParametersConverter.convert(authorizationGrantRequest);
+			if (parameters == null) {
+				parameters = new LinkedMultiValueMap<>();
+			}
+			MultiValueMap<String, String> parametersToAdd = parametersConverter.convert(authorizationGrantRequest);
+			if (parametersToAdd != null) {
+				parameters.addAll(parametersToAdd);
+			}
+			return parameters;
+		};
+		this.requestEntityConverter = this::populateRequest;
+	}
+
+	/**
+	 * Sets the {@link BodyExtractor} that will be used to decode the
+	 * {@link OAuth2AccessTokenResponse}
+	 * @param bodyExtractor the {@link BodyExtractor} that will be used to decode the
+	 * {@link OAuth2AccessTokenResponse}
+	 * @since 5.6
+	 */
+	public final void setBodyExtractor(
+			BodyExtractor<Mono<OAuth2AccessTokenResponse>, ReactiveHttpInputMessage> bodyExtractor) {
+		Assert.notNull(bodyExtractor, "bodyExtractor cannot be null");
+		this.bodyExtractor = bodyExtractor;
 	}
 
 }

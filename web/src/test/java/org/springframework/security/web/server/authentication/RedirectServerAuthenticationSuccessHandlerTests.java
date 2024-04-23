@@ -18,10 +18,10 @@ package org.springframework.security.web.server.authentication;
 
 import java.net.URI;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.test.publisher.PublisherProbe;
 
 import org.springframework.http.HttpStatus;
@@ -44,7 +44,7 @@ import static org.mockito.Mockito.verify;
  * @author Rob Winch
  * @since 5.0
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class RedirectServerAuthenticationSuccessHandlerTests {
 
 	@Mock
@@ -80,7 +80,7 @@ public class RedirectServerAuthenticationSuccessHandlerTests {
 	public void successWhenSubscribeThenStatusAndLocationSet() {
 		this.exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/").build());
 		this.handler.onAuthenticationSuccess(new WebFilterExchange(this.exchange, this.chain), this.authentication)
-				.block();
+			.block();
 		assertThat(this.exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FOUND);
 		assertThat(this.exchange.getResponse().getHeaders().getLocation()).isEqualTo(this.location);
 	}
@@ -92,7 +92,7 @@ public class RedirectServerAuthenticationSuccessHandlerTests {
 		this.handler.setRedirectStrategy(this.redirectStrategy);
 		this.exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/").build());
 		this.handler.onAuthenticationSuccess(new WebFilterExchange(this.exchange, this.chain), this.authentication)
-				.block();
+			.block();
 		redirectResult.assertWasSubscribed();
 		verify(this.redirectStrategy).sendRedirect(any(), eq(this.location));
 	}

@@ -18,10 +18,9 @@ package org.springframework.security.web.savedrequest;
 
 import java.io.Serializable;
 
-import javax.servlet.http.Cookie;
-
-import org.junit.Before;
-import org.junit.Test;
+import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -31,7 +30,7 @@ public class SavedCookieTests {
 
 	SavedCookie savedCookie;
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		this.cookie = new Cookie("name", "value");
 		this.cookie.setComment("comment");

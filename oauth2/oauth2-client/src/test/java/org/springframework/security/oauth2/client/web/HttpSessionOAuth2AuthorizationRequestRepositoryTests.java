@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,7 @@ package org.springframework.security.oauth2.client.web;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -36,8 +34,8 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
  * Tests for {@link HttpSessionOAuth2AuthorizationRequestRepository}.
  *
  * @author Joe Grandja
+ * @author Craig Andrews
  */
-@RunWith(MockitoJUnitRunner.class)
 public class HttpSessionOAuth2AuthorizationRequestRepositoryTests {
 
 	private HttpSessionOAuth2AuthorizationRequestRepository authorizationRequestRepository = new HttpSessionOAuth2AuthorizationRequestRepository();
@@ -45,7 +43,7 @@ public class HttpSessionOAuth2AuthorizationRequestRepositoryTests {
 	@Test
 	public void loadAuthorizationRequestWhenHttpServletRequestIsNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> this.authorizationRequestRepository.loadAuthorizationRequest(null));
+			.isThrownBy(() -> this.authorizationRequestRepository.loadAuthorizationRequest(null));
 	}
 
 	@Test
@@ -53,7 +51,7 @@ public class HttpSessionOAuth2AuthorizationRequestRepositoryTests {
 		MockHttpServletRequest request = new MockHttpServletRequest();
 		request.addParameter(OAuth2ParameterNames.STATE, "state-1234");
 		OAuth2AuthorizationRequest authorizationRequest = this.authorizationRequestRepository
-				.loadAuthorizationRequest(request);
+			.loadAuthorizationRequest(request);
 		assertThat(authorizationRequest).isNull();
 	}
 
@@ -65,38 +63,8 @@ public class HttpSessionOAuth2AuthorizationRequestRepositoryTests {
 		this.authorizationRequestRepository.saveAuthorizationRequest(authorizationRequest, request, response);
 		request.addParameter(OAuth2ParameterNames.STATE, authorizationRequest.getState());
 		OAuth2AuthorizationRequest loadedAuthorizationRequest = this.authorizationRequestRepository
-				.loadAuthorizationRequest(request);
+			.loadAuthorizationRequest(request);
 		assertThat(loadedAuthorizationRequest).isEqualTo(authorizationRequest);
-	}
-
-	// gh-5110
-	@Test
-	public void loadAuthorizationRequestWhenMultipleSavedThenReturnMatchingAuthorizationRequest() {
-		MockHttpServletRequest request = new MockHttpServletRequest();
-		MockHttpServletResponse response = new MockHttpServletResponse();
-		String state1 = "state-1122";
-		OAuth2AuthorizationRequest authorizationRequest1 = createAuthorizationRequest().state(state1).build();
-		this.authorizationRequestRepository.saveAuthorizationRequest(authorizationRequest1, request, response);
-		String state2 = "state-3344";
-		OAuth2AuthorizationRequest authorizationRequest2 = createAuthorizationRequest().state(state2).build();
-		this.authorizationRequestRepository.saveAuthorizationRequest(authorizationRequest2, request, response);
-		String state3 = "state-5566";
-		OAuth2AuthorizationRequest authorizationRequest3 = createAuthorizationRequest().state(state3).build();
-		this.authorizationRequestRepository.saveAuthorizationRequest(authorizationRequest3, request, response);
-		request.addParameter(OAuth2ParameterNames.STATE, state1);
-		OAuth2AuthorizationRequest loadedAuthorizationRequest1 = this.authorizationRequestRepository
-				.loadAuthorizationRequest(request);
-		assertThat(loadedAuthorizationRequest1).isEqualTo(authorizationRequest1);
-		request.removeParameter(OAuth2ParameterNames.STATE);
-		request.addParameter(OAuth2ParameterNames.STATE, state2);
-		OAuth2AuthorizationRequest loadedAuthorizationRequest2 = this.authorizationRequestRepository
-				.loadAuthorizationRequest(request);
-		assertThat(loadedAuthorizationRequest2).isEqualTo(authorizationRequest2);
-		request.removeParameter(OAuth2ParameterNames.STATE);
-		request.addParameter(OAuth2ParameterNames.STATE, state3);
-		OAuth2AuthorizationRequest loadedAuthorizationRequest3 = this.authorizationRequestRepository
-				.loadAuthorizationRequest(request);
-		assertThat(loadedAuthorizationRequest3).isEqualTo(authorizationRequest3);
 	}
 
 	@Test
@@ -112,22 +80,22 @@ public class HttpSessionOAuth2AuthorizationRequestRepositoryTests {
 	public void saveAuthorizationRequestWhenHttpServletRequestIsNullThenThrowIllegalArgumentException() {
 		OAuth2AuthorizationRequest authorizationRequest = createAuthorizationRequest().build();
 		assertThatIllegalArgumentException().isThrownBy(() -> this.authorizationRequestRepository
-				.saveAuthorizationRequest(authorizationRequest, null, new MockHttpServletResponse()));
+			.saveAuthorizationRequest(authorizationRequest, null, new MockHttpServletResponse()));
 	}
 
 	@Test
 	public void saveAuthorizationRequestWhenHttpServletResponseIsNullThenThrowIllegalArgumentException() {
 		OAuth2AuthorizationRequest authorizationRequest = createAuthorizationRequest().build();
 		assertThatIllegalArgumentException().isThrownBy(() -> this.authorizationRequestRepository
-				.saveAuthorizationRequest(authorizationRequest, new MockHttpServletRequest(), null));
+			.saveAuthorizationRequest(authorizationRequest, new MockHttpServletRequest(), null));
 	}
 
 	@Test
 	public void saveAuthorizationRequestWhenStateNullThenThrowIllegalArgumentException() {
 		OAuth2AuthorizationRequest authorizationRequest = createAuthorizationRequest().state(null).build();
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> this.authorizationRequestRepository.saveAuthorizationRequest(authorizationRequest,
-						new MockHttpServletRequest(), new MockHttpServletResponse()));
+			.isThrownBy(() -> this.authorizationRequestRepository.saveAuthorizationRequest(authorizationRequest,
+					new MockHttpServletRequest(), new MockHttpServletResponse()));
 	}
 
 	@Test
@@ -138,7 +106,7 @@ public class HttpSessionOAuth2AuthorizationRequestRepositoryTests {
 				new MockHttpServletResponse());
 		request.addParameter(OAuth2ParameterNames.STATE, authorizationRequest.getState());
 		OAuth2AuthorizationRequest loadedAuthorizationRequest = this.authorizationRequestRepository
-				.loadAuthorizationRequest(request);
+			.loadAuthorizationRequest(request);
 		assertThat(loadedAuthorizationRequest).isEqualTo(authorizationRequest);
 	}
 
@@ -151,7 +119,7 @@ public class HttpSessionOAuth2AuthorizationRequestRepositoryTests {
 				new MockHttpServletResponse());
 		request.addParameter(OAuth2ParameterNames.STATE, authorizationRequest.getState());
 		OAuth2AuthorizationRequest loadedAuthorizationRequest = this.authorizationRequestRepository
-				.loadAuthorizationRequest(request);
+			.loadAuthorizationRequest(request);
 		assertThat(loadedAuthorizationRequest).isEqualTo(authorizationRequest);
 	}
 
@@ -167,7 +135,7 @@ public class HttpSessionOAuth2AuthorizationRequestRepositoryTests {
 				new MockHttpServletResponse());
 		request.addParameter(OAuth2ParameterNames.STATE, authorizationRequest2.getState());
 		OAuth2AuthorizationRequest loadedAuthorizationRequest = this.authorizationRequestRepository
-				.loadAuthorizationRequest(request);
+			.loadAuthorizationRequest(request);
 		assertThat(loadedAuthorizationRequest).isEqualTo(authorizationRequest2);
 	}
 
@@ -180,20 +148,20 @@ public class HttpSessionOAuth2AuthorizationRequestRepositoryTests {
 		request.addParameter(OAuth2ParameterNames.STATE, authorizationRequest.getState());
 		this.authorizationRequestRepository.saveAuthorizationRequest(null, request, response);
 		OAuth2AuthorizationRequest loadedAuthorizationRequest = this.authorizationRequestRepository
-				.loadAuthorizationRequest(request);
+			.loadAuthorizationRequest(request);
 		assertThat(loadedAuthorizationRequest).isNull();
 	}
 
 	@Test
 	public void removeAuthorizationRequestWhenHttpServletRequestIsNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> this.authorizationRequestRepository
-				.removeAuthorizationRequest(null, new MockHttpServletResponse()));
+			.removeAuthorizationRequest(null, new MockHttpServletResponse()));
 	}
 
 	@Test
 	public void removeAuthorizationRequestWhenHttpServletResponseIsNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> this.authorizationRequestRepository
-				.removeAuthorizationRequest(new MockHttpServletRequest(), null));
+			.removeAuthorizationRequest(new MockHttpServletRequest(), null));
 	}
 
 	@Test
@@ -204,9 +172,9 @@ public class HttpSessionOAuth2AuthorizationRequestRepositoryTests {
 		this.authorizationRequestRepository.saveAuthorizationRequest(authorizationRequest, request, response);
 		request.addParameter(OAuth2ParameterNames.STATE, authorizationRequest.getState());
 		OAuth2AuthorizationRequest removedAuthorizationRequest = this.authorizationRequestRepository
-				.removeAuthorizationRequest(request, response);
+			.removeAuthorizationRequest(request, response);
 		OAuth2AuthorizationRequest loadedAuthorizationRequest = this.authorizationRequestRepository
-				.loadAuthorizationRequest(request);
+			.loadAuthorizationRequest(request);
 		assertThat(removedAuthorizationRequest).isNotNull();
 		assertThat(loadedAuthorizationRequest).isNull();
 	}
@@ -220,7 +188,7 @@ public class HttpSessionOAuth2AuthorizationRequestRepositoryTests {
 		this.authorizationRequestRepository.saveAuthorizationRequest(authorizationRequest, request, response);
 		request.addParameter(OAuth2ParameterNames.STATE, authorizationRequest.getState());
 		OAuth2AuthorizationRequest removedAuthorizationRequest = this.authorizationRequestRepository
-				.removeAuthorizationRequest(request, response);
+			.removeAuthorizationRequest(request, response);
 		String sessionAttributeName = HttpSessionOAuth2AuthorizationRequestRepository.class.getName()
 				+ ".AUTHORIZATION_REQUEST";
 		assertThat(removedAuthorizationRequest).isNotNull();
@@ -233,13 +201,15 @@ public class HttpSessionOAuth2AuthorizationRequestRepositoryTests {
 		request.addParameter(OAuth2ParameterNames.STATE, "state-1234");
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		OAuth2AuthorizationRequest removedAuthorizationRequest = this.authorizationRequestRepository
-				.removeAuthorizationRequest(request, response);
+			.removeAuthorizationRequest(request, response);
 		assertThat(removedAuthorizationRequest).isNull();
 	}
 
-	private OAuth2AuthorizationRequest.Builder createAuthorizationRequest() {
-		return OAuth2AuthorizationRequest.authorizationCode().authorizationUri("https://example.com/oauth2/authorize")
-				.clientId("client-id-1234").state("state-1234");
+	protected OAuth2AuthorizationRequest.Builder createAuthorizationRequest() {
+		return OAuth2AuthorizationRequest.authorizationCode()
+			.authorizationUri("https://example.com/oauth2/authorize")
+			.clientId("client-id-1234")
+			.state("state-1234");
 	}
 
 	static class MockDistributedHttpSession extends MockHttpSession {

@@ -18,7 +18,7 @@ package org.springframework.security.web.authentication.preauth;
 
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -75,9 +75,10 @@ public class PreAuthenticatedGrantedAuthoritiesUserDetailsServiceTests {
 		// Password is not saved by
 		// PreAuthenticatedGrantedAuthoritiesUserDetailsService
 		// assertThat(password).isEqualTo(ud.getPassword());
-		assertThat(gas.containsAll(ud.getAuthorities()) && ud.getAuthorities().containsAll(gas)).withFailMessage(
-				"GrantedAuthority collections do not match; result: " + ud.getAuthorities() + ", expected: " + gas)
-				.isTrue();
+		assertThat(gas.containsAll(ud.getAuthorities()) && ud.getAuthorities().containsAll(gas))
+			.withFailMessage(
+					"GrantedAuthority collections do not match; result: " + ud.getAuthorities() + ", expected: " + gas)
+			.isTrue();
 	}
 
 }

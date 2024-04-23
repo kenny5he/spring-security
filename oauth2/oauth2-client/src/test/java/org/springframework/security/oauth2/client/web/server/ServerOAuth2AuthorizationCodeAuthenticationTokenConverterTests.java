@@ -19,11 +19,11 @@ package org.springframework.security.oauth2.client.web.server;
 import java.util.Collections;
 import java.util.Map;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
@@ -47,7 +47,7 @@ import static org.mockito.BDDMockito.given;
  * @author Rob Winch
  * @since 5.1
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class ServerOAuth2AuthorizationCodeAuthenticationTokenConverterTests {
 
 	@Mock
@@ -87,7 +87,7 @@ public class ServerOAuth2AuthorizationCodeAuthenticationTokenConverterTests {
 
 	private ServerOAuth2AuthorizationCodeAuthenticationTokenConverter converter;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.converter = new ServerOAuth2AuthorizationCodeAuthenticationTokenConverter(
 				this.clientRegistrationRepository);
@@ -104,40 +104,40 @@ public class ServerOAuth2AuthorizationCodeAuthenticationTokenConverterTests {
 	public void applyWhenAttributesMissingThenOAuth2AuthorizationException() {
 		this.authorizationRequest.attributes(Map::clear);
 		given(this.authorizationRequestRepository.removeAuthorizationRequest(any()))
-				.willReturn(Mono.just(this.authorizationRequest.build()));
+			.willReturn(Mono.just(this.authorizationRequest.build()));
 		assertThatExceptionOfType(OAuth2AuthorizationException.class).isThrownBy(() -> applyConverter())
-				.withMessageContaining(
-						ServerOAuth2AuthorizationCodeAuthenticationTokenConverter.CLIENT_REGISTRATION_NOT_FOUND_ERROR_CODE);
+			.withMessageContaining(
+					ServerOAuth2AuthorizationCodeAuthenticationTokenConverter.CLIENT_REGISTRATION_NOT_FOUND_ERROR_CODE);
 	}
 
 	@Test
 	public void applyWhenClientRegistrationMissingThenOAuth2AuthorizationException() {
 		given(this.authorizationRequestRepository.removeAuthorizationRequest(any()))
-				.willReturn(Mono.just(this.authorizationRequest.build()));
+			.willReturn(Mono.just(this.authorizationRequest.build()));
 		given(this.clientRegistrationRepository.findByRegistrationId(any())).willReturn(Mono.empty());
 		assertThatExceptionOfType(OAuth2AuthorizationException.class).isThrownBy(() -> applyConverter())
-				.withMessageContaining(
-						ServerOAuth2AuthorizationCodeAuthenticationTokenConverter.CLIENT_REGISTRATION_NOT_FOUND_ERROR_CODE);
+			.withMessageContaining(
+					ServerOAuth2AuthorizationCodeAuthenticationTokenConverter.CLIENT_REGISTRATION_NOT_FOUND_ERROR_CODE);
 	}
 
 	@Test
 	public void applyWhenCodeParameterNotFoundThenErrorCode() {
 		this.request.queryParam(OAuth2ParameterNames.ERROR, "error");
 		given(this.authorizationRequestRepository.removeAuthorizationRequest(any()))
-				.willReturn(Mono.just(this.authorizationRequest.build()));
+			.willReturn(Mono.just(this.authorizationRequest.build()));
 		given(this.clientRegistrationRepository.findByRegistrationId(any()))
-				.willReturn(Mono.just(this.clientRegistration));
+			.willReturn(Mono.just(this.clientRegistration));
 		assertThat(applyConverter().getAuthorizationExchange().getAuthorizationResponse().getError().getErrorCode())
-				.isEqualTo("error");
+			.isEqualTo("error");
 	}
 
 	@Test
 	public void applyWhenCodeParameterFoundThenCode() {
 		this.request.queryParam(OAuth2ParameterNames.CODE, "code");
 		given(this.authorizationRequestRepository.removeAuthorizationRequest(any()))
-				.willReturn(Mono.just(this.authorizationRequest.build()));
+			.willReturn(Mono.just(this.authorizationRequest.build()));
 		given(this.clientRegistrationRepository.findByRegistrationId(any()))
-				.willReturn(Mono.just(this.clientRegistration));
+			.willReturn(Mono.just(this.clientRegistration));
 		OAuth2AuthorizationCodeAuthenticationToken result = applyConverter();
 		OAuth2AuthorizationResponse exchange = result.getAuthorizationExchange().getAuthorizationResponse();
 		assertThat(exchange.getError()).isNull();

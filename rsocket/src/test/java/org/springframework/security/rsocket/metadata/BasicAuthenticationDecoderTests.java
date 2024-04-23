@@ -18,7 +18,7 @@ package org.springframework.security.rsocket.metadata;
 
 import java.util.Map;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
 import org.springframework.core.ResolvableType;
@@ -44,8 +44,9 @@ public class BasicAuthenticationDecoderTests {
 		Map<String, Object> hints = null;
 		DataBuffer dataBuffer = encoder.encodeValue(expectedCredentials, factory, elementType, mimeType, hints);
 		UsernamePasswordMetadata actualCredentials = decoder
-				.decodeToMono(Mono.just(dataBuffer), elementType, mimeType, hints).block();
-		assertThat(actualCredentials).isEqualToComparingFieldByField(expectedCredentials);
+			.decodeToMono(Mono.just(dataBuffer), elementType, mimeType, hints)
+			.block();
+		assertThat(actualCredentials).usingRecursiveComparison().isEqualTo(expectedCredentials);
 	}
 
 }

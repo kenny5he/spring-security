@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,23 +20,23 @@ import java.io.IOException;
 import java.security.Principal;
 import java.util.List;
 
-import javax.servlet.Filter;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpServletResponseWrapper;
-
+import jakarta.servlet.Filter;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponseWrapper;
 import org.apache.http.HttpStatus;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.util.FieldUtils;
@@ -81,12 +81,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Onur Kagan Ozcan
  * @author Mazen Aissa
  */
+@ExtendWith(SpringTestContextExtension.class)
 public class SessionManagementConfigTests {
 
 	private static final String CONFIG_LOCATION_PREFIX = "classpath:org/springframework/security/config/http/SessionManagementConfigTests";
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired
 	MockMvc mvc;
@@ -140,7 +140,7 @@ public class SessionManagementConfigTests {
 		assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_MOVED_TEMPORARILY);
 		assertThat(request.getSession(false)).isNotNull();
 		assertThat(request.getSession(false)
-				.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY)).isNotNull();
+			.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY)).isNotNull();
 	}
 
 	@Test
@@ -180,8 +180,9 @@ public class SessionManagementConfigTests {
 				.andExpect(status().isFound())
 				.andExpect(session()).andReturn();
 		// @formatter:on
-		assertThat(result.getRequest().getSession(false)
-				.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY)).isNull();
+		assertThat(result.getRequest()
+			.getSession(false)
+			.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY)).isNull();
 	}
 
 	@Test
@@ -305,8 +306,9 @@ public class SessionManagementConfigTests {
 	@Test
 	public void autowireWhenConcurrencyControlIsSetThenLogoutHandlersGetAuthenticationObject() throws Exception {
 		this.spring.configLocations(xml("ConcurrencyControlCustomLogoutHandler")).autowire();
-		MvcResult result = this.mvc.perform(get("/auth").with(httpBasic("user", "password"))).andExpect(session())
-				.andReturn();
+		MvcResult result = this.mvc.perform(get("/auth").with(httpBasic("user", "password")))
+			.andExpect(session())
+			.andReturn();
 		MockHttpSession session = (MockHttpSession) result.getRequest().getSession(false);
 		SessionRegistry sessionRegistry = this.spring.getContext().getBean(SessionRegistry.class);
 		sessionRegistry.getSessionInformation(session.getId()).expireNow();
@@ -617,16 +619,6 @@ public class SessionManagementConfigTests {
 
 		@Override
 		public String encodeRedirectURL(String url) {
-			throw new RuntimeException("Unexpected invocation of encodeURL");
-		}
-
-		@Override
-		public String encodeUrl(String url) {
-			throw new RuntimeException("Unexpected invocation of encodeURL");
-		}
-
-		@Override
-		public String encodeRedirectUrl(String url) {
 			throw new RuntimeException("Unexpected invocation of encodeURL");
 		}
 

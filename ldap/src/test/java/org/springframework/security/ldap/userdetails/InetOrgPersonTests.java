@@ -19,7 +19,7 @@ package org.springframework.security.ldap.userdetails;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.ldap.core.DirContextAdapter;
 import org.springframework.ldap.core.DistinguishedName;
@@ -46,7 +46,7 @@ public class InetOrgPersonTests {
 		InetOrgPerson p2 = (InetOrgPerson) essence.createUserDetails();
 		Set<InetOrgPerson> set = new HashSet<>();
 		set.add(p);
-		assertThat(set.contains(p2)).isTrue();
+		assertThat(set).contains(p2);
 	}
 
 	@Test

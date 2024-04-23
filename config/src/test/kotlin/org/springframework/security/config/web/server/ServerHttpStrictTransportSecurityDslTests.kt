@@ -16,14 +16,16 @@
 
 package org.springframework.security.config.web.server.headers
 
-import org.junit.Rule
-import org.junit.Test
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity
 import org.springframework.security.config.web.server.invoke
-import org.springframework.security.config.test.SpringTestRule
+import org.springframework.security.config.test.SpringTestContext
+import org.springframework.security.config.test.SpringTestContextExtension
 import org.springframework.security.config.web.server.ServerHttpSecurity
 import org.springframework.security.web.server.SecurityWebFilterChain
 import org.springframework.security.web.server.header.StrictTransportSecurityServerHttpHeadersWriter
@@ -36,10 +38,10 @@ import java.time.Duration
  *
  * @author Eleftheria Stein
  */
+@ExtendWith(SpringTestContextExtension::class)
 class ServerHttpStrictTransportSecurityDslTests {
-    @Rule
     @JvmField
-    val spring = SpringTestRule()
+    val spring = SpringTestContext(this)
 
     private lateinit var client: WebTestClient
 
@@ -61,6 +63,7 @@ class ServerHttpStrictTransportSecurityDslTests {
                 .expectHeader().valueEquals(StrictTransportSecurityServerHttpHeadersWriter.STRICT_TRANSPORT_SECURITY, "max-age=31536000 ; includeSubDomains")
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class HstsConfig {
@@ -84,6 +87,7 @@ class ServerHttpStrictTransportSecurityDslTests {
                 .expectHeader().doesNotExist(StrictTransportSecurityServerHttpHeadersWriter.STRICT_TRANSPORT_SECURITY)
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class HstsDisabledConfig {
@@ -109,6 +113,7 @@ class ServerHttpStrictTransportSecurityDslTests {
                 .expectHeader().valueEquals(StrictTransportSecurityServerHttpHeadersWriter.STRICT_TRANSPORT_SECURITY, "max-age=1 ; includeSubDomains")
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class MaxAgeConfig {
@@ -134,6 +139,7 @@ class ServerHttpStrictTransportSecurityDslTests {
                 .expectHeader().valueEquals(StrictTransportSecurityServerHttpHeadersWriter.STRICT_TRANSPORT_SECURITY, "max-age=31536000")
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class IncludeSubdomainsConfig {
@@ -159,6 +165,7 @@ class ServerHttpStrictTransportSecurityDslTests {
                 .expectHeader().valueEquals(StrictTransportSecurityServerHttpHeadersWriter.STRICT_TRANSPORT_SECURITY, "max-age=31536000 ; includeSubDomains ; preload")
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class PreloadConfig {

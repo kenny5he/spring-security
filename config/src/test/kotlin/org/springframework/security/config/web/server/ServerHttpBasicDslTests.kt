@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,24 +16,32 @@
 
 package org.springframework.security.config.web.server
 
-import org.junit.Rule
-import org.junit.Test
-import org.mockito.BDDMockito.given
-import org.mockito.Mockito.*
+import io.mockk.every
+import io.mockk.mockkObject
+import io.mockk.verify
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpStatus
 import org.springframework.security.authentication.ReactiveAuthenticationManager
 import org.springframework.security.authentication.TestingAuthenticationToken
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity
+import org.springframework.security.config.test.SpringTestContext
+import org.springframework.security.config.test.SpringTestContextExtension
 import org.springframework.security.core.Authentication
+import org.springframework.security.core.AuthenticationException
 import org.springframework.security.core.userdetails.MapReactiveUserDetailsService
 import org.springframework.security.core.userdetails.User
-import org.springframework.security.config.test.SpringTestRule
 import org.springframework.security.web.server.SecurityWebFilterChain
 import org.springframework.security.web.server.ServerAuthenticationEntryPoint
+import org.springframework.security.web.server.WebFilterExchange
+import org.springframework.security.web.server.authentication.HttpStatusServerEntryPoint
+import org.springframework.security.web.server.authentication.ServerAuthenticationFailureHandler
 import org.springframework.security.web.server.context.ServerSecurityContextRepository
+import org.springframework.security.web.server.context.WebSessionServerSecurityContextRepository
 import org.springframework.test.web.reactive.server.WebTestClient
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -46,10 +54,10 @@ import java.util.*
  *
  * @author Eleftheria Stein
  */
+@ExtendWith(SpringTestContextExtension::class)
 class ServerHttpBasicDslTests {
-    @Rule
     @JvmField
-    val spring = SpringTestRule()
+    val spring = SpringTestContext(this)
 
     private lateinit var client: WebTestClient
 
@@ -82,6 +90,7 @@ class ServerHttpBasicDslTests {
                 .expectStatus().isOk
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class HttpBasicConfig {
@@ -105,25 +114,27 @@ class ServerHttpBasicDslTests {
 
     @Test
     fun `http basic when custom authentication manager then manager used`() {
-        given<Mono<Authentication>>(CustomAuthenticationManagerConfig.AUTHENTICATION_MANAGER.authenticate(any()))
-                .willReturn(Mono.just<Authentication>(TestingAuthenticationToken("user", "password", "ROLE_USER")))
-
         this.spring.register(CustomAuthenticationManagerConfig::class.java).autowire()
+        mockkObject(CustomAuthenticationManagerConfig.AUTHENTICATION_MANAGER)
+        every {
+            CustomAuthenticationManagerConfig.AUTHENTICATION_MANAGER.authenticate(any())
+        } returns Mono.just<Authentication>(TestingAuthenticationToken("user", "password", "ROLE_USER"))
 
         this.client.get()
                 .uri("/")
                 .header("Authorization", "Basic " + Base64.getEncoder().encodeToString("user:password".toByteArray()))
                 .exchange()
 
-        verify<ReactiveAuthenticationManager>(CustomAuthenticationManagerConfig.AUTHENTICATION_MANAGER)
-                .authenticate(any())
+        verify(exactly = 1) { CustomAuthenticationManagerConfig.AUTHENTICATION_MANAGER.authenticate(any()) }
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class CustomAuthenticationManagerConfig {
+
         companion object {
-            var AUTHENTICATION_MANAGER: ReactiveAuthenticationManager = mock(ReactiveAuthenticationManager::class.java)
+            val AUTHENTICATION_MANAGER: ReactiveAuthenticationManager = NoopReactiveAuthenticationManager()
         }
 
         @Bean
@@ -139,24 +150,35 @@ class ServerHttpBasicDslTests {
         }
     }
 
+    class NoopReactiveAuthenticationManager: ReactiveAuthenticationManager {
+        override fun authenticate(authentication: Authentication?): Mono<Authentication> {
+            return Mono.empty()
+        }
+    }
+
     @Test
     fun `http basic when custom security context repository then repository used`() {
         this.spring.register(CustomSecurityContextRepositoryConfig::class.java, UserDetailsConfig::class.java).autowire()
+        mockkObject(CustomSecurityContextRepositoryConfig.SECURITY_CONTEXT_REPOSITORY)
+        every {
+            CustomSecurityContextRepositoryConfig.SECURITY_CONTEXT_REPOSITORY.save(any(), any())
+        } returns Mono.empty()
 
         this.client.get()
                 .uri("/")
                 .header("Authorization", "Basic " + Base64.getEncoder().encodeToString("user:password".toByteArray()))
                 .exchange()
 
-        verify<ServerSecurityContextRepository>(CustomSecurityContextRepositoryConfig.SECURITY_CONTEXT_REPOSITORY)
-                .save(any(), any())
+        verify(exactly = 1) { CustomSecurityContextRepositoryConfig.SECURITY_CONTEXT_REPOSITORY.save(any(), any()) }
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class CustomSecurityContextRepositoryConfig {
+
         companion object {
-            var SECURITY_CONTEXT_REPOSITORY: ServerSecurityContextRepository = mock(ServerSecurityContextRepository::class.java)
+            val SECURITY_CONTEXT_REPOSITORY: ServerSecurityContextRepository = WebSessionServerSecurityContextRepository()
         }
 
         @Bean
@@ -175,20 +197,25 @@ class ServerHttpBasicDslTests {
     @Test
     fun `http basic when custom authentication entry point then entry point used`() {
         this.spring.register(CustomAuthenticationEntryPointConfig::class.java, UserDetailsConfig::class.java).autowire()
+        mockkObject(CustomAuthenticationEntryPointConfig.ENTRY_POINT)
+        every {
+            CustomAuthenticationEntryPointConfig.ENTRY_POINT.commence(any(), any())
+        } returns Mono.empty()
 
         this.client.get()
                 .uri("/")
                 .exchange()
 
-        verify<ServerAuthenticationEntryPoint>(CustomAuthenticationEntryPointConfig.ENTRY_POINT)
-                .commence(any(), any())
+        verify(exactly = 1) { CustomAuthenticationEntryPointConfig.ENTRY_POINT.commence(any(), any()) }
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class CustomAuthenticationEntryPointConfig {
+
         companion object {
-            var ENTRY_POINT: ServerAuthenticationEntryPoint = mock(ServerAuthenticationEntryPoint::class.java)
+            val ENTRY_POINT: ServerAuthenticationEntryPoint = HttpStatusServerEntryPoint(HttpStatus.UNAUTHORIZED)
         }
 
         @Bean
@@ -202,6 +229,53 @@ class ServerHttpBasicDslTests {
                 }
             }
         }
+    }
+
+    @Test
+    fun `http basic when custom authentication failure handler then failure handler used`() {
+        this.spring.register(CustomAuthenticationFailureHandlerConfig::class.java, UserDetailsConfig::class.java).autowire()
+        mockkObject(CustomAuthenticationFailureHandlerConfig.FAILURE_HANDLER)
+        every {
+            CustomAuthenticationFailureHandlerConfig.FAILURE_HANDLER.onAuthenticationFailure(any(), any())
+        } returns Mono.empty()
+
+        this.client.get()
+            .uri("/")
+            .header("Authorization", "Basic " + Base64.getEncoder().encodeToString("user:wrong".toByteArray()))
+            .exchange()
+
+        verify(exactly = 1) { CustomAuthenticationFailureHandlerConfig.FAILURE_HANDLER.onAuthenticationFailure(any(), any()) }
+    }
+
+    @EnableWebFluxSecurity
+    @EnableWebFlux
+    open class CustomAuthenticationFailureHandlerConfig {
+
+        companion object {
+            val FAILURE_HANDLER: ServerAuthenticationFailureHandler = MockServerAuthenticationFailureHandler()
+        }
+
+        @Bean
+        open fun springWebFilterChain(http: ServerHttpSecurity): SecurityWebFilterChain {
+            return http {
+                authorizeExchange {
+                    authorize(anyExchange, authenticated)
+                }
+                httpBasic {
+                    authenticationFailureHandler = FAILURE_HANDLER
+                }
+            }
+        }
+    }
+
+    open class MockServerAuthenticationFailureHandler: ServerAuthenticationFailureHandler {
+        override fun onAuthenticationFailure(
+            webFilterExchange: WebFilterExchange?,
+            exception: AuthenticationException?
+        ): Mono<Void> {
+            return Mono.empty()
+        }
+
     }
 
     @Configuration

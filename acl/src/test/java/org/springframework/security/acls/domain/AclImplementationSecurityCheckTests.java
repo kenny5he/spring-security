@@ -16,9 +16,9 @@
 
 package org.springframework.security.acls.domain;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.acls.model.Acl;
@@ -43,12 +43,12 @@ public class AclImplementationSecurityCheckTests {
 
 	private static final String TARGET_CLASS = "org.springframework.security.acls.TargetObject";
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		SecurityContextHolder.clearContext();
 	}
 
-	@After
+	@AfterEach
 	public void tearDown() {
 		SecurityContextHolder.clearContext();
 	}
@@ -73,12 +73,12 @@ public class AclImplementationSecurityCheckTests {
 				new SimpleGrantedAuthority("ROLE_THREE"));
 		Acl acl2 = new AclImpl(identity, 1L, aclAuthorizationStrategy2, new ConsoleAuditLogger());
 		// Check access in case the principal has no authorization rights
-		assertThatExceptionOfType(NotFoundException.class).isThrownBy(
-				() -> aclAuthorizationStrategy2.securityCheck(acl2, AclAuthorizationStrategy.CHANGE_GENERAL));
-		assertThatExceptionOfType(NotFoundException.class).isThrownBy(
-				() -> aclAuthorizationStrategy2.securityCheck(acl2, AclAuthorizationStrategy.CHANGE_AUDITING));
-		assertThatExceptionOfType(NotFoundException.class).isThrownBy(
-				() -> aclAuthorizationStrategy2.securityCheck(acl2, AclAuthorizationStrategy.CHANGE_OWNERSHIP));
+		assertThatExceptionOfType(NotFoundException.class)
+			.isThrownBy(() -> aclAuthorizationStrategy2.securityCheck(acl2, AclAuthorizationStrategy.CHANGE_GENERAL));
+		assertThatExceptionOfType(NotFoundException.class)
+			.isThrownBy(() -> aclAuthorizationStrategy2.securityCheck(acl2, AclAuthorizationStrategy.CHANGE_AUDITING));
+		assertThatExceptionOfType(NotFoundException.class)
+			.isThrownBy(() -> aclAuthorizationStrategy2.securityCheck(acl2, AclAuthorizationStrategy.CHANGE_OWNERSHIP));
 	}
 
 	@Test
@@ -181,11 +181,11 @@ public class AclImplementationSecurityCheckTests {
 				new DefaultPermissionGrantingStrategy(new ConsoleAuditLogger()), null, null, false,
 				new PrincipalSid(auth));
 		assertThatNoException()
-				.isThrownBy(() -> aclAuthorizationStrategy.securityCheck(acl, AclAuthorizationStrategy.CHANGE_GENERAL));
-		assertThatExceptionOfType(NotFoundException.class).isThrownBy(
-				() -> aclAuthorizationStrategy.securityCheck(acl, AclAuthorizationStrategy.CHANGE_AUDITING));
-		assertThatNoException().isThrownBy(
-				() -> aclAuthorizationStrategy.securityCheck(acl, AclAuthorizationStrategy.CHANGE_OWNERSHIP));
+			.isThrownBy(() -> aclAuthorizationStrategy.securityCheck(acl, AclAuthorizationStrategy.CHANGE_GENERAL));
+		assertThatExceptionOfType(NotFoundException.class)
+			.isThrownBy(() -> aclAuthorizationStrategy.securityCheck(acl, AclAuthorizationStrategy.CHANGE_AUDITING));
+		assertThatNoException()
+			.isThrownBy(() -> aclAuthorizationStrategy.securityCheck(acl, AclAuthorizationStrategy.CHANGE_OWNERSHIP));
 	}
 
 }

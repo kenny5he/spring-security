@@ -32,14 +32,14 @@ import org.springframework.web.servlet.support.RequestDataValueProcessor;
  * Used to add a {@link RequestDataValueProcessor} for Spring MVC and Spring Security CSRF
  * integration. This configuration is added whenever {@link EnableWebMvc} is added by
  * <a href="
- * {@docRoot}/org/springframework/security/config/annotation/web/configuration/SpringWebMvcImportSelector.html">SpringWebMvcImportSelector</a>
- * and the DispatcherServlet is present on the classpath. It also adds the
+ * {@docRoot}/org/springframework/security/config/annotation/web/configuration/SpringWebMvcImportSelector.html">SpringWebMvcImportSelector</a> and
+ * the DispatcherServlet is present on the classpath. It also adds the
  * {@link AuthenticationPrincipalArgumentResolver} as a
  * {@link HandlerMethodArgumentResolver}.
  *
- * @deprecated This is applied internally using SpringWebMvcImportSelector
  * @author Rob Winch
  * @since 3.2
+ * @deprecated This is applied internally using SpringWebMvcImportSelector
  */
 @Deprecated
 @Configuration(proxyBeanMethods = false)
@@ -51,7 +51,7 @@ public class WebMvcSecurityConfiguration implements WebMvcConfigurer {
 	public void addArgumentResolvers(List<HandlerMethodArgumentResolver> argumentResolvers) {
 		argumentResolvers.add(new AuthenticationPrincipalArgumentResolver());
 		argumentResolvers
-				.add(new org.springframework.security.web.bind.support.AuthenticationPrincipalArgumentResolver());
+			.add(new org.springframework.security.web.bind.support.AuthenticationPrincipalArgumentResolver());
 	}
 
 	@Bean

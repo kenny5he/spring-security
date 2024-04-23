@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,11 @@
 package org.springframework.security.web.savedrequest;
 
 import java.util.Base64;
+import java.util.Collections;
 
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -76,9 +76,14 @@ public class CookieRequestCache implements RequestCache {
 		UriComponents uriComponents = UriComponentsBuilder.fromUriString(originalURI).build();
 		DefaultSavedRequest.Builder builder = new DefaultSavedRequest.Builder();
 		int port = getPort(uriComponents);
-		return builder.setScheme(uriComponents.getScheme()).setServerName(uriComponents.getHost())
-				.setRequestURI(uriComponents.getPath()).setQueryString(uriComponents.getQuery()).setServerPort(port)
-				.setMethod(request.getMethod()).build();
+		return builder.setScheme(uriComponents.getScheme())
+			.setServerName(uriComponents.getHost())
+			.setRequestURI(uriComponents.getPath())
+			.setQueryString(uriComponents.getQuery())
+			.setServerPort(port)
+			.setMethod(request.getMethod())
+			.setLocales(Collections.list(request.getLocales()))
+			.build();
 	}
 
 	private int getPort(UriComponents uriComponents) {
@@ -123,7 +128,7 @@ public class CookieRequestCache implements RequestCache {
 
 	private static String getCookiePath(HttpServletRequest request) {
 		String contextPath = request.getContextPath();
-		return (!StringUtils.isEmpty(contextPath)) ? contextPath : "/";
+		return (StringUtils.hasLength(contextPath)) ? contextPath : "/";
 	}
 
 	private boolean matchesSavedRequest(HttpServletRequest request, SavedRequest savedRequest) {

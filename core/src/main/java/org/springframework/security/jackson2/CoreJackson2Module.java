@@ -44,8 +44,8 @@ import org.springframework.security.core.userdetails.User;
  * of all security modules.</b>
  *
  * @author Jitendra Singh.
- * @see SecurityJackson2Modules
  * @since 4.2
+ * @see SecurityJackson2Modules
  */
 @SuppressWarnings("serial")
 public class CoreJackson2Module extends SimpleModule {
@@ -64,6 +64,8 @@ public class CoreJackson2Module extends SimpleModule {
 				UnmodifiableSetMixin.class);
 		context.setMixInAnnotations(Collections.<Object>unmodifiableList(Collections.emptyList()).getClass(),
 				UnmodifiableListMixin.class);
+		context.setMixInAnnotations(Collections.<Object, Object>unmodifiableMap(Collections.emptyMap()).getClass(),
+				UnmodifiableMapMixin.class);
 		context.setMixInAnnotations(User.class, UserMixin.class);
 		context.setMixInAnnotations(UsernamePasswordAuthenticationToken.class,
 				UsernamePasswordAuthenticationTokenMixin.class);

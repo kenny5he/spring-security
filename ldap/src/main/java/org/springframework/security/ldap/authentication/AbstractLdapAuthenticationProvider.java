@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.context.MessageSource;
 import org.springframework.context.MessageSourceAware;
 import org.springframework.context.support.MessageSourceAccessor;
-import org.springframework.core.log.LogMessage;
 import org.springframework.ldap.core.DirContextOperations;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -68,7 +67,6 @@ public abstract class AbstractLdapAuthenticationProvider implements Authenticati
 		UsernamePasswordAuthenticationToken userToken = (UsernamePasswordAuthenticationToken) authentication;
 		String username = userToken.getName();
 		String password = (String) authentication.getCredentials();
-		this.logger.debug(LogMessage.format("Processing authentication request for user: %s", username));
 		if (!StringUtils.hasLength(username)) {
 			throw new BadCredentialsException(
 					this.messages.getMessage("LdapAuthenticationProvider.emptyUsername", "Empty Username"));
@@ -101,9 +99,10 @@ public abstract class AbstractLdapAuthenticationProvider implements Authenticati
 			UserDetails user) {
 		Object password = this.useAuthenticationRequestCredentials ? authentication.getCredentials()
 				: user.getPassword();
-		UsernamePasswordAuthenticationToken result = new UsernamePasswordAuthenticationToken(user, password,
+		UsernamePasswordAuthenticationToken result = UsernamePasswordAuthenticationToken.authenticated(user, password,
 				this.authoritiesMapper.mapAuthorities(user.getAuthorities()));
 		result.setDetails(authentication.getDetails());
+		this.logger.debug("Authenticated user");
 		return result;
 	}
 
@@ -129,6 +128,14 @@ public abstract class AbstractLdapAuthenticationProvider implements Authenticati
 		this.messages = new MessageSourceAccessor(messageSource);
 	}
 
+	/**
+	 * Sets the {@link GrantedAuthoritiesMapper} used for converting the authorities
+	 * loaded from storage to a new set of authorities which will be associated to the
+	 * {@link UsernamePasswordAuthenticationToken}. If not set, defaults to a
+	 * {@link NullAuthoritiesMapper}.
+	 * @param authoritiesMapper the {@link GrantedAuthoritiesMapper} used for mapping the
+	 * user's authorities
+	 */
 	public void setAuthoritiesMapper(GrantedAuthoritiesMapper authoritiesMapper) {
 		this.authoritiesMapper = authoritiesMapper;
 	}

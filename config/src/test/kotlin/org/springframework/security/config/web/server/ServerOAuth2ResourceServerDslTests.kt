@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,26 +16,32 @@
 
 package org.springframework.security.config.web.server
 
-import org.junit.Rule
-import org.junit.Test
-import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.verify
+import io.mockk.every
+import io.mockk.mockkObject
+import io.mockk.verify
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpStatus
-import org.springframework.http.server.reactive.ServerHttpRequest
 import org.springframework.security.authentication.ReactiveAuthenticationManagerResolver
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity
-import org.springframework.security.config.test.SpringTestRule
-import org.springframework.security.oauth2.server.resource.web.server.ServerBearerTokenAuthenticationConverter
+import org.springframework.security.config.test.SpringTestContext
+import org.springframework.security.config.test.SpringTestContextExtension
+import org.springframework.security.core.AuthenticationException
+import org.springframework.security.oauth2.server.resource.authentication.JwtIssuerReactiveAuthenticationManagerResolver
+import org.springframework.security.oauth2.server.resource.web.server.authentication.ServerBearerTokenAuthenticationConverter
 import org.springframework.security.web.server.SecurityWebFilterChain
+import org.springframework.security.web.server.WebFilterExchange
 import org.springframework.security.web.server.authentication.HttpStatusServerEntryPoint
+import org.springframework.security.web.server.authentication.ServerAuthenticationFailureHandler
 import org.springframework.security.web.server.authorization.HttpStatusServerAccessDeniedHandler
 import org.springframework.test.web.reactive.server.WebTestClient
 import org.springframework.web.reactive.config.EnableWebFlux
 import org.springframework.web.server.ServerWebExchange
+import reactor.core.publisher.Mono
 import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.interfaces.RSAPublicKey
@@ -46,12 +52,12 @@ import java.security.spec.RSAPublicKeySpec
  *
  * @author Eleftheria Stein
  */
+@ExtendWith(SpringTestContextExtension::class)
 class ServerOAuth2ResourceServerDslTests {
     private val validJwt = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJtb2NrLXN1YmplY3QiLCJzY29wZSI6Im1lc3NhZ2U6cmVhZCIsImV4cCI6NDY4ODY0MTQxM30.cRl1bv_dDYcAN5U4NlIVKj8uu4mLMwjABF93P4dShiq-GQ-owzaqTSlB4YarNFgV3PKQvT9wxN1jBpGribvISljakoC0E8wDV-saDi8WxN-qvImYsn1zLzYFiZXCfRIxCmonJpydeiAPRxMTPtwnYDS9Ib0T_iA80TBGd-INhyxUUfrwRW5sqKRbjUciRJhpp7fW2ZYXmi9iPt3HDjRQA4IloJZ7f4-spt5Q9wl5HcQTv1t4XrX4eqhVbE5cCoIkFQnKPOc-jhVM44_eazLU6Xk-CCXP8C_UT5pX0luRS2cJrVFfHp2IR_AWxC-shItg6LNEmNFD4Zc-JLZcr0Q86Q"
 
-    @Rule
     @JvmField
-    val spring = SpringTestRule()
+    val spring = SpringTestContext(this)
 
     private lateinit var client: WebTestClient
 
@@ -74,6 +80,7 @@ class ServerOAuth2ResourceServerDslTests {
                 .expectStatus().isSeeOther
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class AccessDeniedHandlerConfig {
@@ -104,6 +111,7 @@ class ServerOAuth2ResourceServerDslTests {
                 .expectStatus().isSeeOther
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class AuthenticationEntryPointConfig {
@@ -125,22 +133,80 @@ class ServerOAuth2ResourceServerDslTests {
     }
 
     @Test
+    fun `http basic when custom authentication failure handler then failure handler used`() {
+        this.spring.register(AuthenticationFailureHandlerConfig::class.java).autowire()
+        mockkObject(AuthenticationFailureHandlerConfig.FAILURE_HANDLER)
+        every {
+            AuthenticationFailureHandlerConfig.FAILURE_HANDLER.onAuthenticationFailure(any(), any())
+        } returns Mono.empty()
+
+        this.client.get()
+            .uri("/")
+            .header("Authorization", "Bearer token")
+            .exchange()
+            .expectStatus().isOk
+
+        verify(exactly = 1) { AuthenticationFailureHandlerConfig.FAILURE_HANDLER.onAuthenticationFailure(any(), any()) }
+    }
+
+    @EnableWebFluxSecurity
+    @EnableWebFlux
+    open class AuthenticationFailureHandlerConfig {
+
+        companion object {
+            val FAILURE_HANDLER: ServerAuthenticationFailureHandler = MockServerAuthenticationFailureHandler()
+        }
+
+        @Bean
+        open fun springWebFilterChain(http: ServerHttpSecurity): SecurityWebFilterChain {
+            return http {
+                authorizeExchange {
+                    authorize(anyExchange, authenticated)
+                }
+                oauth2ResourceServer {
+                    authenticationFailureHandler = FAILURE_HANDLER
+                    jwt {
+                        publicKey = publicKey()
+                    }
+                }
+            }
+        }
+    }
+
+    open class MockServerAuthenticationFailureHandler: ServerAuthenticationFailureHandler {
+        override fun onAuthenticationFailure(
+            webFilterExchange: WebFilterExchange?,
+            exception: AuthenticationException?
+        ): Mono<Void> {
+            return Mono.empty()
+        }
+
+    }
+
+    @Test
     fun `request when custom bearer token converter configured then custom converter used`() {
         this.spring.register(BearerTokenConverterConfig::class.java).autowire()
+        mockkObject(BearerTokenConverterConfig.CONVERTER)
+        every {
+            BearerTokenConverterConfig.CONVERTER.convert(any())
+        } returns Mono.empty()
 
         this.client.get()
                 .uri("/")
                 .headers { it.setBearerAuth(validJwt) }
                 .exchange()
 
-        verify(BearerTokenConverterConfig.CONVERTER).convert(any())
+        verify(exactly = 1) { BearerTokenConverterConfig.CONVERTER.convert(any()) }
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class BearerTokenConverterConfig {
+
         companion object {
-            val CONVERTER: ServerBearerTokenAuthenticationConverter = mock(ServerBearerTokenAuthenticationConverter::class.java)
+            val CONVERTER: ServerBearerTokenAuthenticationConverter =
+				ServerBearerTokenAuthenticationConverter()
         }
 
         @Bean
@@ -162,21 +228,26 @@ class ServerOAuth2ResourceServerDslTests {
     @Test
     fun `request when custom authentication manager resolver configured then custom resolver used`() {
         this.spring.register(AuthenticationManagerResolverConfig::class.java).autowire()
+        mockkObject(AuthenticationManagerResolverConfig.RESOLVER)
+        every {
+            AuthenticationManagerResolverConfig.RESOLVER.resolve(any())
+        } returns Mono.empty()
 
         this.client.get()
                 .uri("/")
                 .headers { it.setBearerAuth(validJwt) }
                 .exchange()
 
-        verify(AuthenticationManagerResolverConfig.RESOLVER).resolve(any())
+        verify(exactly = 1) { AuthenticationManagerResolverConfig.RESOLVER.resolve(any()) }
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class AuthenticationManagerResolverConfig {
+
         companion object {
-            val RESOLVER: ReactiveAuthenticationManagerResolver<ServerWebExchange> =
-                    mock(ReactiveAuthenticationManagerResolver::class.java) as ReactiveAuthenticationManagerResolver<ServerWebExchange>
+            val RESOLVER: ReactiveAuthenticationManagerResolver<ServerWebExchange> = JwtIssuerReactiveAuthenticationManagerResolver("issuer")
         }
 
         @Bean

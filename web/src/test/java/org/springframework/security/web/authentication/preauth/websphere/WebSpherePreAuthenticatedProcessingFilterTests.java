@@ -16,10 +16,9 @@
 
 package org.springframework.security.web.authentication.preauth.websphere;
 
-import javax.servlet.FilterChain;
-
-import org.junit.After;
-import org.junit.Test;
+import jakarta.servlet.FilterChain;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.stubbing.Answer;
 
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -39,7 +38,7 @@ import static org.mockito.Mockito.mock;
  */
 public class WebSpherePreAuthenticatedProcessingFilterTests {
 
-	@After
+	@AfterEach
 	public void clearContext() {
 		SecurityContextHolder.clearContext();
 	}
@@ -54,7 +53,7 @@ public class WebSpherePreAuthenticatedProcessingFilterTests {
 		assertThat(filter.getPreAuthenticatedCredentials(new MockHttpServletRequest())).isEqualTo("N/A");
 		AuthenticationManager am = mock(AuthenticationManager.class);
 		given(am.authenticate(any(Authentication.class)))
-				.willAnswer((Answer<Authentication>) (invocation) -> (Authentication) invocation.getArguments()[0]);
+			.willAnswer((Answer<Authentication>) (invocation) -> (Authentication) invocation.getArguments()[0]);
 		filter.setAuthenticationManager(am);
 		WebSpherePreAuthenticatedWebAuthenticationDetailsSource ads = new WebSpherePreAuthenticatedWebAuthenticationDetailsSource(
 				helper);

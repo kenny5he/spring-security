@@ -105,7 +105,7 @@ public class KeyBasedPersistenceTokenService implements TokenService, Initializi
 			return null;
 		}
 		String[] tokens = StringUtils
-				.delimitedListToStringArray(Utf8.decode(Base64.getDecoder().decode(Utf8.encode(key))), ":");
+			.delimitedListToStringArray(Utf8.decode(Base64.getDecoder().decode(Utf8.encode(key))), ":");
 		Assert.isTrue(tokens.length >= 4, () -> "Expected 4 or more tokens but found " + tokens.length);
 		long creationTime;
 		try {
@@ -133,7 +133,7 @@ public class KeyBasedPersistenceTokenService implements TokenService, Initializi
 	}
 
 	/**
-	 * @return a pseduo random number (hex encoded)
+	 * @return a pseudo random number (hex encoded)
 	 */
 	private String generatePseudoRandomNumber() {
 		byte[] randomBytes = new byte[this.pseudoRandomNumberBytes];
@@ -142,7 +142,7 @@ public class KeyBasedPersistenceTokenService implements TokenService, Initializi
 	}
 
 	private String computeServerSecretApplicableAt(long time) {
-		return this.serverSecret + ":" + new Long(time % this.serverInteger).intValue();
+		return this.serverSecret + ":" + Long.valueOf(time % this.serverInteger).intValue();
 	}
 
 	/**

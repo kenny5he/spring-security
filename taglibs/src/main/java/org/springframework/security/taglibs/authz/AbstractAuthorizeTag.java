@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2010 the original author or authors.
+ * Copyright 2004-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,10 @@ package org.springframework.security.taglibs.authz;
 import java.io.IOException;
 import java.util.Map;
 
-import javax.servlet.ServletContext;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.GenericTypeResolver;
@@ -32,7 +32,9 @@ import org.springframework.expression.ParseException;
 import org.springframework.security.access.expression.ExpressionUtils;
 import org.springframework.security.access.expression.SecurityExpressionHandler;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 import org.springframework.security.web.FilterInvocation;
 import org.springframework.security.web.WebAttributes;
 import org.springframework.security.web.access.WebInvocationPrivilegeEvaluator;
@@ -110,7 +112,7 @@ public abstract class AbstractAuthorizeTag {
 	 * @throws IOException
 	 */
 	public boolean authorizeUsingAccessExpression() throws IOException {
-		if (SecurityContextHolder.getContext().getAuthentication() == null) {
+		if (getContext().getAuthentication() == null) {
 			return false;
 		}
 		SecurityExpressionHandler<FilterInvocation> handler = getExpressionHandler();
@@ -131,7 +133,7 @@ public abstract class AbstractAuthorizeTag {
 		FilterInvocation f = new FilterInvocation(getRequest(), getResponse(), (request, response) -> {
 			throw new UnsupportedOperationException();
 		});
-		return handler.createEvaluationContext(SecurityContextHolder.getContext().getAuthentication(), f);
+		return handler.createEvaluationContext(getContext().getAuthentication(), f);
 	}
 
 	/**
@@ -142,7 +144,7 @@ public abstract class AbstractAuthorizeTag {
 	 */
 	public boolean authorizeUsingUrlCheck() throws IOException {
 		String contextPath = ((HttpServletRequest) getRequest()).getContextPath();
-		Authentication currentUser = SecurityContextHolder.getContext().getAuthentication();
+		Authentication currentUser = getContext().getAuthentication();
 		return getPrivilegeEvaluator().isAllowed(contextPath, getUrl(), getMethod(), currentUser);
 	}
 
@@ -170,14 +172,25 @@ public abstract class AbstractAuthorizeTag {
 		this.method = (method != null) ? method.toUpperCase() : null;
 	}
 
+	private SecurityContext getContext() {
+		ApplicationContext appContext = SecurityWebApplicationContextUtils
+			.findRequiredWebApplicationContext(getServletContext());
+		String[] names = appContext.getBeanNamesForType(SecurityContextHolderStrategy.class);
+		if (names.length == 1) {
+			SecurityContextHolderStrategy strategy = appContext.getBean(SecurityContextHolderStrategy.class);
+			return strategy.getContext();
+		}
+		return SecurityContextHolder.getContext();
+	}
+
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private SecurityExpressionHandler<FilterInvocation> getExpressionHandler() throws IOException {
 		ApplicationContext appContext = SecurityWebApplicationContextUtils
-				.findRequiredWebApplicationContext(getServletContext());
+			.findRequiredWebApplicationContext(getServletContext());
 		Map<String, SecurityExpressionHandler> handlers = appContext.getBeansOfType(SecurityExpressionHandler.class);
 		for (SecurityExpressionHandler handler : handlers.values()) {
-			if (FilterInvocation.class.equals(
-					GenericTypeResolver.resolveTypeArgument(handler.getClass(), SecurityExpressionHandler.class))) {
+			if (FilterInvocation.class
+				.equals(GenericTypeResolver.resolveTypeArgument(handler.getClass(), SecurityExpressionHandler.class))) {
 				return handler;
 			}
 		}
@@ -187,12 +200,12 @@ public abstract class AbstractAuthorizeTag {
 
 	private WebInvocationPrivilegeEvaluator getPrivilegeEvaluator() throws IOException {
 		WebInvocationPrivilegeEvaluator privEvaluatorFromRequest = (WebInvocationPrivilegeEvaluator) getRequest()
-				.getAttribute(WebAttributes.WEB_INVOCATION_PRIVILEGE_EVALUATOR_ATTRIBUTE);
+			.getAttribute(WebAttributes.WEB_INVOCATION_PRIVILEGE_EVALUATOR_ATTRIBUTE);
 		if (privEvaluatorFromRequest != null) {
 			return privEvaluatorFromRequest;
 		}
 		ApplicationContext ctx = SecurityWebApplicationContextUtils
-				.findRequiredWebApplicationContext(getServletContext());
+			.findRequiredWebApplicationContext(getServletContext());
 		Map<String, WebInvocationPrivilegeEvaluator> wipes = ctx.getBeansOfType(WebInvocationPrivilegeEvaluator.class);
 		if (wipes.size() == 0) {
 			throw new IOException(

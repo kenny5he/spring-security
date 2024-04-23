@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,12 @@
 
 package org.springframework.security.config.http;
 
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.web.WebAttributes;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -39,12 +40,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Luke Taylor
  * @author Josh Cummings
  */
+@ExtendWith(SpringTestContextExtension.class)
 public class FormLoginBeanDefinitionParserTests {
 
 	private static final String CONFIG_LOCATION_PREFIX = "classpath:org/springframework/security/config/http/FormLoginBeanDefinitionParserTests";
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired
 	MockMvc mvc;
@@ -62,7 +63,7 @@ public class FormLoginBeanDefinitionParserTests {
 				+ "    <meta name=\"author\" content=\"\">\n"
 				+ "    <title>Please sign in</title>\n"
 				+ "    <link href=\"https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M\" crossorigin=\"anonymous\">\n"
-				+ "    <link href=\"https://getbootstrap.com/docs/4.0/examples/signin/signin.css\" rel=\"stylesheet\" crossorigin=\"anonymous\"/>\n"
+				+ "    <link href=\"https://getbootstrap.com/docs/4.0/examples/signin/signin.css\" rel=\"stylesheet\" integrity=\"sha384-oOE/3m0LUMPub4kaC09mrdEhIc+e3exm4xOGxAmuFXhBNF4hcg/6MiAXAf5p0P56\" crossorigin=\"anonymous\"/>\n"
 				+ "  </head>\n"
 				+ "  <body>\n"
 				+ "     <div class=\"container\">\n"
@@ -103,7 +104,7 @@ public class FormLoginBeanDefinitionParserTests {
 				+ "    <meta name=\"author\" content=\"\">\n"
 				+ "    <title>Please sign in</title>\n"
 				+ "    <link href=\"https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M\" crossorigin=\"anonymous\">\n"
-				+ "    <link href=\"https://getbootstrap.com/docs/4.0/examples/signin/signin.css\" rel=\"stylesheet\" crossorigin=\"anonymous\"/>\n"
+				+ "    <link href=\"https://getbootstrap.com/docs/4.0/examples/signin/signin.css\" rel=\"stylesheet\" integrity=\"sha384-oOE/3m0LUMPub4kaC09mrdEhIc+e3exm4xOGxAmuFXhBNF4hcg/6MiAXAf5p0P56\" crossorigin=\"anonymous\"/>\n"
 				+ "  </head>\n"
 				+ "  <body>\n"
 				+ "     <div class=\"container\">\n"
@@ -126,91 +127,6 @@ public class FormLoginBeanDefinitionParserTests {
 		this.mvc.perform(get("/logout"))
 				.andExpect(status().is3xxRedirection());
 		// @formatter:on
-	}
-
-	@Test
-	public void getLoginWhenConfiguredForOpenIdThenLoginPageReflects() throws Exception {
-		this.spring.configLocations(this.xml("WithOpenId")).autowire();
-		// @formatter:off
-		String expectedContent = "<!DOCTYPE html>\n"
-				+ "<html lang=\"en\">\n"
-				+ "  <head>\n"
-				+ "    <meta charset=\"utf-8\">\n"
-				+ "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, shrink-to-fit=no\">\n"
-				+ "    <meta name=\"description\" content=\"\">\n"
-				+ "    <meta name=\"author\" content=\"\">\n"
-				+ "    <title>Please sign in</title>\n"
-				+ "    <link href=\"https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M\" crossorigin=\"anonymous\">\n"
-				+ "    <link href=\"https://getbootstrap.com/docs/4.0/examples/signin/signin.css\" rel=\"stylesheet\" crossorigin=\"anonymous\"/>\n"
-				+ "  </head>\n"
-				+ "  <body>\n"
-				+ "     <div class=\"container\">\n"
-				+ "      <form class=\"form-signin\" method=\"post\" action=\"/login\">\n"
-				+ "        <h2 class=\"form-signin-heading\">Please sign in</h2>\n"
-				+ "        <p>\n"
-				+ "          <label for=\"username\" class=\"sr-only\">Username</label>\n"
-				+ "          <input type=\"text\" id=\"username\" name=\"username\" class=\"form-control\" placeholder=\"Username\" required autofocus>\n"
-				+ "        </p>\n"
-				+ "        <p>\n"
-				+ "          <label for=\"password\" class=\"sr-only\">Password</label>\n"
-				+ "          <input type=\"password\" id=\"password\" name=\"password\" class=\"form-control\" placeholder=\"Password\" required>\n"
-				+ "        </p>\n"
-				+ "        <button class=\"btn btn-lg btn-primary btn-block\" type=\"submit\">Sign in</button>\n"
-				+ "      </form>\n"
-				+ "      <form name=\"oidf\" class=\"form-signin\" method=\"post\" action=\"/login/openid\">\n"
-				+ "        <h2 class=\"form-signin-heading\">Login with OpenID Identity</h2>\n"
-				+ "        <p>\n"
-				+ "          <label for=\"username\" class=\"sr-only\">Identity</label>\n"
-				+ "          <input type=\"text\" id=\"username\" name=\"openid_identifier\" class=\"form-control\" placeholder=\"Username\" required autofocus>\n"
-				+ "        </p>\n"
-				+ "        <button class=\"btn btn-lg btn-primary btn-block\" type=\"submit\">Sign in</button>\n"
-				+ "      </form>\n"
-				+ "</div>\n"
-				+ "</body></html>";
-		// @formatter:on
-		this.mvc.perform(get("/login")).andExpect(content().string(expectedContent));
-	}
-
-	@Test
-	public void getLoginWhenConfiguredForOpenIdWithCustomAttributesThenLoginPageReflects() throws Exception {
-		this.spring.configLocations(this.xml("WithOpenIdCustomAttributes")).autowire();
-		// @formatter:off
-		String expectedContent = "<!DOCTYPE html>\n"
-				+ "<html lang=\"en\">\n"
-				+ "  <head>\n"
-				+ "    <meta charset=\"utf-8\">\n"
-				+ "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, shrink-to-fit=no\">\n"
-				+ "    <meta name=\"description\" content=\"\">\n"
-				+ "    <meta name=\"author\" content=\"\">\n"
-				+ "    <title>Please sign in</title>\n"
-				+ "    <link href=\"https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css\" rel=\"stylesheet\" integrity=\"sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M\" crossorigin=\"anonymous\">\n"
-				+ "    <link href=\"https://getbootstrap.com/docs/4.0/examples/signin/signin.css\" rel=\"stylesheet\" crossorigin=\"anonymous\"/>\n"
-				+ "  </head>\n"
-				+ "  <body>\n"
-				+ "     <div class=\"container\">\n"
-				+ "      <form class=\"form-signin\" method=\"post\" action=\"/login\">\n"
-				+ "        <h2 class=\"form-signin-heading\">Please sign in</h2>\n"
-				+ "        <p>\n"
-				+ "          <label for=\"username\" class=\"sr-only\">Username</label>\n"
-				+ "          <input type=\"text\" id=\"username\" name=\"username\" class=\"form-control\" placeholder=\"Username\" required autofocus>\n"
-				+ "        </p>\n"
-				+ "        <p>\n"
-				+ "          <label for=\"password\" class=\"sr-only\">Password</label>\n"
-				+ "          <input type=\"password\" id=\"password\" name=\"password\" class=\"form-control\" placeholder=\"Password\" required>\n"
-				+ "        </p>\n"
-				+ "        <button class=\"btn btn-lg btn-primary btn-block\" type=\"submit\">Sign in</button>\n"
-				+ "      </form>\n"
-				+ "      <form name=\"oidf\" class=\"form-signin\" method=\"post\" action=\"/signin\">\n"
-				+ "        <h2 class=\"form-signin-heading\">Login with OpenID Identity</h2>\n" + "        <p>\n"
-				+ "          <label for=\"username\" class=\"sr-only\">Identity</label>\n"
-				+ "          <input type=\"text\" id=\"username\" name=\"openid_identifier\" class=\"form-control\" placeholder=\"Username\" required autofocus>\n"
-				+ "        </p>\n"
-				+ "        <button class=\"btn btn-lg btn-primary btn-block\" type=\"submit\">Sign in</button>\n"
-				+ "      </form>\n"
-				+ "</div>\n"
-				+ "</body></html>";
-		// @formatter:on
-		this.mvc.perform(get("/login")).andExpect(content().string(expectedContent));
 	}
 
 	@Test

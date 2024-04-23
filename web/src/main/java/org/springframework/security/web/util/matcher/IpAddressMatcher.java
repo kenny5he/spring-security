@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package org.springframework.security.web.util.matcher;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
@@ -47,6 +47,7 @@ public final class IpAddressMatcher implements RequestMatcher {
 	 * come.
 	 */
 	public IpAddressMatcher(String ipAddress) {
+		assertStartsWithHexa(ipAddress);
 		if (ipAddress.indexOf('/') > 0) {
 			String[] addressAndMask = StringUtils.split(ipAddress, "/");
 			ipAddress = addressAndMask[0];
@@ -56,8 +57,9 @@ public final class IpAddressMatcher implements RequestMatcher {
 			this.nMaskBits = -1;
 		}
 		this.requiredAddress = parseAddress(ipAddress);
-		Assert.isTrue(this.requiredAddress.getAddress().length * 8 >= this.nMaskBits,
-				String.format("IP address %s is too short for bitmask of length %d", ipAddress, this.nMaskBits));
+		String finalIpAddress = ipAddress;
+		Assert.isTrue(this.requiredAddress.getAddress().length * 8 >= this.nMaskBits, () -> String
+			.format("IP address %s is too short for bitmask of length %d", finalIpAddress, this.nMaskBits));
 	}
 
 	@Override
@@ -66,6 +68,7 @@ public final class IpAddressMatcher implements RequestMatcher {
 	}
 
 	public boolean matches(String address) {
+		assertStartsWithHexa(address);
 		InetAddress remoteAddress = parseAddress(address);
 		if (!this.requiredAddress.getClass().equals(remoteAddress.getClass())) {
 			return false;
@@ -88,12 +91,19 @@ public final class IpAddressMatcher implements RequestMatcher {
 		return true;
 	}
 
+	private void assertStartsWithHexa(String ipAddress) {
+		Assert.isTrue(
+				ipAddress.charAt(0) == '[' || ipAddress.charAt(0) == ':'
+						|| Character.digit(ipAddress.charAt(0), 16) != -1,
+				"ipAddress must start with a [, :, or a hexadecimal digit");
+	}
+
 	private InetAddress parseAddress(String address) {
 		try {
 			return InetAddress.getByName(address);
 		}
 		catch (UnknownHostException ex) {
-			throw new IllegalArgumentException("Failed to parse address" + address, ex);
+			throw new IllegalArgumentException("Failed to parse address '" + address + "'", ex);
 		}
 	}
 

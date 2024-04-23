@@ -19,11 +19,11 @@ package org.springframework.security.oauth2.client;
 import java.time.Duration;
 import java.time.Instant;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -42,7 +42,7 @@ import static org.mockito.BDDMockito.given;
  * @author Rob Winch
  * @since 5.1
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class InMemoryReactiveOAuth2AuthorizedClientServiceTests {
 
 	@Mock
@@ -75,7 +75,7 @@ public class InMemoryReactiveOAuth2AuthorizedClientServiceTests {
 			.build();
 	// @formatter:on
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.authorizedClientService = new InMemoryReactiveOAuth2AuthorizedClientService(
 				this.clientRegistrationRepository);
@@ -85,7 +85,7 @@ public class InMemoryReactiveOAuth2AuthorizedClientServiceTests {
 	public void constructorNullClientRegistrationRepositoryThenThrowsIllegalArgumentException() {
 		this.clientRegistrationRepository = null;
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new InMemoryReactiveOAuth2AuthorizedClientService(this.clientRegistrationRepository));
+			.isThrownBy(() -> new InMemoryReactiveOAuth2AuthorizedClientService(this.clientRegistrationRepository));
 	}
 
 	@Test
@@ -127,25 +127,25 @@ public class InMemoryReactiveOAuth2AuthorizedClientServiceTests {
 	@Test
 	public void loadAuthorizedClientWhenClientRegistrationIdNotFoundThenEmpty() {
 		given(this.clientRegistrationRepository.findByRegistrationId(this.clientRegistrationId))
-				.willReturn(Mono.empty());
-		StepVerifier.create(
-				this.authorizedClientService.loadAuthorizedClient(this.clientRegistrationId, this.principalName))
-				.verifyComplete();
+			.willReturn(Mono.empty());
+		StepVerifier
+			.create(this.authorizedClientService.loadAuthorizedClient(this.clientRegistrationId, this.principalName))
+			.verifyComplete();
 	}
 
 	@Test
 	public void loadAuthorizedClientWhenClientRegistrationFoundAndNotAuthorizedClientThenEmpty() {
 		given(this.clientRegistrationRepository.findByRegistrationId(this.clientRegistrationId))
-				.willReturn(Mono.just(this.clientRegistration));
-		StepVerifier.create(
-				this.authorizedClientService.loadAuthorizedClient(this.clientRegistrationId, this.principalName))
-				.verifyComplete();
+			.willReturn(Mono.just(this.clientRegistration));
+		StepVerifier
+			.create(this.authorizedClientService.loadAuthorizedClient(this.clientRegistrationId, this.principalName))
+			.verifyComplete();
 	}
 
 	@Test
 	public void loadAuthorizedClientWhenClientRegistrationFoundThenFound() {
 		given(this.clientRegistrationRepository.findByRegistrationId(this.clientRegistrationId))
-				.willReturn(Mono.just(this.clientRegistration));
+			.willReturn(Mono.just(this.clientRegistration));
 		OAuth2AuthorizedClient authorizedClient = new OAuth2AuthorizedClient(this.clientRegistration,
 				this.principalName, this.accessToken);
 		// @formatter:off
@@ -217,7 +217,7 @@ public class InMemoryReactiveOAuth2AuthorizedClientServiceTests {
 	@Test
 	public void removeAuthorizedClientWhenClientIdThenNoException() {
 		given(this.clientRegistrationRepository.findByRegistrationId(this.clientRegistrationId))
-				.willReturn(Mono.empty());
+			.willReturn(Mono.empty());
 		OAuth2AuthorizedClient authorizedClient = new OAuth2AuthorizedClient(this.clientRegistration,
 				this.principalName, this.accessToken);
 		// @formatter:off
@@ -233,7 +233,7 @@ public class InMemoryReactiveOAuth2AuthorizedClientServiceTests {
 	@Test
 	public void removeAuthorizedClientWhenClientRegistrationFoundRemovedThenNotFound() {
 		given(this.clientRegistrationRepository.findByRegistrationId(this.clientRegistrationId))
-				.willReturn(Mono.just(this.clientRegistration));
+			.willReturn(Mono.just(this.clientRegistration));
 		OAuth2AuthorizedClient authorizedClient = new OAuth2AuthorizedClient(this.clientRegistration,
 				this.principalName, this.accessToken);
 		// @formatter:off

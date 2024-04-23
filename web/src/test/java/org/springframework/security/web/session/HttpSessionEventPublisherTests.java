@@ -16,9 +16,8 @@
 
 package org.springframework.security.web.session;
 
-import javax.servlet.http.HttpSessionEvent;
-
-import org.junit.Test;
+import jakarta.servlet.http.HttpSessionEvent;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockServletContext;

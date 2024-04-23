@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.TestClientRegistrations;
@@ -63,7 +63,7 @@ public class OidcUserRequestUtilsTests {
 
 	@Test
 	public void shouldRetrieveUserInfoWhenNotAuthorizationCodeThenFalse() {
-		this.registration.authorizationGrantType(AuthorizationGrantType.IMPLICIT);
+		this.registration.authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS);
 		assertThat(OidcUserRequestUtils.shouldRetrieveUserInfo(userRequest())).isFalse();
 	}
 

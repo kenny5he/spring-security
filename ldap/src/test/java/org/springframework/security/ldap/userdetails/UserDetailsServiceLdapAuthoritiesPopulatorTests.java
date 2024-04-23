@@ -19,7 +19,7 @@ package org.springframework.security.ldap.userdetails;
 import java.util.Collection;
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.ldap.core.DirContextAdapter;
 import org.springframework.security.core.GrantedAuthority;
@@ -47,7 +47,7 @@ public class UserDetailsServiceLdapAuthoritiesPopulatorTests {
 		UserDetailsServiceLdapAuthoritiesPopulator populator = new UserDetailsServiceLdapAuthoritiesPopulator(uds);
 		Collection<? extends GrantedAuthority> auths = populator.getGrantedAuthorities(new DirContextAdapter(), "joe");
 		assertThat(auths).hasSize(1);
-		assertThat(AuthorityUtils.authorityListToSet(auths).contains("ROLE_USER")).isTrue();
+		assertThat(AuthorityUtils.authorityListToSet(auths)).contains("ROLE_USER");
 	}
 
 }

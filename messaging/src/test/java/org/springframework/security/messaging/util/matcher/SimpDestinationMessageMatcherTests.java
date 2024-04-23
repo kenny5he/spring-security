@@ -16,8 +16,8 @@
 
 package org.springframework.security.messaging.util.matcher;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessageType;
@@ -36,7 +36,7 @@ public class SimpDestinationMessageMatcherTests {
 
 	PathMatcher pathMatcher;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.messageBuilder = MessageBuilder.withPayload("M");
 		this.matcher = new SimpDestinationMessageMatcher("/**");
@@ -113,7 +113,7 @@ public class SimpDestinationMessageMatcherTests {
 		this.matcher = new SimpDestinationMessageMatcher("/topics/{topic}/**");
 		this.messageBuilder.setHeader(SimpMessageHeaderAccessor.DESTINATION_HEADER, "/topics/someTopic/sub1");
 		this.messageBuilder.setHeader(SimpMessageHeaderAccessor.MESSAGE_TYPE_HEADER, SimpMessageType.MESSAGE);
-		assertThat(this.matcher.extractPathVariables(this.messageBuilder.build()).get("topic")).isEqualTo("someTopic");
+		assertThat(this.matcher.extractPathVariables(this.messageBuilder.build())).containsEntry("topic", "someTopic");
 	}
 
 	@Test

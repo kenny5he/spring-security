@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,35 +16,45 @@
 
 package org.springframework.security.config.annotation.web.configurers;
 
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.ObjectPostProcessor;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.SecurityContextChangedListenerConfig;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.config.users.AuthenticationTestConfiguration;
+import org.springframework.security.core.context.SecurityContextChangedListener;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 import org.springframework.security.core.userdetails.PasswordEncodedUser;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders;
 import org.springframework.security.web.PortMapper;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.ExceptionTranslationFilter;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.config.Customizer.withDefaults;
+import static org.springframework.security.config.annotation.SecurityContextChangedListenerArgumentMatchers.setAuthentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.logout;
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
@@ -59,10 +69,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Eleftheria Stein
  * @since 5.1
  */
+@ExtendWith(SpringTestContextExtension.class)
 public class FormLoginConfigurerTests {
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -94,6 +104,24 @@ public class FormLoginConfigurerTests {
 				.andExpect(status().isFound())
 				.andExpect(redirectedUrl("/"));
 		// @formatter:on
+	}
+
+	@Test
+	public void formLoginWhenSecurityContextHolderStrategyThenUses() throws Exception {
+		this.spring.register(FormLoginConfig.class, SecurityContextChangedListenerConfig.class).autowire();
+		// @formatter:off
+		SecurityMockMvcRequestBuilders.FormLoginRequestBuilder loginRequest = formLogin()
+				.user("username", "user")
+				.password("password", "password");
+		this.mockMvc.perform(loginRequest)
+				.andExpect(status().isFound())
+				.andExpect(redirectedUrl("/"));
+		// @formatter:on
+		SecurityContextHolderStrategy strategy = this.spring.getContext().getBean(SecurityContextHolderStrategy.class);
+		verify(strategy, atLeastOnce()).getContext();
+		SecurityContextChangedListener listener = this.spring.getContext()
+			.getBean(SecurityContextChangedListener.class);
+		verify(listener).securityContextChanged(setAuthentication(UsernamePasswordAuthenticationToken.class));
 	}
 
 	@Test
@@ -333,7 +361,7 @@ public class FormLoginConfigurerTests {
 		ObjectPostProcessorConfig.objectPostProcessor = spy(ReflectingObjectPostProcessor.class);
 		this.spring.register(ObjectPostProcessorConfig.class).autowire();
 		verify(ObjectPostProcessorConfig.objectPostProcessor)
-				.postProcess(any(UsernamePasswordAuthenticationFilter.class));
+			.postProcess(any(UsernamePasswordAuthenticationFilter.class));
 	}
 
 	@Test
@@ -350,23 +378,26 @@ public class FormLoginConfigurerTests {
 		verify(ObjectPostProcessorConfig.objectPostProcessor).postProcess(any(ExceptionTranslationFilter.class));
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class RequestCacheConfig extends WebSecurityConfigurerAdapter {
+	static class RequestCacheConfig {
 
 		private RequestCache requestCache = mock(RequestCache.class);
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.formLogin().and()
 				.requestCache()
 					.requestCache(this.requestCache);
+			return http.build();
 			// @formatter:on
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
 	static class RequestCacheBeanConfig {
 
@@ -377,20 +408,18 @@ public class FormLoginConfigurerTests {
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class FormLoginConfig extends WebSecurityConfigurerAdapter {
+	@EnableWebMvc
+	static class FormLoginConfig {
 
-		@Override
-		public void configure(WebSecurity web) {
-			// @formatter:off
-			web
-				.ignoring()
-					.antMatchers("/resources/**");
-			// @formatter:on
+		@Bean
+		WebSecurityCustomizer webSecurityCustomizer() {
+			return (web) -> web.ignoring().requestMatchers("/resources/**");
 		}
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.authorizeRequests()
@@ -399,24 +428,22 @@ public class FormLoginConfigurerTests {
 				.formLogin()
 					.loginPage("/login");
 			// @formatter:on
+			return http.build();
 		}
 
-		@Override
-		protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-			// @formatter:off
-			auth
-				.inMemoryAuthentication()
-					.withUser(PasswordEncodedUser.user());
-			// @formatter:on
+		@Bean
+		UserDetailsService userDetailsService() {
+			return new InMemoryUserDetailsManager(PasswordEncodedUser.user());
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class FormLoginInLambdaConfig extends WebSecurityConfigurerAdapter {
+	static class FormLoginInLambdaConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.authorizeRequests((authorizeRequests) ->
@@ -425,24 +452,22 @@ public class FormLoginConfigurerTests {
 				)
 				.formLogin(withDefaults());
 			// @formatter:on
+			return http.build();
 		}
 
-		@Override
-		protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-			// @formatter:off
-			auth
-				.inMemoryAuthentication()
-					.withUser(PasswordEncodedUser.user());
-			// @formatter:on
+		@Bean
+		UserDetailsService userDetailsService() {
+			return new InMemoryUserDetailsManager(PasswordEncodedUser.user());
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class FormLoginConfigPermitAll extends WebSecurityConfigurerAdapter {
+	static class FormLoginConfigPermitAll {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.authorizeRequests()
@@ -450,16 +475,18 @@ public class FormLoginConfigurerTests {
 					.and()
 				.formLogin()
 					.permitAll();
+			return http.build();
 			// @formatter:on
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class FormLoginDefaultsConfig extends WebSecurityConfigurerAdapter {
+	static class FormLoginDefaultsConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.authorizeRequests()
@@ -471,16 +498,18 @@ public class FormLoginConfigurerTests {
 					.and()
 				.logout()
 					.permitAll();
+			return http.build();
 			// @formatter:on
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class FormLoginDefaultsInLambdaConfig extends WebSecurityConfigurerAdapter {
+	static class FormLoginDefaultsInLambdaConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.authorizeRequests((authorizeRequests) ->
@@ -493,16 +522,18 @@ public class FormLoginConfigurerTests {
 						.permitAll()
 				)
 				.logout(LogoutConfigurer::permitAll);
+			return http.build();
 			// @formatter:on
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class FormLoginLoginProcessingUrlConfig extends WebSecurityConfigurerAdapter {
+	static class FormLoginLoginProcessingUrlConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.authorizeRequests()
@@ -521,24 +552,22 @@ public class FormLoginConfigurerTests {
 					.logoutUrl("/logout")
 					.deleteCookies("JSESSIONID");
 			// @formatter:on
+			return http.build();
 		}
 
-		@Override
-		protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-			// @formatter:off
-			auth
-				.inMemoryAuthentication()
-					.withUser(PasswordEncodedUser.user());
-			// @formatter:on
+		@Bean
+		UserDetailsService userDetailsService() {
+			return new InMemoryUserDetailsManager(PasswordEncodedUser.user());
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class FormLoginLoginProcessingUrlInLambdaConfig extends WebSecurityConfigurerAdapter {
+	static class FormLoginLoginProcessingUrlInLambdaConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.authorizeRequests((authorizeRequests) ->
@@ -559,26 +588,24 @@ public class FormLoginConfigurerTests {
 						.deleteCookies("JSESSIONID")
 				);
 			// @formatter:on
+			return http.build();
 		}
 
-		@Override
-		protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-			// @formatter:off
-			auth
-				.inMemoryAuthentication()
-					.withUser(PasswordEncodedUser.user());
-			// @formatter:on
+		@Bean
+		UserDetailsService userDetailsService() {
+			return new InMemoryUserDetailsManager(PasswordEncodedUser.user());
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class FormLoginUsesPortMapperConfig extends WebSecurityConfigurerAdapter {
+	static class FormLoginUsesPortMapperConfig {
 
 		static PortMapper PORT_MAPPER;
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.authorizeRequests()
@@ -591,19 +618,22 @@ public class FormLoginConfigurerTests {
 					.portMapper(PORT_MAPPER);
 			// @formatter:on
 			LoginUrlAuthenticationEntryPoint authenticationEntryPoint = (LoginUrlAuthenticationEntryPoint) http
-					.getConfigurer(FormLoginConfigurer.class).getAuthenticationEntryPoint();
+				.getConfigurer(FormLoginConfigurer.class)
+				.getAuthenticationEntryPoint();
 			authenticationEntryPoint.setForceHttps(true);
+			return http.build();
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class PermitAllIgnoresFailureHandlerConfig extends WebSecurityConfigurerAdapter {
+	static class PermitAllIgnoresFailureHandlerConfig {
 
 		static AuthenticationFailureHandler FAILURE_HANDLER = mock(AuthenticationFailureHandler.class);
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.authorizeRequests()
@@ -612,16 +642,18 @@ public class FormLoginConfigurerTests {
 				.formLogin()
 					.failureHandler(FAILURE_HANDLER)
 					.permitAll();
+			return http.build();
 			// @formatter:on
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class DuplicateInvocationsDoesNotOverrideConfig extends WebSecurityConfigurerAdapter {
+	static class DuplicateInvocationsDoesNotOverrideConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.formLogin()
@@ -629,24 +661,22 @@ public class FormLoginConfigurerTests {
 					.and()
 				.formLogin();
 			// @formatter:on
+			return http.build();
 		}
 
-		@Override
-		protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-			// @formatter:off
-			auth
-				.inMemoryAuthentication()
-					.withUser(PasswordEncodedUser.user());
-			// @formatter:on
+		@Bean
+		UserDetailsService userDetailsService() {
+			return new InMemoryUserDetailsManager(PasswordEncodedUser.user());
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class FormLoginUserForwardAuthenticationSuccessAndFailureConfig extends WebSecurityConfigurerAdapter {
+	static class FormLoginUserForwardAuthenticationSuccessAndFailureConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.csrf()
@@ -659,31 +689,30 @@ public class FormLoginConfigurerTests {
 					.successForwardUrl("/success_forward_url")
 					.permitAll();
 			// @formatter:on
+			return http.build();
 		}
 
-		@Override
-		protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-			// @formatter:off
-			auth
-				.inMemoryAuthentication()
-					.withUser(PasswordEncodedUser.user());
-			// @formatter:on
+		@Bean
+		UserDetailsService userDetailsService() {
+			return new InMemoryUserDetailsManager(PasswordEncodedUser.user());
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class ObjectPostProcessorConfig extends WebSecurityConfigurerAdapter {
+	static class ObjectPostProcessorConfig {
 
 		static ObjectPostProcessor<Object> objectPostProcessor;
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.exceptionHandling()
 					.and()
 				.formLogin();
+			return http.build();
 			// @formatter:on
 		}
 

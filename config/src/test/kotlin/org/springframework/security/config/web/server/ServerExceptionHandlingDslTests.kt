@@ -17,16 +17,18 @@
 package org.springframework.security.config.web.server
 
 import org.assertj.core.api.Assertions
-import org.junit.Rule
-import org.junit.Test
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpStatus
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity
 import org.springframework.security.core.userdetails.MapReactiveUserDetailsService
 import org.springframework.security.core.userdetails.User
-import org.springframework.security.config.test.SpringTestRule
+import org.springframework.security.config.test.SpringTestContext
+import org.springframework.security.config.test.SpringTestContextExtension
 import org.springframework.security.web.server.SecurityWebFilterChain
 import org.springframework.security.web.server.authentication.RedirectServerAuthenticationEntryPoint
 import org.springframework.security.web.server.authorization.HttpStatusServerAccessDeniedHandler
@@ -39,10 +41,10 @@ import java.util.*
  *
  * @author Eleftheria Stein
  */
+@ExtendWith(SpringTestContextExtension::class)
 class ServerExceptionHandlingDslTests {
-    @Rule
     @JvmField
-    val spring = SpringTestRule()
+    val spring = SpringTestContext(this)
 
     private lateinit var client: WebTestClient
 
@@ -69,6 +71,7 @@ class ServerExceptionHandlingDslTests {
         }
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class EntryPointConfig {
@@ -97,6 +100,7 @@ class ServerExceptionHandlingDslTests {
                 .expectStatus().isSeeOther
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class AccessDeniedHandlerConfig {

@@ -19,8 +19,8 @@ package org.springframework.security.oauth2.client.registration;
 import java.util.Arrays;
 import java.util.List;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import reactor.test.StepVerifier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,7 +37,7 @@ public class InMemoryReactiveClientRegistrationRepositoryTests {
 
 	private InMemoryReactiveClientRegistrationRepository repository;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.repository = new InMemoryReactiveClientRegistrationRepository(this.registration);
 	}
@@ -51,28 +51,28 @@ public class InMemoryReactiveClientRegistrationRepositoryTests {
 	public void constructorWhenClientRegistrationArrayThenIllegalArgumentException() {
 		ClientRegistration[] registrations = null;
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new InMemoryReactiveClientRegistrationRepository(registrations));
+			.isThrownBy(() -> new InMemoryReactiveClientRegistrationRepository(registrations));
 	}
 
 	@Test
 	public void constructorWhenClientRegistrationListThenIllegalArgumentException() {
 		List<ClientRegistration> registrations = null;
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new InMemoryReactiveClientRegistrationRepository(registrations));
+			.isThrownBy(() -> new InMemoryReactiveClientRegistrationRepository(registrations));
 	}
 
 	@Test
 	public void constructorListClientRegistrationWhenDuplicateIdThenIllegalArgumentException() {
 		List<ClientRegistration> registrations = Arrays.asList(this.registration, this.registration);
 		assertThatIllegalStateException()
-				.isThrownBy(() -> new InMemoryReactiveClientRegistrationRepository(registrations));
+			.isThrownBy(() -> new InMemoryReactiveClientRegistrationRepository(registrations));
 	}
 
 	@Test
 	public void constructorWhenClientRegistrationIsNullThenIllegalArgumentException() {
 		ClientRegistration registration = null;
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new InMemoryReactiveClientRegistrationRepository(registration));
+			.isThrownBy(() -> new InMemoryReactiveClientRegistrationRepository(registration));
 	}
 
 	@Test
@@ -87,7 +87,7 @@ public class InMemoryReactiveClientRegistrationRepositoryTests {
 	@Test
 	public void findByRegistrationIdWhenNotValidIdThenEmpty() {
 		StepVerifier.create(this.repository.findByRegistrationId(this.registration.getRegistrationId() + "invalid"))
-				.verifyComplete();
+			.verifyComplete();
 	}
 
 	@Test

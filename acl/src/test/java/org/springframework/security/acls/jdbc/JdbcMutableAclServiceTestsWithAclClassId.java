@@ -18,7 +18,7 @@ package org.springframework.security.acls.jdbc;
 
 import java.util.UUID;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.acls.TargetObjectWithUUID;
 import org.springframework.security.acls.domain.ObjectIdentityImpl;
@@ -79,7 +79,7 @@ public class JdbcMutableAclServiceTestsWithAclClassId extends JdbcMutableAclServ
 		ObjectIdentity oid = new ObjectIdentityImpl(TARGET_CLASS_WITH_UUID, id);
 		getJdbcMutableAclService().createAcl(oid);
 		assertThat(getJdbcMutableAclService().readAclById(new ObjectIdentityImpl(TARGET_CLASS_WITH_UUID, id)))
-				.isNotNull();
+			.isNotNull();
 	}
 
 }

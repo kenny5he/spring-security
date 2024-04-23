@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2013 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +22,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.lang.reflect.Method;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.core.MethodParameter;
 import org.springframework.security.authentication.TestingAuthenticationToken;
@@ -48,12 +48,12 @@ public class AuthenticationPrincipalArgumentResolverTests {
 
 	private AuthenticationPrincipalArgumentResolver resolver;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.resolver = new AuthenticationPrincipalArgumentResolver();
 	}
 
-	@After
+	@AfterEach
 	public void cleanup() {
 		SecurityContextHolder.clearContext();
 	}
@@ -100,14 +100,14 @@ public class AuthenticationPrincipalArgumentResolverTests {
 	public void resolveArgumentUserDetails() throws Exception {
 		setAuthenticationPrincipal(new User("user", "password", AuthorityUtils.createAuthorityList("ROLE_USER")));
 		assertThat(this.resolver.resolveArgument(showUserAnnotationUserDetails(), null))
-				.isEqualTo(this.expectedPrincipal);
+			.isEqualTo(this.expectedPrincipal);
 	}
 
 	@Test
 	public void resolveArgumentCustomUserPrincipal() throws Exception {
 		setAuthenticationPrincipal(new CustomUserPrincipal());
 		assertThat(this.resolver.resolveArgument(showUserAnnotationCustomUserPrincipal(), null))
-				.isEqualTo(this.expectedPrincipal);
+			.isEqualTo(this.expectedPrincipal);
 	}
 
 	@Test
@@ -134,6 +134,14 @@ public class AuthenticationPrincipalArgumentResolverTests {
 	}
 
 	@Test
+	public void resolveArgumentSpelPrimitive() throws Exception {
+		CustomUserPrincipal principal = new CustomUserPrincipal();
+		setAuthenticationPrincipal(principal);
+		this.expectedPrincipal = principal.id;
+		assertThat(this.resolver.resolveArgument(showUserSpelPrimitive(), null)).isEqualTo(this.expectedPrincipal);
+	}
+
+	@Test
 	public void resolveArgumentNullOnInvalidType() throws Exception {
 		setAuthenticationPrincipal(new CustomUserPrincipal());
 		assertThat(this.resolver.resolveArgument(showUserAnnotationString(), null)).isNull();
@@ -143,14 +151,14 @@ public class AuthenticationPrincipalArgumentResolverTests {
 	public void resolveArgumentErrorOnInvalidType() throws Exception {
 		setAuthenticationPrincipal(new CustomUserPrincipal());
 		assertThatExceptionOfType(ClassCastException.class)
-				.isThrownBy(() -> this.resolver.resolveArgument(showUserAnnotationErrorOnInvalidType(), null));
+			.isThrownBy(() -> this.resolver.resolveArgument(showUserAnnotationErrorOnInvalidType(), null));
 	}
 
 	@Test
 	public void resolveArgumentCustomserErrorOnInvalidType() throws Exception {
 		setAuthenticationPrincipal(new CustomUserPrincipal());
-		assertThatExceptionOfType(ClassCastException.class).isThrownBy(
-				() -> this.resolver.resolveArgument(showUserAnnotationCurrentUserErrorOnInvalidType(), null));
+		assertThatExceptionOfType(ClassCastException.class)
+			.isThrownBy(() -> this.resolver.resolveArgument(showUserAnnotationCurrentUserErrorOnInvalidType(), null));
 	}
 
 	@Test
@@ -195,6 +203,10 @@ public class AuthenticationPrincipalArgumentResolverTests {
 		return getMethodParameter("showUserSpelCopy", CopyUserPrincipal.class);
 	}
 
+	private MethodParameter showUserSpelPrimitive() {
+		return getMethodParameter("showUserSpelPrimitive", int.class);
+	}
+
 	private MethodParameter showUserAnnotationObject() {
 		return getMethodParameter("showUserAnnotation", Object.class);
 	}
@@ -207,7 +219,7 @@ public class AuthenticationPrincipalArgumentResolverTests {
 	private void setAuthenticationPrincipal(Object principal) {
 		this.expectedPrincipal = principal;
 		SecurityContextHolder.getContext()
-				.setAuthentication(new TestingAuthenticationToken(this.expectedPrincipal, "password", "ROLE_USER"));
+			.setAuthentication(new TestingAuthenticationToken(this.expectedPrincipal, "password", "ROLE_USER"));
 	}
 
 	@Target({ ElementType.PARAMETER })
@@ -258,11 +270,16 @@ public class AuthenticationPrincipalArgumentResolverTests {
 				expression = "new org.springframework.security.messaging.context.AuthenticationPrincipalArgumentResolverTests$CopyUserPrincipal(#this)") CopyUserPrincipal user) {
 		}
 
+		public void showUserSpelPrimitive(@AuthenticationPrincipal(expression = "id") int id) {
+		}
+
 	}
 
 	static class CustomUserPrincipal {
 
 		public final String property = "property";
+
+		public final int id = 1;
 
 	}
 

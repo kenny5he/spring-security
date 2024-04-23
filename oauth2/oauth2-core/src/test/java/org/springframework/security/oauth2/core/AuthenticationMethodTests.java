@@ -16,7 +16,7 @@
 
 package org.springframework.security.oauth2.core;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -31,7 +31,7 @@ public class AuthenticationMethodTests {
 	@Test
 	public void constructorWhenValueIsNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new AuthenticationMethod(null))
-				.withMessage("value cannot be empty");
+			.withMessage("value cannot be empty");
 	}
 
 	@Test

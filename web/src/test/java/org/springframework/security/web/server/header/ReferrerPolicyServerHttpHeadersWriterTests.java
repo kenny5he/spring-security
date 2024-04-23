@@ -16,8 +16,8 @@
 
 package org.springframework.security.web.server.header;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
@@ -38,7 +38,7 @@ public class ReferrerPolicyServerHttpHeadersWriterTests {
 
 	private ReferrerPolicyServerHttpHeadersWriter writer;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/"));
 		this.writer = new ReferrerPolicyServerHttpHeadersWriter();
@@ -50,7 +50,7 @@ public class ReferrerPolicyServerHttpHeadersWriterTests {
 		HttpHeaders headers = this.exchange.getResponse().getHeaders();
 		assertThat(headers).hasSize(1);
 		assertThat(headers.get(ReferrerPolicyServerHttpHeadersWriter.REFERRER_POLICY))
-				.containsOnly(ReferrerPolicy.NO_REFERRER.getPolicy());
+			.containsOnly(ReferrerPolicy.NO_REFERRER.getPolicy());
 	}
 
 	@Test
@@ -60,14 +60,15 @@ public class ReferrerPolicyServerHttpHeadersWriterTests {
 		HttpHeaders headers = this.exchange.getResponse().getHeaders();
 		assertThat(headers).hasSize(1);
 		assertThat(headers.get(ReferrerPolicyServerHttpHeadersWriter.REFERRER_POLICY))
-				.containsOnly(ReferrerPolicy.SAME_ORIGIN.getPolicy());
+			.containsOnly(ReferrerPolicy.SAME_ORIGIN.getPolicy());
 	}
 
 	@Test
 	public void writeHeadersWhenAlreadyWrittenThenWritesHeader() {
 		String headerValue = ReferrerPolicy.SAME_ORIGIN.getPolicy();
-		this.exchange.getResponse().getHeaders().set(ReferrerPolicyServerHttpHeadersWriter.REFERRER_POLICY,
-				headerValue);
+		this.exchange.getResponse()
+			.getHeaders()
+			.set(ReferrerPolicyServerHttpHeadersWriter.REFERRER_POLICY, headerValue);
 		this.writer.writeHttpHeaders(this.exchange);
 		HttpHeaders headers = this.exchange.getResponse().getHeaders();
 		assertThat(headers).hasSize(1);

@@ -23,9 +23,8 @@ import java.util.Collections;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
@@ -50,11 +49,12 @@ import org.springframework.security.access.intercept.aspectj.AspectJMethodSecuri
 import org.springframework.security.access.method.AbstractMethodSecurityMetadataSource;
 import org.springframework.security.access.method.MethodSecurityMetadataSource;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.test.context.annotation.SecurityTestExecutionListeners;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -63,12 +63,11 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
  * @author Rob Winch
  * @author Josh Cummings
  */
-@RunWith(SpringJUnit4ClassRunner.class)
+@ExtendWith({ SpringExtension.class, SpringTestContextExtension.class })
 @SecurityTestExecutionListeners
 public class NamespaceGlobalMethodSecurityTests {
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired(required = false)
 	private MethodSecurityService service;
@@ -109,7 +108,7 @@ public class NamespaceGlobalMethodSecurityTests {
 	@WithMockUser
 	public void methodSecurityWhenCustomMethodSecurityMetadataSourceThenAuthorizes() {
 		this.spring.register(CustomMethodSecurityMetadataSourceConfig.class, MethodSecurityServiceConfig.class)
-				.autowire();
+			.autowire();
 		assertThatExceptionOfType(AccessDeniedException.class).isThrownBy(() -> this.service.preAuthorize());
 		assertThatExceptionOfType(AccessDeniedException.class).isThrownBy(() -> this.service.secured());
 		assertThatExceptionOfType(AccessDeniedException.class).isThrownBy(() -> this.service.jsr250());
@@ -119,9 +118,10 @@ public class NamespaceGlobalMethodSecurityTests {
 	@WithMockUser
 	public void contextRefreshWhenUsingAspectJThenAutowire() throws Exception {
 		this.spring.register(AspectJModeConfig.class, MethodSecurityServiceConfig.class).autowire();
-		assertThat(this.spring.getContext().getBean(
-				Class.forName("org.springframework.security.access.intercept.aspectj.aspect.AnnotationSecurityAspect")))
-						.isNotNull();
+		assertThat(this.spring.getContext()
+			.getBean(Class
+				.forName("org.springframework.security.access.intercept.aspectj.aspect.AnnotationSecurityAspect")))
+			.isNotNull();
 		assertThat(this.spring.getContext().getBean(AspectJMethodSecurityInterceptor.class)).isNotNull();
 		// TODO diagnose why aspectj isn't weaving method security advice around
 		// MethodSecurityServiceImpl
@@ -131,9 +131,10 @@ public class NamespaceGlobalMethodSecurityTests {
 	public void contextRefreshWhenUsingAspectJAndCustomGlobalMethodSecurityConfigurationThenAutowire()
 			throws Exception {
 		this.spring.register(AspectJModeExtendsGMSCConfig.class).autowire();
-		assertThat(this.spring.getContext().getBean(
-				Class.forName("org.springframework.security.access.intercept.aspectj.aspect.AnnotationSecurityAspect")))
-						.isNotNull();
+		assertThat(this.spring.getContext()
+			.getBean(Class
+				.forName("org.springframework.security.access.intercept.aspectj.aspect.AnnotationSecurityAspect")))
+			.isNotNull();
 		assertThat(this.spring.getContext().getBean(AspectJMethodSecurityInterceptor.class)).isNotNull();
 	}
 
@@ -141,8 +142,9 @@ public class NamespaceGlobalMethodSecurityTests {
 	@WithMockUser
 	public void methodSecurityWhenOrderSpecifiedThenConfigured() {
 		this.spring.register(CustomOrderConfig.class, MethodSecurityServiceConfig.class).autowire();
-		assertThat(this.spring.getContext().getBean("metaDataSourceAdvisor", MethodSecurityMetadataSourceAdvisor.class)
-				.getOrder()).isEqualTo(-135);
+		assertThat(this.spring.getContext()
+			.getBean("metaDataSourceAdvisor", MethodSecurityMetadataSourceAdvisor.class)
+			.getOrder()).isEqualTo(-135);
 		assertThatExceptionOfType(AccessDeniedException.class).isThrownBy(() -> this.service.jsr250());
 	}
 
@@ -150,8 +152,9 @@ public class NamespaceGlobalMethodSecurityTests {
 	@WithMockUser
 	public void methodSecurityWhenOrderUnspecifiedThenConfiguredToLowestPrecedence() {
 		this.spring.register(DefaultOrderConfig.class, MethodSecurityServiceConfig.class).autowire();
-		assertThat(this.spring.getContext().getBean("metaDataSourceAdvisor", MethodSecurityMetadataSourceAdvisor.class)
-				.getOrder()).isEqualTo(Ordered.LOWEST_PRECEDENCE);
+		assertThat(this.spring.getContext()
+			.getBean("metaDataSourceAdvisor", MethodSecurityMetadataSourceAdvisor.class)
+			.getOrder()).isEqualTo(Ordered.LOWEST_PRECEDENCE);
 		assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> this.service.jsr250());
 	}
 
@@ -159,9 +162,10 @@ public class NamespaceGlobalMethodSecurityTests {
 	@WithMockUser
 	public void methodSecurityWhenOrderUnspecifiedAndCustomGlobalMethodSecurityConfigurationThenConfiguredToLowestPrecedence() {
 		this.spring.register(DefaultOrderExtendsMethodSecurityConfig.class, MethodSecurityServiceConfig.class)
-				.autowire();
-		assertThat(this.spring.getContext().getBean("metaDataSourceAdvisor", MethodSecurityMetadataSourceAdvisor.class)
-				.getOrder()).isEqualTo(Ordered.LOWEST_PRECEDENCE);
+			.autowire();
+		assertThat(this.spring.getContext()
+			.getBean("metaDataSourceAdvisor", MethodSecurityMetadataSourceAdvisor.class)
+			.getOrder()).isEqualTo(Ordered.LOWEST_PRECEDENCE);
 		assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> this.service.jsr250());
 	}
 
@@ -205,7 +209,7 @@ public class NamespaceGlobalMethodSecurityTests {
 	public void methodSecurityWhenCustomRunAsManagerThenRunAsWrapsAuthentication() {
 		this.spring.register(CustomRunAsManagerConfig.class, MethodSecurityServiceConfig.class).autowire();
 		assertThat(this.service.runAs().getAuthorities())
-				.anyMatch((authority) -> "ROLE_RUN_AS_SUPER".equals(authority.getAuthority()));
+			.anyMatch((authority) -> "ROLE_RUN_AS_SUPER".equals(authority.getAuthority()));
 	}
 
 	@Test
@@ -222,8 +226,8 @@ public class NamespaceGlobalMethodSecurityTests {
 	@WithMockUser
 	public void methodSecurityWhenMissingEnableAnnotationThenShowsHelpfulError() {
 		assertThatExceptionOfType(Exception.class)
-				.isThrownBy(() -> this.spring.register(ExtendsNoEnableAnntotationConfig.class).autowire())
-				.withStackTraceContaining(EnableGlobalMethodSecurity.class.getName() + " is required");
+			.isThrownBy(() -> this.spring.register(ExtendsNoEnableAnntotationConfig.class).autowire())
+			.withStackTraceContaining(EnableGlobalMethodSecurity.class.getName() + " is required");
 	}
 
 	@Test
@@ -235,6 +239,7 @@ public class NamespaceGlobalMethodSecurityTests {
 		assertThatExceptionOfType(AccessDeniedException.class).isThrownBy(() -> this.service.preAuthorize());
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(prePostEnabled = true, securedEnabled = true)
 	public static class CustomAccessDecisionManagerConfig extends GlobalMethodSecurityConfiguration {
 
@@ -265,6 +270,7 @@ public class NamespaceGlobalMethodSecurityTests {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(prePostEnabled = true)
 	public static class CustomAfterInvocationManagerConfig extends GlobalMethodSecurityConfiguration {
 
@@ -295,6 +301,7 @@ public class NamespaceGlobalMethodSecurityTests {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(prePostEnabled = true)
 	public static class CustomAuthenticationConfig extends GlobalMethodSecurityConfiguration {
 
@@ -314,12 +321,13 @@ public class NamespaceGlobalMethodSecurityTests {
 
 	}
 
-	@EnableGlobalMethodSecurity(jsr250Enabled = true)
 	@Configuration
+	@EnableGlobalMethodSecurity(jsr250Enabled = true)
 	public static class Jsr250Config {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity
 	public static class CustomMethodSecurityMetadataSourceConfig extends GlobalMethodSecurityConfiguration {
 
@@ -343,11 +351,13 @@ public class NamespaceGlobalMethodSecurityTests {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(mode = AdviceMode.ASPECTJ, securedEnabled = true)
 	public static class AspectJModeConfig {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(mode = AdviceMode.ASPECTJ, securedEnabled = true)
 	public static class AspectJModeExtendsGMSCConfig extends GlobalMethodSecurityConfiguration {
 
@@ -361,7 +371,7 @@ public class NamespaceGlobalMethodSecurityTests {
 			BeanDefinitionBuilder advice = BeanDefinitionBuilder.rootBeanDefinition(ExceptingInterceptor.class);
 			registry.registerBeanDefinition("exceptingInterceptor", advice.getBeanDefinition());
 			BeanDefinitionBuilder advisor = BeanDefinitionBuilder
-					.rootBeanDefinition(MethodSecurityMetadataSourceAdvisor.class);
+				.rootBeanDefinition(MethodSecurityMetadataSourceAdvisor.class);
 			advisor.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
 			advisor.addConstructorArgValue("exceptingInterceptor");
 			advisor.addConstructorArgReference("methodSecurityMetadataSource");
@@ -381,44 +391,52 @@ public class NamespaceGlobalMethodSecurityTests {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(order = -135, jsr250Enabled = true)
 	@Import(AdvisorOrderConfig.class)
 	public static class CustomOrderConfig {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(jsr250Enabled = true)
 	@Import(AdvisorOrderConfig.class)
 	public static class DefaultOrderConfig {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(jsr250Enabled = true)
 	@Import(AdvisorOrderConfig.class)
 	public static class DefaultOrderExtendsMethodSecurityConfig extends GlobalMethodSecurityConfiguration {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(prePostEnabled = true)
 	public static class PreAuthorizeConfig {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(prePostEnabled = true)
 	public static class PreAuthorizeExtendsGMSCConfig extends GlobalMethodSecurityConfiguration {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(proxyTargetClass = true, prePostEnabled = true)
 	public static class ProxyTargetClassConfig {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(prePostEnabled = true)
 	public static class DefaultProxyConfig {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(securedEnabled = true)
 	public static class CustomRunAsManagerConfig extends GlobalMethodSecurityConfiguration {
 
@@ -431,6 +449,7 @@ public class NamespaceGlobalMethodSecurityTests {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(securedEnabled = true)
 	public static class SecuredConfig {
 

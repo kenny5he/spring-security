@@ -16,7 +16,7 @@
 
 package org.springframework.security.config.web.server;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebDriver;
@@ -53,7 +53,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.springframework.security.config.Customizer.withDefaults;
 
 /**
@@ -102,8 +102,9 @@ public class FormLoginTests {
 	@Test
 	public void formLoginWhenDefaultsInLambdaThenCreatesDefaultLoginPage() {
 		SecurityWebFilterChain securityWebFilter = this.http
-				.authorizeExchange((exchanges) -> exchanges.anyExchange().authenticated()).formLogin(withDefaults())
-				.build();
+			.authorizeExchange((exchanges) -> exchanges.anyExchange().authenticated())
+			.formLogin(withDefaults())
+			.build();
 		WebTestClient webTestClient = WebTestClientBuilder.bindToWebFilters(securityWebFilter).build();
 		WebDriver driver = WebTestClientHtmlUnitDriverBuilder.webTestClientSetup(webTestClient).build();
 		DefaultLoginPage loginPage = HomePage.to(driver, DefaultLoginPage.class).assertAt();
@@ -269,9 +270,9 @@ public class FormLoginTests {
 		ReactiveAuthenticationManager defaultAuthenticationManager = mock(ReactiveAuthenticationManager.class);
 		ReactiveAuthenticationManager customAuthenticationManager = mock(ReactiveAuthenticationManager.class);
 		given(defaultAuthenticationManager.authenticate(any()))
-				.willThrow(new RuntimeException("should not interact with default auth manager"));
+			.willThrow(new RuntimeException("should not interact with default auth manager"));
 		given(customAuthenticationManager.authenticate(any()))
-				.willReturn(Mono.just(new TestingAuthenticationToken("user", "password", "ROLE_USER", "ROLE_ADMIN")));
+			.willReturn(Mono.just(new TestingAuthenticationToken("user", "password", "ROLE_USER", "ROLE_ADMIN")));
 		// @formatter:off
 		SecurityWebFilterChain securityWebFilter = this.http
 				.authenticationManager(defaultAuthenticationManager)
@@ -294,7 +295,7 @@ public class FormLoginTests {
 				.submit(HomePage.class);
 		// @formatter:on
 		homePage.assertAt();
-		verifyZeroInteractions(defaultAuthenticationManager);
+		verifyNoMoreInteractions(defaultAuthenticationManager);
 	}
 
 	@Test

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2014 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +16,19 @@
 
 package org.springframework.security.test.web.servlet.showcase.secured;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -41,7 +43,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@RunWith(SpringJUnit4ClassRunner.class)
+@ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = DefaultfSecurityRequestsTests.Config.class)
 @WebAppConfiguration
 public class DefaultfSecurityRequestsTests {
@@ -51,52 +53,56 @@ public class DefaultfSecurityRequestsTests {
 
 	private MockMvc mvc;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.mvc = MockMvcBuilders.webAppContextSetup(this.context)
-				.defaultRequest(get("/").with(user("user").roles("ADMIN"))).apply(springSecurity()).build();
+			.defaultRequest(get("/").with(user("user").roles("ADMIN")))
+			.apply(springSecurity())
+			.build();
 	}
 
 	@Test
 	public void requestProtectedUrlWithUser() throws Exception {
 		this.mvc.perform(get("/"))
-				// Ensure we got past Security
-				.andExpect(status().isNotFound())
-				// Ensure it appears we are authenticated with user
-				.andExpect(authenticated().withUsername("user"));
+			// Ensure we got past Security
+			.andExpect(status().isNotFound())
+			// Ensure it appears we are authenticated with user
+			.andExpect(authenticated().withUsername("user"));
 	}
 
 	@Test
 	public void requestProtectedUrlWithAdmin() throws Exception {
 		this.mvc.perform(get("/admin"))
-				// Ensure we got past Security
-				.andExpect(status().isNotFound())
-				// Ensure it appears we are authenticated with user
-				.andExpect(authenticated().withUsername("user"));
+			// Ensure we got past Security
+			.andExpect(status().isNotFound())
+			// Ensure it appears we are authenticated with user
+			.andExpect(authenticated().withUsername("user"));
 	}
 
 	@Test
 	public void requestProtectedUrlWithAnonymous() throws Exception {
 		this.mvc.perform(get("/admin").with(anonymous()))
-				// Ensure we got past Security
-				.andExpect(status().isUnauthorized())
-				// Ensure it appears we are authenticated with user
-				.andExpect(unauthenticated());
+			// Ensure we got past Security
+			.andExpect(status().isUnauthorized())
+			// Ensure it appears we are authenticated with user
+			.andExpect(unauthenticated());
 	}
 
+	@Configuration
 	@EnableWebSecurity
 	@EnableWebMvc
-	static class Config extends WebSecurityConfigurerAdapter {
+	static class Config {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.authorizeRequests()
-					.antMatchers("/admin/**").hasRole("ADMIN")
+					.requestMatchers("/admin/**").hasRole("ADMIN")
 					.anyRequest().authenticated()
 					.and()
 				.httpBasic();
+			return http.build();
 			// @formatter:on
 		}
 

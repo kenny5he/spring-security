@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,11 +37,9 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import javax.servlet.ServletContext;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import com.nimbusds.oauth2.sdk.util.StringUtils;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.core.io.DefaultResourceLoader;
@@ -57,6 +55,7 @@ import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
@@ -64,12 +63,14 @@ import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.client.web.method.annotation.OAuth2AuthorizedClientArgumentResolver;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticatedPrincipal;
+import org.springframework.security.oauth2.core.OAuth2TokenIntrospectionClaimNames;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
@@ -85,8 +86,8 @@ import org.springframework.security.oauth2.server.resource.authentication.Bearer
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.introspection.OAuth2IntrospectionAuthenticatedPrincipal;
-import org.springframework.security.oauth2.server.resource.introspection.OAuth2IntrospectionClaimNames;
 import org.springframework.security.test.context.TestSecurityContextHolder;
+import org.springframework.security.test.context.TestSecurityContextHolderStrategyAdapter;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.security.test.web.support.WebTestUtils;
 import org.springframework.security.web.context.HttpRequestResponseHolder;
@@ -95,6 +96,8 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestHandler;
+import org.springframework.security.web.csrf.DeferredCsrfToken;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -102,6 +105,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.DigestUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
@@ -115,6 +119,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  * @since 4.0
  */
 public final class SecurityMockMvcRequestPostProcessors {
+
+	private static final SecurityContextHolderStrategy DEFAULT_SECURITY_CONTEXT_HOLDER_STRATEGY = new TestSecurityContextHolderStrategyAdapter();
 
 	private SecurityMockMvcRequestPostProcessors() {
 	}
@@ -177,7 +183,7 @@ public final class SecurityMockMvcRequestPostProcessors {
 	/**
 	 * Creates a {@link RequestPostProcessor} that can be used to ensure that the
 	 * resulting request is ran with the user in the {@link TestSecurityContextHolder}.
-	 * @return the {@link RequestPostProcessor} to sue
+	 * @return the {@link RequestPostProcessor} to use
 	 */
 	public static RequestPostProcessor testSecurityContext() {
 		return new TestSecurityContextHolderPostProcessor();
@@ -431,7 +437,7 @@ public final class SecurityMockMvcRequestPostProcessors {
 	 *
 	 * <p>
 	 * The support works by associating the authorized client to the HttpServletRequest
-	 * via the {@link HttpSessionOAuth2AuthorizedClientRepository}
+	 * using an {@link OAuth2AuthorizedClientRepository}
 	 * </p>
 	 * @return the {@link OAuth2ClientRequestPostProcessor} for additional customization
 	 * @since 5.3
@@ -446,7 +452,7 @@ public final class SecurityMockMvcRequestPostProcessors {
 	 *
 	 * <p>
 	 * The support works by associating the authorized client to the HttpServletRequest
-	 * via the {@link HttpSessionOAuth2AuthorizedClientRepository}
+	 * using an {@link OAuth2AuthorizedClientRepository}
 	 * </p>
 	 * @param registrationId The registration id for the {@link OAuth2AuthorizedClient}
 	 * @return the {@link OAuth2ClientRequestPostProcessor} for additional customization
@@ -454,6 +460,18 @@ public final class SecurityMockMvcRequestPostProcessors {
 	 */
 	public static OAuth2ClientRequestPostProcessor oauth2Client(String registrationId) {
 		return new OAuth2ClientRequestPostProcessor(registrationId);
+	}
+
+	private static SecurityContextHolderStrategy getSecurityContextHolderStrategy(HttpServletRequest request) {
+		WebApplicationContext context = WebApplicationContextUtils
+			.findWebApplicationContext(request.getServletContext());
+		if (context == null) {
+			return DEFAULT_SECURITY_CONTEXT_HOLDER_STRATEGY;
+		}
+		if (context.getBeanNamesForType(SecurityContextHolderStrategy.class).length == 0) {
+			return DEFAULT_SECURITY_CONTEXT_HOLDER_STRATEGY;
+		}
+		return context.getBean(SecurityContextHolderStrategy.class);
 	}
 
 	/**
@@ -470,7 +488,7 @@ public final class SecurityMockMvcRequestPostProcessors {
 
 		@Override
 		public MockHttpServletRequest postProcessRequest(MockHttpServletRequest request) {
-			request.setAttribute("javax.servlet.request.X509Certificate", this.certificates);
+			request.setAttribute("jakarta.servlet.request.X509Certificate", this.certificates);
 			return request;
 		}
 
@@ -484,6 +502,10 @@ public final class SecurityMockMvcRequestPostProcessors {
 	 */
 	public static final class CsrfRequestPostProcessor implements RequestPostProcessor {
 
+		private static final byte[] INVALID_TOKEN_BYTES = new byte[] { 1, 1, 1, 96, 99, 98 };
+
+		private static final String INVALID_TOKEN_VALUE = Base64.getEncoder().encodeToString(INVALID_TOKEN_BYTES);
+
 		private boolean asHeader;
 
 		private boolean useInvalidToken;
@@ -494,14 +516,17 @@ public final class SecurityMockMvcRequestPostProcessors {
 		@Override
 		public MockHttpServletRequest postProcessRequest(MockHttpServletRequest request) {
 			CsrfTokenRepository repository = WebTestUtils.getCsrfTokenRepository(request);
+			CsrfTokenRequestHandler handler = WebTestUtils.getCsrfTokenRequestHandler(request);
 			if (!(repository instanceof TestCsrfTokenRepository)) {
 				repository = new TestCsrfTokenRepository(new HttpSessionCsrfTokenRepository());
 				WebTestUtils.setCsrfTokenRepository(request, repository);
 			}
 			TestCsrfTokenRepository.enable(request);
-			CsrfToken token = repository.generateToken(request);
-			repository.saveToken(token, request, new MockHttpServletResponse());
-			String tokenValue = this.useInvalidToken ? "invalid" + token.getToken() : token.getToken();
+			MockHttpServletResponse response = new MockHttpServletResponse();
+			DeferredCsrfToken deferredCsrfToken = repository.loadDeferredToken(request, response);
+			handler.handle(request, response, deferredCsrfToken::get);
+			CsrfToken token = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+			String tokenValue = this.useInvalidToken ? INVALID_TOKEN_VALUE : token.getToken();
 			if (this.asHeader) {
 				request.addHeader(token.getHeaderName(), tokenValue);
 			}
@@ -711,7 +736,7 @@ public final class SecurityMockMvcRequestPostProcessors {
 		 * @param request the {@link HttpServletRequest} to use
 		 */
 		final void save(Authentication authentication, HttpServletRequest request) {
-			SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+			SecurityContext securityContext = getSecurityContextHolderStrategy(request).createEmptyContext();
 			securityContext.setAuthentication(authentication);
 			save(securityContext, request);
 		}
@@ -791,8 +816,6 @@ public final class SecurityMockMvcRequestPostProcessors {
 	private static final class TestSecurityContextHolderPostProcessor extends SecurityContextRequestPostProcessorSupport
 			implements RequestPostProcessor {
 
-		private SecurityContext EMPTY = SecurityContextHolder.createEmptyContext();
-
 		@Override
 		public MockHttpServletRequest postProcessRequest(MockHttpServletRequest request) {
 			// TestSecurityContextHolder is only a default value
@@ -800,8 +823,10 @@ public final class SecurityMockMvcRequestPostProcessors {
 			if (existingContext != null) {
 				return request;
 			}
-			SecurityContext context = TestSecurityContextHolder.getContext();
-			if (!this.EMPTY.equals(context)) {
+			SecurityContextHolderStrategy strategy = getSecurityContextHolderStrategy(request);
+			SecurityContext empty = strategy.createEmptyContext();
+			SecurityContext context = strategy.getContext();
+			if (!empty.equals(context)) {
 				save(context, request);
 			}
 			return request;
@@ -852,7 +877,7 @@ public final class SecurityMockMvcRequestPostProcessors {
 
 		@Override
 		public MockHttpServletRequest postProcessRequest(MockHttpServletRequest request) {
-			SecurityContext context = SecurityContextHolder.createEmptyContext();
+			SecurityContext context = getSecurityContextHolderStrategy(request).createEmptyContext();
 			context.setAuthentication(this.authentication);
 			save(this.authentication, request);
 			return request;
@@ -870,10 +895,10 @@ public final class SecurityMockMvcRequestPostProcessors {
 	 */
 	private static final class UserDetailsRequestPostProcessor implements RequestPostProcessor {
 
-		private final RequestPostProcessor delegate;
+		private final AuthenticationRequestPostProcessor delegate;
 
 		UserDetailsRequestPostProcessor(UserDetails user) {
-			Authentication token = new UsernamePasswordAuthenticationToken(user, user.getPassword(),
+			Authentication token = UsernamePasswordAuthenticationToken.authenticated(user, user.getPassword(),
 					user.getAuthorities());
 			this.delegate = new AuthenticationRequestPostProcessor(token);
 		}
@@ -1050,8 +1075,10 @@ public final class SecurityMockMvcRequestPostProcessors {
 		 * @return the {@link JwtRequestPostProcessor} for additional customization
 		 */
 		public JwtRequestPostProcessor jwt(Consumer<Jwt.Builder> jwtBuilderConsumer) {
-			Jwt.Builder jwtBuilder = Jwt.withTokenValue("token").header("alg", "none").claim(JwtClaimNames.SUB, "user")
-					.claim("scope", "read");
+			Jwt.Builder jwtBuilder = Jwt.withTokenValue("token")
+				.header("alg", "none")
+				.claim(JwtClaimNames.SUB, "user")
+				.claim("scope", "read");
 			jwtBuilderConsumer.accept(jwtBuilder);
 			this.jwt = jwtBuilder.build();
 			return this;
@@ -1191,14 +1218,14 @@ public final class SecurityMockMvcRequestPostProcessors {
 
 		private Map<String, Object> defaultAttributes() {
 			Map<String, Object> attributes = new HashMap<>();
-			attributes.put(OAuth2IntrospectionClaimNames.SUBJECT, "user");
-			attributes.put(OAuth2IntrospectionClaimNames.SCOPE, "read");
+			attributes.put(OAuth2TokenIntrospectionClaimNames.SUB, "user");
+			attributes.put(OAuth2TokenIntrospectionClaimNames.SCOPE, "read");
 			return attributes;
 		}
 
 		private Collection<GrantedAuthority> defaultAuthorities() {
 			Map<String, Object> attributes = this.attributes.get();
-			Object scope = attributes.get(OAuth2IntrospectionClaimNames.SCOPE);
+			Object scope = attributes.get(OAuth2TokenIntrospectionClaimNames.SCOPE);
 			if (scope == null) {
 				return Collections.emptyList();
 			}
@@ -1206,7 +1233,7 @@ public final class SecurityMockMvcRequestPostProcessors {
 				return getAuthorities((Collection) scope);
 			}
 			String scopes = scope.toString();
-			if (StringUtils.isBlank(scopes)) {
+			if (!StringUtils.hasText(scopes)) {
 				return Collections.emptyList();
 			}
 			return getAuthorities(Arrays.asList(scopes.split(" ")));
@@ -1217,8 +1244,9 @@ public final class SecurityMockMvcRequestPostProcessors {
 		}
 
 		private Collection<GrantedAuthority> getAuthorities(Collection<?> scopes) {
-			return scopes.stream().map((scope) -> new SimpleGrantedAuthority("SCOPE_" + scope))
-					.collect(Collectors.toList());
+			return scopes.stream()
+				.map((scope) -> new SimpleGrantedAuthority("SCOPE_" + scope))
+				.collect(Collectors.toList());
 		}
 
 		private OAuth2AccessToken getOAuth2AccessToken(OAuth2AuthenticatedPrincipal principal) {
@@ -1318,11 +1346,7 @@ public final class SecurityMockMvcRequestPostProcessors {
 		 * Use the provided {@link ClientRegistration} as the client to authorize.
 		 *
 		 * The supplied {@link ClientRegistration} will be registered into an
-		 * {@link HttpSessionOAuth2AuthorizedClientRepository}. Tests relying on
-		 * {@link org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient}
-		 * annotations should register an
-		 * {@link HttpSessionOAuth2AuthorizedClientRepository} bean to the application
-		 * context.
+		 * {@link OAuth2AuthorizedClientRepository}.
 		 * @param clientRegistration the {@link ClientRegistration} to use
 		 * @return the {@link OAuth2LoginRequestPostProcessor} for further configuration
 		 */
@@ -1338,12 +1362,16 @@ public final class SecurityMockMvcRequestPostProcessors {
 					this.clientRegistration.getRegistrationId());
 			request = new AuthenticationRequestPostProcessor(token).postProcessRequest(request);
 			return new OAuth2ClientRequestPostProcessor().clientRegistration(this.clientRegistration)
-					.principalName(oauth2User.getName()).accessToken(this.accessToken).postProcessRequest(request);
+				.principalName(oauth2User.getName())
+				.accessToken(this.accessToken)
+				.postProcessRequest(request);
 		}
 
 		private ClientRegistration.Builder clientRegistrationBuilder() {
-			return ClientRegistration.withRegistrationId("test").authorizationGrantType(AuthorizationGrantType.PASSWORD)
-					.clientId("test-client").tokenUri("https://token-uri.example.org");
+			return ClientRegistration.withRegistrationId("test")
+				.authorizationGrantType(AuthorizationGrantType.PASSWORD)
+				.clientId("test-client")
+				.tokenUri("https://token-uri.example.org");
 		}
 
 		private Collection<GrantedAuthority> defaultAuthorities() {
@@ -1457,11 +1485,7 @@ public final class SecurityMockMvcRequestPostProcessors {
 		 * Use the provided {@link ClientRegistration} as the client to authorize.
 		 *
 		 * The supplied {@link ClientRegistration} will be registered into an
-		 * {@link HttpSessionOAuth2AuthorizedClientRepository}. Tests relying on
-		 * {@link org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient}
-		 * annotations should register an
-		 * {@link HttpSessionOAuth2AuthorizedClientRepository} bean to the application
-		 * context.
+		 * {@link HttpSessionOAuth2AuthorizedClientRepository}.
 		 * @param clientRegistration the {@link ClientRegistration} to use
 		 * @return the {@link OidcLoginRequestPostProcessor} for further configuration
 		 */
@@ -1474,12 +1498,15 @@ public final class SecurityMockMvcRequestPostProcessors {
 		public MockHttpServletRequest postProcessRequest(MockHttpServletRequest request) {
 			OidcUser oidcUser = this.oidcUser.get();
 			return new OAuth2LoginRequestPostProcessor(this.accessToken).oauth2User(oidcUser)
-					.clientRegistration(this.clientRegistration).postProcessRequest(request);
+				.clientRegistration(this.clientRegistration)
+				.postProcessRequest(request);
 		}
 
 		private ClientRegistration.Builder clientRegistrationBuilder() {
-			return ClientRegistration.withRegistrationId("test").authorizationGrantType(AuthorizationGrantType.PASSWORD)
-					.clientId("test-client").tokenUri("https://token-uri.example.org");
+			return ClientRegistration.withRegistrationId("test")
+				.authorizationGrantType(AuthorizationGrantType.PASSWORD)
+				.clientId("test-client")
+				.tokenUri("https://token-uri.example.org");
 		}
 
 		private Collection<GrantedAuthority> getAuthorities() {
@@ -1587,37 +1614,39 @@ public final class SecurityMockMvcRequestPostProcessors {
 			}
 			OAuth2AuthorizedClient client = new OAuth2AuthorizedClient(this.clientRegistration, this.principalName,
 					this.accessToken);
-			OAuth2AuthorizedClientManager authorizationClientManager = OAuth2ClientServletTestUtils
-					.getOAuth2AuthorizedClientManager(request);
-			if (!(authorizationClientManager instanceof TestOAuth2AuthorizedClientManager)) {
-				authorizationClientManager = new TestOAuth2AuthorizedClientManager(authorizationClientManager);
-				OAuth2ClientServletTestUtils.setOAuth2AuthorizedClientManager(request, authorizationClientManager);
+			OAuth2AuthorizedClientRepository authorizedClientRepository = OAuth2ClientServletTestUtils
+				.getAuthorizedClientRepository(request);
+			if (!(authorizedClientRepository instanceof TestOAuth2AuthorizedClientRepository)) {
+				authorizedClientRepository = new TestOAuth2AuthorizedClientRepository(authorizedClientRepository);
+				OAuth2ClientServletTestUtils.setAuthorizedClientRepository(request, authorizedClientRepository);
 			}
-			TestOAuth2AuthorizedClientManager.enable(request);
-			request.setAttribute(TestOAuth2AuthorizedClientManager.TOKEN_ATTR_NAME, client);
+			TestOAuth2AuthorizedClientRepository.enable(request);
+			authorizedClientRepository.saveAuthorizedClient(client, null, request, new MockHttpServletResponse());
 			return request;
 		}
 
 		private ClientRegistration.Builder clientRegistrationBuilder() {
 			return ClientRegistration.withRegistrationId(this.registrationId)
-					.authorizationGrantType(AuthorizationGrantType.PASSWORD).clientId("test-client")
-					.clientSecret("test-secret").tokenUri("https://idp.example.org/oauth/token");
+				.authorizationGrantType(AuthorizationGrantType.PASSWORD)
+				.clientId("test-client")
+				.clientSecret("test-secret")
+				.tokenUri("https://idp.example.org/oauth/token");
 		}
 
 		/**
-		 * Used to wrap the {@link OAuth2AuthorizedClientManager} to provide support for
-		 * testing when the request is wrapped
+		 * Used to wrap the {@link OAuth2AuthorizedClientRepository} to provide support
+		 * for testing when the request is wrapped
 		 */
 		private static final class TestOAuth2AuthorizedClientManager implements OAuth2AuthorizedClientManager {
 
-			static final String TOKEN_ATTR_NAME = TestOAuth2AuthorizedClientManager.class.getName().concat(".TOKEN");
-
 			static final String ENABLED_ATTR_NAME = TestOAuth2AuthorizedClientManager.class.getName()
-					.concat(".ENABLED");
+				.concat(".ENABLED");
 
 			private final OAuth2AuthorizedClientManager delegate;
 
-			private TestOAuth2AuthorizedClientManager(OAuth2AuthorizedClientManager delegate) {
+			private OAuth2AuthorizedClientRepository authorizedClientRepository;
+
+			TestOAuth2AuthorizedClientManager(OAuth2AuthorizedClientManager delegate) {
 				this.delegate = delegate;
 			}
 
@@ -1625,9 +1654,66 @@ public final class SecurityMockMvcRequestPostProcessors {
 			public OAuth2AuthorizedClient authorize(OAuth2AuthorizeRequest authorizeRequest) {
 				HttpServletRequest request = authorizeRequest.getAttribute(HttpServletRequest.class.getName());
 				if (isEnabled(request)) {
-					return (OAuth2AuthorizedClient) request.getAttribute(TOKEN_ATTR_NAME);
+					return this.authorizedClientRepository.loadAuthorizedClient(
+							authorizeRequest.getClientRegistrationId(), authorizeRequest.getPrincipal(), request);
 				}
 				return this.delegate.authorize(authorizeRequest);
+			}
+
+			static void enable(HttpServletRequest request) {
+				request.setAttribute(ENABLED_ATTR_NAME, Boolean.TRUE);
+			}
+
+			boolean isEnabled(HttpServletRequest request) {
+				return Boolean.TRUE.equals(request.getAttribute(ENABLED_ATTR_NAME));
+			}
+
+		}
+
+		/**
+		 * Used to wrap the {@link OAuth2AuthorizedClientRepository} to provide support
+		 * for testing when the request is wrapped
+		 */
+		static final class TestOAuth2AuthorizedClientRepository implements OAuth2AuthorizedClientRepository {
+
+			static final String TOKEN_ATTR_NAME = TestOAuth2AuthorizedClientRepository.class.getName().concat(".TOKEN");
+
+			static final String ENABLED_ATTR_NAME = TestOAuth2AuthorizedClientRepository.class.getName()
+				.concat(".ENABLED");
+
+			private final OAuth2AuthorizedClientRepository delegate;
+
+			TestOAuth2AuthorizedClientRepository(OAuth2AuthorizedClientRepository delegate) {
+				this.delegate = delegate;
+			}
+
+			@Override
+			public <T extends OAuth2AuthorizedClient> T loadAuthorizedClient(String clientRegistrationId,
+					Authentication principal, HttpServletRequest request) {
+				if (isEnabled(request)) {
+					return (T) request.getAttribute(TOKEN_ATTR_NAME);
+				}
+				return this.delegate.loadAuthorizedClient(clientRegistrationId, principal, request);
+			}
+
+			@Override
+			public void saveAuthorizedClient(OAuth2AuthorizedClient authorizedClient, Authentication principal,
+					HttpServletRequest request, HttpServletResponse response) {
+				if (isEnabled(request)) {
+					request.setAttribute(TOKEN_ATTR_NAME, authorizedClient);
+					return;
+				}
+				this.delegate.saveAuthorizedClient(authorizedClient, principal, request, response);
+			}
+
+			@Override
+			public void removeAuthorizedClient(String clientRegistrationId, Authentication principal,
+					HttpServletRequest request, HttpServletResponse response) {
+				if (isEnabled(request)) {
+					request.removeAttribute(TOKEN_ATTR_NAME);
+					return;
+				}
+				this.delegate.removeAuthorizedClient(clientRegistrationId, principal, request, response);
 			}
 
 			static void enable(HttpServletRequest request) {
@@ -1648,7 +1734,7 @@ public final class SecurityMockMvcRequestPostProcessors {
 			}
 
 			/**
-			 * Gets the {@link OAuth2AuthorizedClientManager} for the specified
+			 * Gets the {@link OAuth2AuthorizedClientRepository} for the specified
 			 * {@link HttpServletRequest}. If one is not found, one based off of
 			 * {@link HttpSessionOAuth2AuthorizedClientRepository} is used.
 			 * @param request the {@link HttpServletRequest} to obtain the
@@ -1656,12 +1742,44 @@ public final class SecurityMockMvcRequestPostProcessors {
 			 * @return the {@link OAuth2AuthorizedClientManager} for the specified
 			 * {@link HttpServletRequest}
 			 */
+			static OAuth2AuthorizedClientRepository getAuthorizedClientRepository(HttpServletRequest request) {
+				OAuth2AuthorizedClientManager manager = getOAuth2AuthorizedClientManager(request);
+				if (manager == null) {
+					return DEFAULT_CLIENT_REPO;
+				}
+				if (manager instanceof DefaultOAuth2AuthorizedClientManager) {
+					return (OAuth2AuthorizedClientRepository) ReflectionTestUtils.getField(manager,
+							"authorizedClientRepository");
+				}
+				if (manager instanceof TestOAuth2AuthorizedClientManager) {
+					return ((TestOAuth2AuthorizedClientManager) manager).authorizedClientRepository;
+				}
+				return DEFAULT_CLIENT_REPO;
+			}
+
+			static void setAuthorizedClientRepository(HttpServletRequest request,
+					OAuth2AuthorizedClientRepository repository) {
+				OAuth2AuthorizedClientManager manager = getOAuth2AuthorizedClientManager(request);
+				if (manager == null) {
+					return;
+				}
+				if (manager instanceof DefaultOAuth2AuthorizedClientManager) {
+					ReflectionTestUtils.setField(manager, "authorizedClientRepository", repository);
+					return;
+				}
+				if (!(manager instanceof TestOAuth2AuthorizedClientManager)) {
+					manager = new TestOAuth2AuthorizedClientManager(manager);
+					setOAuth2AuthorizedClientManager(request, manager);
+				}
+				TestOAuth2AuthorizedClientManager.enable(request);
+				((TestOAuth2AuthorizedClientManager) manager).authorizedClientRepository = repository;
+			}
+
 			static OAuth2AuthorizedClientManager getOAuth2AuthorizedClientManager(HttpServletRequest request) {
 				OAuth2AuthorizedClientArgumentResolver resolver = findResolver(request,
 						OAuth2AuthorizedClientArgumentResolver.class);
 				if (resolver == null) {
-					return (authorizeRequest) -> DEFAULT_CLIENT_REPO.loadAuthorizedClient(
-							authorizeRequest.getClientRegistrationId(), authorizeRequest.getPrincipal(), request);
+					return null;
 				}
 				return (OAuth2AuthorizedClientManager) ReflectionTestUtils.getField(resolver,
 						"authorizedClientManager");

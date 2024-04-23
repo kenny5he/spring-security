@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -254,6 +254,20 @@ public class JwtGrantedAuthoritiesConverterTests {
 		jwtGrantedAuthoritiesConverter.setAuthoritiesClaimName("roles");
 		Collection<GrantedAuthority> authorities = jwtGrantedAuthoritiesConverter.convert(jwt);
 		assertThat(authorities).isEmpty();
+	}
+
+	@Test
+	public void convertWithCustomAuthoritiesSplitRegexWhenTokenHasScopeAttributeThenTranslatedToAuthorities() {
+		// @formatter:off
+		Jwt jwt = TestJwts.jwt()
+				.claim("scope", "message:read,message:write")
+				.build();
+		// @formatter:on
+		JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
+		jwtGrantedAuthoritiesConverter.setAuthoritiesClaimDelimiter(",");
+		Collection<GrantedAuthority> authorities = jwtGrantedAuthoritiesConverter.convert(jwt);
+		assertThat(authorities).containsExactly(new SimpleGrantedAuthority("SCOPE_message:read"),
+				new SimpleGrantedAuthority("SCOPE_message:write"));
 	}
 
 }

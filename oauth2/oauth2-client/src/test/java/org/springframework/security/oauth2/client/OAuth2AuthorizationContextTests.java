@@ -16,8 +16,8 @@
 
 package org.springframework.security.oauth2.client;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -42,7 +42,7 @@ public class OAuth2AuthorizationContextTests {
 
 	private Authentication principal;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.clientRegistration = TestClientRegistrations.clientRegistration().build();
 		this.authorizedClient = new OAuth2AuthorizedClient(this.clientRegistration, "principal",
@@ -53,22 +53,22 @@ public class OAuth2AuthorizationContextTests {
 	@Test
 	public void withClientRegistrationWhenNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> OAuth2AuthorizationContext.withClientRegistration(null).build())
-				.withMessage("clientRegistration cannot be null");
+			.isThrownBy(() -> OAuth2AuthorizationContext.withClientRegistration(null).build())
+			.withMessage("clientRegistration cannot be null");
 	}
 
 	@Test
 	public void withAuthorizedClientWhenNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> OAuth2AuthorizationContext.withAuthorizedClient(null).build())
-				.withMessage("authorizedClient cannot be null");
+			.isThrownBy(() -> OAuth2AuthorizationContext.withAuthorizedClient(null).build())
+			.withMessage("authorizedClient cannot be null");
 	}
 
 	@Test
 	public void withClientRegistrationWhenPrincipalIsNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> OAuth2AuthorizationContext.withClientRegistration(this.clientRegistration).build())
-				.withMessage("principal cannot be null");
+			.isThrownBy(() -> OAuth2AuthorizationContext.withClientRegistration(this.clientRegistration).build())
+			.withMessage("principal cannot be null");
 	}
 
 	@Test

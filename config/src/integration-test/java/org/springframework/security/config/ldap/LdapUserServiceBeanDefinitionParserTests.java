@@ -18,8 +18,8 @@ package org.springframework.security.config.ldap;
 
 import java.util.Set;
 
-import org.junit.After;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.w3c.dom.Element;
 
 import org.springframework.security.config.util.InMemoryXmlApplicationContext;
@@ -47,7 +47,7 @@ public class LdapUserServiceBeanDefinitionParserTests {
 
 	private InMemoryXmlApplicationContext appCtx;
 
-	@After
+	@AfterEach
 	public void closeAppContext() {
 		if (this.appCtx != null) {
 			this.appCtx.close();
@@ -58,17 +58,17 @@ public class LdapUserServiceBeanDefinitionParserTests {
 	@Test
 	public void beanClassNamesAreCorrect() {
 		assertThat(FilterBasedLdapUserSearch.class.getName())
-				.isEqualTo(LdapUserServiceBeanDefinitionParser.LDAP_SEARCH_CLASS);
+			.isEqualTo(LdapUserServiceBeanDefinitionParser.LDAP_SEARCH_CLASS);
 		assertThat(PersonContextMapper.class.getName())
-				.isEqualTo(LdapUserServiceBeanDefinitionParser.PERSON_MAPPER_CLASS);
+			.isEqualTo(LdapUserServiceBeanDefinitionParser.PERSON_MAPPER_CLASS);
 		assertThat(InetOrgPersonContextMapper.class.getName())
-				.isEqualTo(LdapUserServiceBeanDefinitionParser.INET_ORG_PERSON_MAPPER_CLASS);
+			.isEqualTo(LdapUserServiceBeanDefinitionParser.INET_ORG_PERSON_MAPPER_CLASS);
 		assertThat(LdapUserDetailsMapper.class.getName())
-				.isEqualTo(LdapUserServiceBeanDefinitionParser.LDAP_USER_MAPPER_CLASS);
+			.isEqualTo(LdapUserServiceBeanDefinitionParser.LDAP_USER_MAPPER_CLASS);
 		assertThat(DefaultLdapAuthoritiesPopulator.class.getName())
-				.isEqualTo(LdapUserServiceBeanDefinitionParser.LDAP_AUTHORITIES_POPULATOR_CLASS);
+			.isEqualTo(LdapUserServiceBeanDefinitionParser.LDAP_AUTHORITIES_POPULATOR_CLASS);
 		assertThat(new LdapUserServiceBeanDefinitionParser().getBeanClassName(mock(Element.class)))
-				.isEqualTo(LdapUserDetailsService.class.getName());
+			.isEqualTo(LdapUserDetailsService.class.getName());
 	}
 
 	@Test
@@ -87,7 +87,7 @@ public class LdapUserServiceBeanDefinitionParserTests {
 
 		Set<String> authorities = AuthorityUtils.authorityListToSet(ben.getAuthorities());
 		assertThat(authorities).hasSize(3);
-		assertThat(authorities.contains("ROLE_DEVELOPERS")).isTrue();
+		assertThat(authorities).contains("ROLE_DEVELOPERS");
 	}
 
 	@Test
@@ -128,7 +128,7 @@ public class LdapUserServiceBeanDefinitionParserTests {
 
 		Set<String> authorities = AuthorityUtils.authorityListToSet(ben.getAuthorities());
 		assertThat(authorities).hasSize(3);
-		assertThat(authorities.contains("ROLE_DEVELOPER")).isTrue();
+		assertThat(authorities).contains("ROLE_DEVELOPER");
 
 	}
 

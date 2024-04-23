@@ -19,11 +19,11 @@ package org.springframework.security.messaging.access.expression;
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
@@ -43,7 +43,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class MessageExpressionVoterTests {
 
 	@Mock
@@ -68,10 +68,10 @@ public class MessageExpressionVoterTests {
 
 	MessageExpressionVoter voter;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.attributes = Arrays
-				.<ConfigAttribute>asList(new MessageExpressionConfigAttribute(this.expression, this.matcher));
+			.<ConfigAttribute>asList(new MessageExpressionConfigAttribute(this.expression, this.matcher));
 		this.voter = new MessageExpressionVoter();
 	}
 
@@ -79,21 +79,21 @@ public class MessageExpressionVoterTests {
 	public void voteGranted() {
 		given(this.expression.getValue(any(EvaluationContext.class), eq(Boolean.class))).willReturn(true);
 		assertThat(this.voter.vote(this.authentication, this.message, this.attributes))
-				.isEqualTo(AccessDecisionVoter.ACCESS_GRANTED);
+			.isEqualTo(AccessDecisionVoter.ACCESS_GRANTED);
 	}
 
 	@Test
 	public void voteDenied() {
 		given(this.expression.getValue(any(EvaluationContext.class), eq(Boolean.class))).willReturn(false);
 		assertThat(this.voter.vote(this.authentication, this.message, this.attributes))
-				.isEqualTo(AccessDecisionVoter.ACCESS_DENIED);
+			.isEqualTo(AccessDecisionVoter.ACCESS_DENIED);
 	}
 
 	@Test
 	public void voteAbstain() {
 		this.attributes = Arrays.<ConfigAttribute>asList(new SecurityConfig("ROLE_USER"));
 		assertThat(this.voter.vote(this.authentication, this.message, this.attributes))
-				.isEqualTo(AccessDecisionVoter.ACCESS_ABSTAIN);
+			.isEqualTo(AccessDecisionVoter.ACCESS_ABSTAIN);
 	}
 
 	@Test
@@ -125,10 +125,10 @@ public class MessageExpressionVoterTests {
 	public void customExpressionHandler() {
 		this.voter.setExpressionHandler(this.expressionHandler);
 		given(this.expressionHandler.createEvaluationContext(this.authentication, this.message))
-				.willReturn(this.evaluationContext);
+			.willReturn(this.evaluationContext);
 		given(this.expression.getValue(this.evaluationContext, Boolean.class)).willReturn(true);
 		assertThat(this.voter.vote(this.authentication, this.message, this.attributes))
-				.isEqualTo(AccessDecisionVoter.ACCESS_GRANTED);
+			.isEqualTo(AccessDecisionVoter.ACCESS_GRANTED);
 		verify(this.expressionHandler).createEvaluationContext(this.authentication, this.message);
 	}
 
@@ -137,13 +137,13 @@ public class MessageExpressionVoterTests {
 		final MessageExpressionConfigAttribute configAttribute = mock(MessageExpressionConfigAttribute.class);
 		this.voter.setExpressionHandler(this.expressionHandler);
 		given(this.expressionHandler.createEvaluationContext(this.authentication, this.message))
-				.willReturn(this.evaluationContext);
+			.willReturn(this.evaluationContext);
 		given(configAttribute.getAuthorizeExpression()).willReturn(this.expression);
 		this.attributes = Arrays.<ConfigAttribute>asList(configAttribute);
 		given(configAttribute.postProcess(this.evaluationContext, this.message)).willReturn(this.evaluationContext);
 		given(this.expression.getValue(any(EvaluationContext.class), eq(Boolean.class))).willReturn(true);
 		assertThat(this.voter.vote(this.authentication, this.message, this.attributes))
-				.isEqualTo(AccessDecisionVoter.ACCESS_GRANTED);
+			.isEqualTo(AccessDecisionVoter.ACCESS_GRANTED);
 		verify(configAttribute).postProcess(this.evaluationContext, this.message);
 	}
 

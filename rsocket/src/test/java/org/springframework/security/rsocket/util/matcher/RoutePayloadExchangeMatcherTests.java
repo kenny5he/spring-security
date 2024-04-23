@@ -21,11 +21,11 @@ import java.util.Map;
 
 import io.rsocket.Payload;
 import io.rsocket.metadata.WellKnownMimeType;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.http.MediaType;
 import org.springframework.messaging.rsocket.MetadataExtractor;
@@ -43,11 +43,11 @@ import static org.mockito.BDDMockito.given;
 /**
  * @author Rob Winch
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class RoutePayloadExchangeMatcherTests {
 
 	static final MimeType COMPOSITE_METADATA = MimeTypeUtils
-			.parseMimeType(WellKnownMimeType.MESSAGE_RSOCKET_COMPOSITE_METADATA.getString());
+		.parseMimeType(WellKnownMimeType.MESSAGE_RSOCKET_COMPOSITE_METADATA.getString());
 
 	@Mock
 	private MetadataExtractor metadataExtractor;
@@ -67,7 +67,7 @@ public class RoutePayloadExchangeMatcherTests {
 
 	private RoutePayloadExchangeMatcher matcher;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.pattern = "a.b";
 		this.matcher = new RoutePayloadExchangeMatcher(this.metadataExtractor, this.routeMatcher, this.pattern);
@@ -86,7 +86,7 @@ public class RoutePayloadExchangeMatcherTests {
 	public void matchesWhenNotMatchThenNotMatch() {
 		String route = "route";
 		given(this.metadataExtractor.extract(any(), any()))
-				.willReturn(Collections.singletonMap(MetadataExtractor.ROUTE_KEY, route));
+			.willReturn(Collections.singletonMap(MetadataExtractor.ROUTE_KEY, route));
 		PayloadExchangeMatcher.MatchResult result = this.matcher.matches(this.exchange).block();
 		assertThat(result.isMatch()).isFalse();
 	}
@@ -95,7 +95,7 @@ public class RoutePayloadExchangeMatcherTests {
 	public void matchesWhenMatchAndNoVariablesThenMatch() {
 		String route = "route";
 		given(this.metadataExtractor.extract(any(), any()))
-				.willReturn(Collections.singletonMap(MetadataExtractor.ROUTE_KEY, route));
+			.willReturn(Collections.singletonMap(MetadataExtractor.ROUTE_KEY, route));
 		given(this.routeMatcher.parseRoute(any())).willReturn(this.route);
 		given(this.routeMatcher.matchAndExtract(any(), any())).willReturn(Collections.emptyMap());
 		PayloadExchangeMatcher.MatchResult result = this.matcher.matches(this.exchange).block();
@@ -107,7 +107,7 @@ public class RoutePayloadExchangeMatcherTests {
 		String route = "route";
 		Map<String, String> variables = Collections.singletonMap("a", "b");
 		given(this.metadataExtractor.extract(any(), any()))
-				.willReturn(Collections.singletonMap(MetadataExtractor.ROUTE_KEY, route));
+			.willReturn(Collections.singletonMap(MetadataExtractor.ROUTE_KEY, route));
 		given(this.routeMatcher.parseRoute(any())).willReturn(this.route);
 		given(this.routeMatcher.matchAndExtract(any(), any())).willReturn(variables);
 		PayloadExchangeMatcher.MatchResult result = this.matcher.matches(this.exchange).block();

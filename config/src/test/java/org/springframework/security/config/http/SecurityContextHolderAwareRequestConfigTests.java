@@ -18,22 +18,21 @@ package org.springframework.security.config.http;
 
 import java.io.IOException;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.apache.http.HttpHeaders;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpSession;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.context.annotation.SecurityTestExecutionListeners;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -52,14 +51,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Rob Winch
  * @author Josh Cummings
  */
-@RunWith(SpringJUnit4ClassRunner.class)
+@ExtendWith({ SpringExtension.class, SpringTestContextExtension.class })
 @SecurityTestExecutionListeners
 public class SecurityContextHolderAwareRequestConfigTests {
 
 	private static final String CONFIG_LOCATION_PREFIX = "classpath:org/springframework/security/config/http/SecurityContextHolderAwareRequestConfigTests";
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired
 	private MockMvc mvc;
@@ -179,8 +177,9 @@ public class SecurityContextHolderAwareRequestConfigTests {
 	@Test
 	public void servletLogoutWhenUsingCustomLogoutThenUsesSpringSecurity() throws Exception {
 		this.spring.configLocations(this.xml("Logout")).autowire();
-		this.mvc.perform(get("/authenticate")).andExpect(status().isFound())
-				.andExpect(redirectedUrl("http://localhost/signin"));
+		this.mvc.perform(get("/authenticate"))
+			.andExpect(status().isFound())
+			.andExpect(redirectedUrl("http://localhost/signin"));
 		// @formatter:off
 		MvcResult result = this.mvc.perform(get("/good-login"))
 				.andReturn();

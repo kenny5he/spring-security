@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,18 @@
 
 package org.springframework.security.config.annotation.web.configurers;
 
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -35,10 +39,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Rob Winch
  * @author Eleftheria Stein
  */
+@ExtendWith(SpringTestContextExtension.class)
 public class RequestMatcherConfigurerTests {
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired
 	MockMvc mvc;
@@ -66,45 +70,49 @@ public class RequestMatcherConfigurerTests {
 		// @formatter:on
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class Sec2908Config extends WebSecurityConfigurerAdapter {
+	static class Sec2908Config {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
-				.requestMatchers()
-					.antMatchers("/api/**")
+				.securityMatchers()
+					.requestMatchers(new AntPathRequestMatcher("/api/**"))
 					.and()
-				.requestMatchers()
-					.antMatchers("/oauth/**")
+				.securityMatchers()
+					.requestMatchers(new AntPathRequestMatcher("/oauth/**"))
 					.and()
 				.authorizeRequests()
 					.anyRequest().denyAll();
+			return http.build();
 			// @formatter:on
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class AuthorizeRequestInLambdaConfig extends WebSecurityConfigurerAdapter {
+	static class AuthorizeRequestInLambdaConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
-				.requestMatchers((requestMatchers) ->
-					requestMatchers
-						.antMatchers("/api/**")
+				.securityMatchers((matchers) ->
+					matchers
+						.requestMatchers(new AntPathRequestMatcher("/api/**"))
 				)
-				.requestMatchers((requestMatchers) ->
-					requestMatchers
-						.antMatchers("/oauth/**")
+				.securityMatchers((matchers) ->
+					matchers
+						.requestMatchers(new AntPathRequestMatcher("/oauth/**"))
 				)
 				.authorizeRequests((authorizeRequests) ->
 					authorizeRequests
 						.anyRequest().denyAll()
 				);
+			return http.build();
 			// @formatter:on
 		}
 

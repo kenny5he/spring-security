@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package org.springframework.security.access.prepost;
 import java.lang.reflect.Method;
 import java.util.Collection;
 
+import kotlinx.coroutines.reactive.ReactiveFlowKt;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.reactivestreams.Publisher;
@@ -26,6 +27,10 @@ import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import org.springframework.core.KotlinDetector;
+import org.springframework.core.MethodParameter;
+import org.springframework.core.ReactiveAdapter;
+import org.springframework.core.ReactiveAdapterRegistry;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.ConfigAttribute;
 import org.springframework.security.access.method.MethodSecurityMetadataSource;
@@ -38,11 +43,18 @@ import org.springframework.util.Assert;
 
 /**
  * A {@link MethodInterceptor} that supports {@link PreAuthorize} and
- * {@link PostAuthorize} for methods that return {@link Mono} or {@link Flux}
+ * {@link PostAuthorize} for methods that return {@link Mono} or {@link Flux} and Kotlin
+ * coroutine functions.
  *
  * @author Rob Winch
+ * @author Eleftheria Stein
  * @since 5.0
+ * @deprecated Use
+ * {@link org.springframework.security.authorization.method.AuthorizationManagerBeforeReactiveMethodInterceptor}
+ * or
+ * {@link org.springframework.security.authorization.method.AuthorizationManagerAfterReactiveMethodInterceptor}
  */
+@Deprecated
 public class PrePostAdviceReactiveMethodInterceptor implements MethodInterceptor {
 
 	private Authentication anonymous = new AnonymousAuthenticationToken("key", "anonymous",
@@ -53,6 +65,10 @@ public class PrePostAdviceReactiveMethodInterceptor implements MethodInterceptor
 	private final PreInvocationAuthorizationAdvice preInvocationAdvice;
 
 	private final PostInvocationAuthorizationAdvice postAdvice;
+
+	private static final String COROUTINES_FLOW_CLASS_NAME = "kotlinx.coroutines.flow.Flow";
+
+	private static final int RETURN_TYPE_METHOD_PARAMETER_INDEX = -1;
 
 	/**
 	 * Creates a new instance
@@ -75,10 +91,18 @@ public class PrePostAdviceReactiveMethodInterceptor implements MethodInterceptor
 	public Object invoke(final MethodInvocation invocation) {
 		Method method = invocation.getMethod();
 		Class<?> returnType = method.getReturnType();
-		Assert.state(Publisher.class.isAssignableFrom(returnType),
+
+		boolean isSuspendingFunction = KotlinDetector.isSuspendingFunction(method);
+		boolean hasFlowReturnType = COROUTINES_FLOW_CLASS_NAME
+			.equals(new MethodParameter(method, RETURN_TYPE_METHOD_PARAMETER_INDEX).getParameterType().getName());
+		boolean hasReactiveReturnType = Publisher.class.isAssignableFrom(returnType) || isSuspendingFunction
+				|| hasFlowReturnType;
+
+		Assert.state(hasReactiveReturnType,
 				() -> "The returnType " + returnType + " on " + method
 						+ " must return an instance of org.reactivestreams.Publisher "
-						+ "(i.e. Mono / Flux) in order to support Reactor Context");
+						+ "(i.e. Mono / Flux) or the function must be a Kotlin coroutine "
+						+ "function in order to support Reactor Context");
 		Class<?> targetClass = invocation.getThis().getClass();
 		Collection<ConfigAttribute> attributes = this.attributeSource.getAttributes(method, targetClass);
 		PreInvocationAttribute preAttr = findPreInvocationAttribute(attributes);
@@ -92,20 +116,44 @@ public class PrePostAdviceReactiveMethodInterceptor implements MethodInterceptor
 		PostInvocationAttribute attr = findPostInvocationAttribute(attributes);
 		if (Mono.class.isAssignableFrom(returnType)) {
 			return toInvoke.flatMap((auth) -> PrePostAdviceReactiveMethodInterceptor.<Mono<?>>proceed(invocation)
-					.map((r) -> (attr != null) ? this.postAdvice.after(auth, invocation, attr, r) : r));
+				.map((r) -> (attr != null) ? this.postAdvice.after(auth, invocation, attr, r) : r));
 		}
 		if (Flux.class.isAssignableFrom(returnType)) {
 			return toInvoke.flatMapMany((auth) -> PrePostAdviceReactiveMethodInterceptor.<Flux<?>>proceed(invocation)
-					.map((r) -> (attr != null) ? this.postAdvice.after(auth, invocation, attr, r) : r));
+				.map((r) -> (attr != null) ? this.postAdvice.after(auth, invocation, attr, r) : r));
 		}
-		return toInvoke.flatMapMany(
-				(auth) -> Flux.from(PrePostAdviceReactiveMethodInterceptor.<Publisher<?>>proceed(invocation))
+		if (hasFlowReturnType) {
+			if (isSuspendingFunction) {
+				return toInvoke
+					.flatMapMany((auth) -> Flux.from(PrePostAdviceReactiveMethodInterceptor.proceed(invocation))
 						.map((r) -> (attr != null) ? this.postAdvice.after(auth, invocation, attr, r) : r));
+			}
+			else {
+				ReactiveAdapter adapter = ReactiveAdapterRegistry.getSharedInstance().getAdapter(returnType);
+				Assert.state(adapter != null, () -> "The returnType " + returnType + " on " + method
+						+ " must have a org.springframework.core.ReactiveAdapter registered");
+				Flux<?> response = toInvoke.flatMapMany((auth) -> Flux
+					.from(adapter.toPublisher(PrePostAdviceReactiveMethodInterceptor.flowProceed(invocation)))
+					.map((r) -> (attr != null) ? this.postAdvice.after(auth, invocation, attr, r) : r));
+				return KotlinDelegate.asFlow(response);
+			}
+		}
+		return toInvoke.flatMap((auth) -> Mono.from(PrePostAdviceReactiveMethodInterceptor.proceed(invocation))
+			.map((r) -> (attr != null) ? this.postAdvice.after(auth, invocation, attr, r) : r));
 	}
 
 	private static <T extends Publisher<?>> T proceed(final MethodInvocation invocation) {
 		try {
 			return (T) invocation.proceed();
+		}
+		catch (Throwable throwable) {
+			throw Exceptions.propagate(throwable);
+		}
+	}
+
+	private static Object flowProceed(final MethodInvocation invocation) {
+		try {
+			return invocation.proceed();
 		}
 		catch (Throwable throwable) {
 			throw Exceptions.propagate(throwable);
@@ -128,6 +176,17 @@ public class PrePostAdviceReactiveMethodInterceptor implements MethodInterceptor
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Inner class to avoid a hard dependency on Kotlin at runtime.
+	 */
+	private static class KotlinDelegate {
+
+		private static Object asFlow(Publisher<?> publisher) {
+			return ReactiveFlowKt.asFlow(publisher);
+		}
+
 	}
 
 }

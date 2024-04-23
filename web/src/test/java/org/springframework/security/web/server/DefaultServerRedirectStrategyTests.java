@@ -18,10 +18,10 @@ package org.springframework.security.web.server;
 
 import java.net.URI;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
@@ -30,13 +30,13 @@ import org.springframework.web.server.ServerWebExchange;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 /**
  * @author Rob Winch
  * @since 5.0
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class DefaultServerRedirectStrategyTests {
 
 	@Mock
@@ -59,7 +59,7 @@ public class DefaultServerRedirectStrategyTests {
 	@Test
 	public void sendRedirectWhenNoSubscribersThenNoActions() {
 		this.strategy.sendRedirect(this.exchange, this.location);
-		verifyZeroInteractions(this.exchange);
+		verifyNoMoreInteractions(this.exchange);
 	}
 
 	@Test
@@ -76,7 +76,7 @@ public class DefaultServerRedirectStrategyTests {
 		this.strategy.sendRedirect(this.exchange, this.location).block();
 		assertThat(this.exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FOUND);
 		assertThat(this.exchange.getResponse().getHeaders().getLocation())
-				.hasPath("/context" + this.location.getPath());
+			.hasPath("/context" + this.location.getPath());
 	}
 
 	@Test

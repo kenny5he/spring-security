@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,10 @@
 
 package org.springframework.security.oauth2.client.web;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -111,6 +112,8 @@ public class OAuth2LoginAuthenticationFilter extends AbstractAuthenticationProce
 
 	private AuthorizationRequestRepository<OAuth2AuthorizationRequest> authorizationRequestRepository = new HttpSessionOAuth2AuthorizationRequestRepository();
 
+	private Converter<OAuth2LoginAuthenticationToken, OAuth2AuthenticationToken> authenticationResultConverter = this::createAuthenticationResult;
+
 	/**
 	 * Constructs an {@code OAuth2LoginAuthenticationFilter} using the provided
 	 * parameters.
@@ -164,7 +167,7 @@ public class OAuth2LoginAuthenticationFilter extends AbstractAuthenticationProce
 			throw new OAuth2AuthenticationException(oauth2Error, oauth2Error.toString());
 		}
 		OAuth2AuthorizationRequest authorizationRequest = this.authorizationRequestRepository
-				.removeAuthorizationRequest(request, response);
+			.removeAuthorizationRequest(request, response);
 		if (authorizationRequest == null) {
 			OAuth2Error oauth2Error = new OAuth2Error(AUTHORIZATION_REQUEST_NOT_FOUND_ERROR_CODE);
 			throw new OAuth2AuthenticationException(oauth2Error, oauth2Error.toString());
@@ -189,10 +192,11 @@ public class OAuth2LoginAuthenticationFilter extends AbstractAuthenticationProce
 				new OAuth2AuthorizationExchange(authorizationRequest, authorizationResponse));
 		authenticationRequest.setDetails(authenticationDetails);
 		OAuth2LoginAuthenticationToken authenticationResult = (OAuth2LoginAuthenticationToken) this
-				.getAuthenticationManager().authenticate(authenticationRequest);
-		OAuth2AuthenticationToken oauth2Authentication = new OAuth2AuthenticationToken(
-				authenticationResult.getPrincipal(), authenticationResult.getAuthorities(),
-				authenticationResult.getClientRegistration().getRegistrationId());
+			.getAuthenticationManager()
+			.authenticate(authenticationRequest);
+		OAuth2AuthenticationToken oauth2Authentication = this.authenticationResultConverter
+			.convert(authenticationResult);
+		Assert.notNull(oauth2Authentication, "authentication result cannot be null");
 		oauth2Authentication.setDetails(authenticationDetails);
 		OAuth2AuthorizedClient authorizedClient = new OAuth2AuthorizedClient(
 				authenticationResult.getClientRegistration(), oauth2Authentication.getName(),
@@ -211,6 +215,25 @@ public class OAuth2LoginAuthenticationFilter extends AbstractAuthenticationProce
 			AuthorizationRequestRepository<OAuth2AuthorizationRequest> authorizationRequestRepository) {
 		Assert.notNull(authorizationRequestRepository, "authorizationRequestRepository cannot be null");
 		this.authorizationRequestRepository = authorizationRequestRepository;
+	}
+
+	/**
+	 * Sets the converter responsible for converting from
+	 * {@link OAuth2LoginAuthenticationToken} to {@link OAuth2AuthenticationToken}
+	 * authentication result.
+	 * @param authenticationResultConverter the converter for
+	 * {@link OAuth2AuthenticationToken}'s
+	 * @since 5.6
+	 */
+	public final void setAuthenticationResultConverter(
+			Converter<OAuth2LoginAuthenticationToken, OAuth2AuthenticationToken> authenticationResultConverter) {
+		Assert.notNull(authenticationResultConverter, "authenticationResultConverter cannot be null");
+		this.authenticationResultConverter = authenticationResultConverter;
+	}
+
+	private OAuth2AuthenticationToken createAuthenticationResult(OAuth2LoginAuthenticationToken authenticationResult) {
+		return new OAuth2AuthenticationToken(authenticationResult.getPrincipal(), authenticationResult.getAuthorities(),
+				authenticationResult.getClientRegistration().getRegistrationId());
 	}
 
 }

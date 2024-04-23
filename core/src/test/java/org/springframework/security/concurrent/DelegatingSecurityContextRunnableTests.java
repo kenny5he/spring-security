@@ -20,29 +20,33 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.stubbing.Answer;
 
 import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.core.task.support.ExecutorServiceAdapter;
+import org.springframework.security.core.context.MockSecurityContextHolderStrategy;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.mockito.BDDMockito.willAnswer;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 /**
  * @author Rob Winch
  * @since 3.2
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class DelegatingSecurityContextRunnableTests {
 
 	@Mock
@@ -60,17 +64,27 @@ public class DelegatingSecurityContextRunnableTests {
 
 	private SecurityContext originalSecurityContext;
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		this.originalSecurityContext = SecurityContextHolder.createEmptyContext();
+		this.executor = Executors.newFixedThreadPool(1);
+	}
+
+	private void givenDelegateRunWillAnswerWithCurrentSecurityContext() {
 		willAnswer((Answer<Object>) (invocation) -> {
 			assertThat(SecurityContextHolder.getContext()).isEqualTo(this.securityContext);
 			return null;
 		}).given(this.delegate).run();
-		this.executor = Executors.newFixedThreadPool(1);
 	}
 
-	@After
+	private void givenDelegateRunWillAnswerWithCurrentSecurityContext(SecurityContextHolderStrategy strategy) {
+		willAnswer((Answer<Object>) (invocation) -> {
+			assertThat(strategy.getContext()).isEqualTo(this.securityContext);
+			return null;
+		}).given(this.delegate).run();
+	}
+
+	@AfterEach
 	public void tearDown() {
 		SecurityContextHolder.clearContext();
 	}
@@ -83,7 +97,7 @@ public class DelegatingSecurityContextRunnableTests {
 	@Test
 	public void constructorNullDelegateNonNullSecurityContext() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new DelegatingSecurityContextRunnable(null, this.securityContext));
+			.isThrownBy(() -> new DelegatingSecurityContextRunnable(null, this.securityContext));
 	}
 
 	@Test
@@ -94,17 +108,19 @@ public class DelegatingSecurityContextRunnableTests {
 	@Test
 	public void constructorNullSecurityContext() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new DelegatingSecurityContextRunnable(this.delegate, null));
+			.isThrownBy(() -> new DelegatingSecurityContextRunnable(this.delegate, null));
 	}
 
 	@Test
 	public void call() throws Exception {
+		givenDelegateRunWillAnswerWithCurrentSecurityContext();
 		this.runnable = new DelegatingSecurityContextRunnable(this.delegate, this.securityContext);
 		assertWrapped(this.runnable);
 	}
 
 	@Test
 	public void callDefaultSecurityContext() throws Exception {
+		givenDelegateRunWillAnswerWithCurrentSecurityContext();
 		SecurityContextHolder.setContext(this.securityContext);
 		this.runnable = new DelegatingSecurityContextRunnable(this.delegate);
 		SecurityContextHolder.clearContext(); // ensure runnable is what sets up the
@@ -112,9 +128,24 @@ public class DelegatingSecurityContextRunnableTests {
 		assertWrapped(this.runnable);
 	}
 
+	@Test
+	public void callDefaultSecurityContextWithCustomSecurityContextHolderStrategy() throws Exception {
+		SecurityContextHolderStrategy securityContextHolderStrategy = spy(new MockSecurityContextHolderStrategy());
+		givenDelegateRunWillAnswerWithCurrentSecurityContext(securityContextHolderStrategy);
+		securityContextHolderStrategy.setContext(this.securityContext);
+		DelegatingSecurityContextRunnable runnable = new DelegatingSecurityContextRunnable(this.delegate);
+		runnable.setSecurityContextHolderStrategy(securityContextHolderStrategy);
+		this.runnable = runnable;
+		// ensure callable is what sets up the SecurityContextHolder
+		securityContextHolderStrategy.clearContext();
+		assertWrapped(this.runnable);
+		verify(securityContextHolderStrategy, atLeastOnce()).getContext();
+	}
+
 	// SEC-3031
 	@Test
 	public void callOnSameThread() throws Exception {
+		givenDelegateRunWillAnswerWithCurrentSecurityContext();
 		this.originalSecurityContext = this.securityContext;
 		SecurityContextHolder.setContext(this.originalSecurityContext);
 		this.executor = synchronousExecutor();
@@ -125,7 +156,7 @@ public class DelegatingSecurityContextRunnableTests {
 	@Test
 	public void createNullDelegate() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> DelegatingSecurityContextRunnable.create(null, this.securityContext));
+			.isThrownBy(() -> DelegatingSecurityContextRunnable.create(null, this.securityContext));
 	}
 
 	@Test
@@ -135,6 +166,7 @@ public class DelegatingSecurityContextRunnableTests {
 
 	@Test
 	public void createNullSecurityContext() throws Exception {
+		givenDelegateRunWillAnswerWithCurrentSecurityContext();
 		SecurityContextHolder.setContext(this.securityContext);
 		this.runnable = DelegatingSecurityContextRunnable.create(this.delegate, null);
 		SecurityContextHolder.clearContext(); // ensure runnable is what sets up the
@@ -144,6 +176,7 @@ public class DelegatingSecurityContextRunnableTests {
 
 	@Test
 	public void create() throws Exception {
+		givenDelegateRunWillAnswerWithCurrentSecurityContext();
 		this.runnable = DelegatingSecurityContextRunnable.create(this.delegate, this.securityContext);
 		assertWrapped(this.runnable);
 	}

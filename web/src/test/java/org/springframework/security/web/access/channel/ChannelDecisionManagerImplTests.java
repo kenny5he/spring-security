@@ -22,9 +22,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Vector;
 
-import javax.servlet.FilterChain;
-
-import org.junit.Test;
+import jakarta.servlet.FilterChain;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -153,7 +152,7 @@ public class ChannelDecisionManagerImplTests {
 	public void testStartupFailsWithEmptyChannelProcessorsList() throws Exception {
 		ChannelDecisionManagerImpl cdm = new ChannelDecisionManagerImpl();
 		assertThatIllegalArgumentException().isThrownBy(cdm::afterPropertiesSet)
-				.withMessage("A list of ChannelProcessors is required");
+			.withMessage("A list of ChannelProcessors is required");
 	}
 
 	private class MockChannelProcessor implements ChannelProcessor {

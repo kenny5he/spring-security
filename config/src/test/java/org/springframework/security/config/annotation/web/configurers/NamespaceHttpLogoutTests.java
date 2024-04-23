@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,24 +20,25 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
 
-import javax.servlet.http.HttpSession;
-
+import jakarta.servlet.http.HttpSession;
 import org.assertj.core.api.Condition;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.context.annotation.SecurityTestExecutionListeners;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.SimpleUrlLogoutSuccessHandler;
-import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -56,12 +57,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Rob Winch
  * @author Josh Cummings
  */
-@RunWith(SpringRunner.class)
+@ExtendWith({ SpringExtension.class, SpringTestContextExtension.class })
 @SecurityTestExecutionListeners
 public class NamespaceHttpLogoutTests {
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired
 	MockMvc mvc;
@@ -152,7 +152,8 @@ public class NamespaceHttpLogoutTests {
 
 	ResultMatcher authenticated(boolean authenticated) {
 		return (result) -> assertThat(Optional.ofNullable(SecurityContextHolder.getContext().getAuthentication())
-				.map(Authentication::isAuthenticated).orElse(false)).isEqualTo(authenticated);
+			.map(Authentication::isAuthenticated)
+			.orElse(false)).isEqualTo(authenticated);
 	}
 
 	ResultMatcher noCookies() {
@@ -161,50 +162,57 @@ public class NamespaceHttpLogoutTests {
 
 	ResultMatcher session(Predicate<HttpSession> sessionPredicate) {
 		return (result) -> assertThat(result.getRequest().getSession(false))
-				.is(new Condition<>(sessionPredicate, "sessionPredicate failed"));
+			.is(new Condition<>(sessionPredicate, "sessionPredicate failed"));
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class HttpLogoutConfig extends WebSecurityConfigurerAdapter {
+	static class HttpLogoutConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+			return http.build();
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class HttpLogoutDisabledInLambdaConfig extends WebSecurityConfigurerAdapter {
+	static class HttpLogoutDisabledInLambdaConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			http.logout(AbstractHttpConfigurer::disable);
+			return http.build();
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class CustomHttpLogoutConfig extends WebSecurityConfigurerAdapter {
+	static class CustomHttpLogoutConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.logout()
 					.deleteCookies("remove") // logout@delete-cookies
 					.invalidateHttpSession(false) // logout@invalidate-session=false (default is true)
 					.logoutUrl("/custom-logout") // logout@logout-url (default is /logout)
-					.logoutSuccessUrl("/logout-success"); // logout@success-url (default is /login?logout)
+					.logoutSuccessUrl("/logout-success");
+			return http.build(); // logout@success-url (default is /login?logout)
 			// @formatter:on
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class CustomHttpLogoutInLambdaConfig extends WebSecurityConfigurerAdapter {
+	static class CustomHttpLogoutInLambdaConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.logout((logout) ->
@@ -213,37 +221,42 @@ public class NamespaceHttpLogoutTests {
 							.logoutUrl("/custom-logout")
 							.logoutSuccessUrl("/logout-success")
 				);
+			return http.build();
 			// @formatter:on
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class SuccessHandlerRefHttpLogoutConfig extends WebSecurityConfigurerAdapter {
+	static class SuccessHandlerRefHttpLogoutConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			SimpleUrlLogoutSuccessHandler logoutSuccessHandler = new SimpleUrlLogoutSuccessHandler();
 			logoutSuccessHandler.setDefaultTargetUrl("/SuccessHandlerRefHttpLogoutConfig");
 			// @formatter:off
 			http
 				.logout()
 					.logoutSuccessHandler(logoutSuccessHandler);
+			return http.build();
 			// @formatter:on
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class SuccessHandlerRefHttpLogoutInLambdaConfig extends WebSecurityConfigurerAdapter {
+	static class SuccessHandlerRefHttpLogoutInLambdaConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			SimpleUrlLogoutSuccessHandler logoutSuccessHandler = new SimpleUrlLogoutSuccessHandler();
 			logoutSuccessHandler.setDefaultTargetUrl("/SuccessHandlerRefHttpLogoutConfig");
 			// @formatter:off
 			http
 				.logout((logout) -> logout.logoutSuccessHandler(logoutSuccessHandler));
+			return http.build();
 			// @formatter:on
 		}
 

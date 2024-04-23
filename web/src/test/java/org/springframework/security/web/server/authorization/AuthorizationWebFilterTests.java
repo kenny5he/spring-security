@@ -16,10 +16,10 @@
 
 package org.springframework.security.web.server.authorization;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import reactor.test.publisher.PublisherProbe;
@@ -39,7 +39,7 @@ import static org.mockito.BDDMockito.given;
  * @author Rob Winch
  * @since 5.0
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class AuthorizationWebFilterTests {
 
 	@Mock
@@ -65,8 +65,8 @@ public class AuthorizationWebFilterTests {
 		given(this.chain.filter(this.exchange)).willReturn(this.chainResult.mono());
 		AuthorizationWebFilter filter = new AuthorizationWebFilter(
 				(a, e) -> a.flatMap((auth) -> Mono.error(new AccessDeniedException("Denied"))));
-		Mono<Void> result = filter.filter(this.exchange, this.chain).subscriberContext(
-				ReactiveSecurityContextHolder.withSecurityContext(Mono.just(new SecurityContextImpl())));
+		Mono<Void> result = filter.filter(this.exchange, this.chain)
+			.contextWrite(ReactiveSecurityContextHolder.withSecurityContext(Mono.just(new SecurityContextImpl())));
 		StepVerifier.create(result).expectError(AccessDeniedException.class).verify();
 		this.chainResult.assertWasNotSubscribed();
 	}
@@ -76,8 +76,9 @@ public class AuthorizationWebFilterTests {
 		given(this.chain.filter(this.exchange)).willReturn(this.chainResult.mono());
 		AuthorizationWebFilter filter = new AuthorizationWebFilter(
 				(a, e) -> Mono.error(new AccessDeniedException("Denied")));
-		Mono<Void> result = filter.filter(this.exchange, this.chain).subscriberContext(
-				ReactiveSecurityContextHolder.withAuthentication(new TestingAuthenticationToken("a", "b", "R")));
+		Mono<Void> result = filter.filter(this.exchange, this.chain)
+			.contextWrite(
+					ReactiveSecurityContextHolder.withAuthentication(new TestingAuthenticationToken("a", "b", "R")));
 		StepVerifier.create(result).expectError(AccessDeniedException.class).verify();
 		this.chainResult.assertWasNotSubscribed();
 	}
@@ -89,7 +90,7 @@ public class AuthorizationWebFilterTests {
 		AuthorizationWebFilter filter = new AuthorizationWebFilter(
 				(a, e) -> Mono.error(new AccessDeniedException("Denied")));
 		Mono<Void> result = filter.filter(this.exchange, this.chain)
-				.subscriberContext(ReactiveSecurityContextHolder.withSecurityContext(context.mono()));
+			.contextWrite(ReactiveSecurityContextHolder.withSecurityContext(context.mono()));
 		StepVerifier.create(result).expectError(AccessDeniedException.class).verify();
 		this.chainResult.assertWasNotSubscribed();
 		context.assertWasNotSubscribed();
@@ -102,7 +103,7 @@ public class AuthorizationWebFilterTests {
 		AuthorizationWebFilter filter = new AuthorizationWebFilter(
 				(a, e) -> Mono.just(new AuthorizationDecision(true)));
 		Mono<Void> result = filter.filter(this.exchange, this.chain)
-				.subscriberContext(ReactiveSecurityContextHolder.withSecurityContext(context.mono()));
+			.contextWrite(ReactiveSecurityContextHolder.withSecurityContext(context.mono()));
 		StepVerifier.create(result).verifyComplete();
 		this.chainResult.assertWasSubscribed();
 		context.assertWasNotSubscribed();
@@ -112,10 +113,10 @@ public class AuthorizationWebFilterTests {
 	public void filterWhenGrantedAndDoeAccessAuthenticationThenChainSubscribedAndSecurityContextSubscribed() {
 		PublisherProbe<SecurityContext> context = PublisherProbe.empty();
 		given(this.chain.filter(this.exchange)).willReturn(this.chainResult.mono());
-		AuthorizationWebFilter filter = new AuthorizationWebFilter((a, e) -> a
-				.map((auth) -> new AuthorizationDecision(true)).defaultIfEmpty(new AuthorizationDecision(true)));
+		AuthorizationWebFilter filter = new AuthorizationWebFilter((a,
+				e) -> a.map((auth) -> new AuthorizationDecision(true)).defaultIfEmpty(new AuthorizationDecision(true)));
 		Mono<Void> result = filter.filter(this.exchange, this.chain)
-				.subscriberContext(ReactiveSecurityContextHolder.withSecurityContext(context.mono()));
+			.contextWrite(ReactiveSecurityContextHolder.withSecurityContext(context.mono()));
 		StepVerifier.create(result).verifyComplete();
 		this.chainResult.assertWasSubscribed();
 		context.assertWasSubscribed();

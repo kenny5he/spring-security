@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,10 +55,19 @@ import org.springframework.util.ClassUtils;
  * @param <B> the {@link ProviderManagerBuilder} type that this is configuring.
  * @author Rob Winch
  * @author Eddú Meléndez
+ * @author Tony Dalbrekt
  * @since 3.2
  */
 public class LdapAuthenticationProviderConfigurer<B extends ProviderManagerBuilder<B>>
 		extends SecurityConfigurerAdapter<AuthenticationManager, B> {
+
+	private static final String APACHEDS_CLASSNAME = "org.apache.directory.server.core.DefaultDirectoryService";
+
+	private static final String UNBOUNDID_CLASSNAME = "com.unboundid.ldap.listener.InMemoryDirectoryServer";
+
+	private static final boolean apacheDsPresent;
+
+	private static final boolean unboundIdPresent;
 
 	private String groupRoleAttribute = "cn";
 
@@ -89,6 +98,12 @@ public class LdapAuthenticationProviderConfigurer<B extends ProviderManagerBuild
 	private LdapAuthoritiesPopulator ldapAuthoritiesPopulator;
 
 	private GrantedAuthoritiesMapper authoritiesMapper;
+
+	static {
+		ClassLoader classLoader = LdapAuthenticationProviderConfigurer.class.getClassLoader();
+		apacheDsPresent = ClassUtils.isPresent(APACHEDS_CLASSNAME, classLoader);
+		unboundIdPresent = ClassUtils.isPresent(UNBOUNDID_CLASSNAME, classLoader);
+	}
 
 	private LdapAuthenticationProvider build() throws Exception {
 		BaseLdapPathContextSource contextSource = getContextSource();
@@ -140,7 +155,7 @@ public class LdapAuthenticationProviderConfigurer<B extends ProviderManagerBuild
 		defaultAuthoritiesPopulator.setGroupSearchFilter(this.groupSearchFilter);
 		defaultAuthoritiesPopulator.setSearchSubtree(this.groupSearchSubtree);
 		defaultAuthoritiesPopulator.setRolePrefix(this.rolePrefix);
-		this.ldapAuthoritiesPopulator = defaultAuthoritiesPopulator;
+		this.ldapAuthoritiesPopulator = postProcess(defaultAuthoritiesPopulator);
 		return defaultAuthoritiesPopulator;
 	}
 
@@ -150,7 +165,6 @@ public class LdapAuthenticationProviderConfigurer<B extends ProviderManagerBuild
 	 * {@link SimpleAuthorityMapper}
 	 * @return the {@link LdapAuthenticationProviderConfigurer} for further customizations
 	 *
-	 * @author Tony Dalbrekt
 	 * @since 4.1.1
 	 */
 	public LdapAuthenticationProviderConfigurer<B> authoritiesMapper(
@@ -315,8 +329,8 @@ public class LdapAuthenticationProviderConfigurer<B extends ProviderManagerBuild
 	/**
 	 * If set to true, a subtree scope search will be performed for group membership. If
 	 * false a single-level search is used.
-	 * @param searchSubtree set to true to enable searching of the entire tree below the
-	 * <tt>groupSearchBase</tt>.
+	 * @param groupSearchSubtree set to true to enable searching of the entire tree below
+	 * the <tt>groupSearchBase</tt>.
 	 * @return the {@link LdapAuthenticationProviderConfigurer} for further customizations
 	 */
 	public LdapAuthenticationProviderConfigurer<B> groupSearchSubtree(boolean groupSearchSubtree) {
@@ -387,7 +401,7 @@ public class LdapAuthenticationProviderConfigurer<B extends ProviderManagerBuild
 	 */
 	public PasswordCompareConfigurer passwordCompare() {
 		return new PasswordCompareConfigurer().passwordAttribute("password")
-				.passwordEncoder(NoOpPasswordEncoder.getInstance());
+			.passwordEncoder(NoOpPasswordEncoder.getInstance());
 	}
 
 	/**
@@ -562,13 +576,13 @@ public class LdapAuthenticationProviderConfigurer<B extends ProviderManagerBuild
 		}
 
 		private void startEmbeddedLdapServer() throws Exception {
-			if (ClassUtils.isPresent(APACHEDS_CLASSNAME, getClass().getClassLoader())) {
+			if (apacheDsPresent) {
 				ApacheDSContainer apacheDsContainer = new ApacheDSContainer(this.root, this.ldif);
 				apacheDsContainer.setPort(getPort());
 				postProcess(apacheDsContainer);
 				this.port = apacheDsContainer.getLocalPort();
 			}
-			else if (ClassUtils.isPresent(UNBOUNDID_CLASSNAME, getClass().getClassLoader())) {
+			else if (unboundIdPresent) {
 				UnboundIdContainer unboundIdContainer = new UnboundIdContainer(this.root, this.ldif);
 				unboundIdContainer.setPort(getPort());
 				postProcess(unboundIdContainer);

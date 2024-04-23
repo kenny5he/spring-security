@@ -19,7 +19,7 @@ package org.springframework.security.oauth2.server.resource.authentication;
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -84,8 +84,10 @@ public class ReactiveJwtAuthenticationConverterAdapterTests {
 
 	@Test
 	public void convertWhenTokenHasBothScopeAndScpThenScopeAttributeIsTranslatedToAuthorities() {
-		Jwt jwt = TestJwts.jwt().claim("scp", Arrays.asList("message:read", "message:write"))
-				.claim("scope", "missive:read missive:write").build();
+		Jwt jwt = TestJwts.jwt()
+			.claim("scp", Arrays.asList("message:read", "message:write"))
+			.claim("scope", "missive:read missive:write")
+			.build();
 		AbstractAuthenticationToken authentication = this.jwtAuthenticationConverter.convert(jwt).block();
 		Collection<GrantedAuthority> authorities = authentication.getAuthorities();
 		// @formatter:off

@@ -20,13 +20,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.servlet.http.Cookie;
-
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import jakarta.servlet.http.Cookie;
 import org.json.JSONException;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.skyscreamer.jsonassert.JSONAssert;
 
 import org.springframework.security.web.savedrequest.SavedCookie;
@@ -67,7 +66,7 @@ public class SavedCookieMixinTests extends AbstractMixinTests {
 	public void serializeWithOverrideConfigurationTest() throws JsonProcessingException, JSONException {
 		SavedCookie savedCookie = new SavedCookie(new Cookie("SESSION", "123456789"));
 		this.mapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.PUBLIC_ONLY)
-				.setVisibility(PropertyAccessor.GETTER, JsonAutoDetect.Visibility.ANY);
+			.setVisibility(PropertyAccessor.GETTER, JsonAutoDetect.Visibility.ANY);
 		String actualJson = this.mapper.writeValueAsString(savedCookie);
 		JSONAssert.assertEquals(COOKIE_JSON, actualJson, true);
 	}

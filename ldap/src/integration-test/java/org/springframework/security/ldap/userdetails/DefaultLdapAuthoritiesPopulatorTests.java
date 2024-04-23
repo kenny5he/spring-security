@@ -20,9 +20,9 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.ldap.core.ContextSource;
@@ -34,7 +34,7 @@ import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.ldap.ApacheDsContainerConfig;
 import org.springframework.security.ldap.SpringSecurityLdapTemplate;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -43,7 +43,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
  * @author Luke Taylor
  * @author Eddú Meléndez
  */
-@RunWith(SpringRunner.class)
+@ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = ApacheDsContainerConfig.class)
 @SuppressWarnings({ "deprecation" })
 public class DefaultLdapAuthoritiesPopulatorTests {
@@ -53,7 +53,7 @@ public class DefaultLdapAuthoritiesPopulatorTests {
 
 	private DefaultLdapAuthoritiesPopulator populator;
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		this.populator = new DefaultLdapAuthoritiesPopulator(this.contextSource, "ou=groups");
 		this.populator.setIgnorePartialResultException(false);
@@ -68,7 +68,7 @@ public class DefaultLdapAuthoritiesPopulatorTests {
 
 		Collection<GrantedAuthority> authorities = this.populator.getGrantedAuthorities(ctx, "notfound");
 		assertThat(authorities).hasSize(1);
-		assertThat(AuthorityUtils.authorityListToSet(authorities).contains("ROLE_USER")).isTrue();
+		assertThat(AuthorityUtils.authorityListToSet(authorities)).contains("ROLE_USER");
 	}
 
 	@Test
@@ -77,9 +77,9 @@ public class DefaultLdapAuthoritiesPopulatorTests {
 		this.populator.setDefaultRole("ROLE_USER");
 
 		Collection<GrantedAuthority> authorities = this.populator
-				.getGrantedAuthorities(new DirContextAdapter(new DistinguishedName("cn=notused")), "notused");
+			.getGrantedAuthorities(new DirContextAdapter(new DistinguishedName("cn=notused")), "notused");
 		assertThat(authorities).hasSize(1);
-		assertThat(AuthorityUtils.authorityListToSet(authorities).contains("ROLE_USER")).isTrue();
+		assertThat(AuthorityUtils.authorityListToSet(authorities)).contains("ROLE_USER");
 	}
 
 	@Test
@@ -98,8 +98,8 @@ public class DefaultLdapAuthoritiesPopulatorTests {
 
 		assertThat(authorities).as("Should have 2 roles").hasSize(2);
 
-		assertThat(authorities.contains("ROLE_DEVELOPER")).isTrue();
-		assertThat(authorities.contains("ROLE_MANAGER")).isTrue();
+		assertThat(authorities).contains("ROLE_DEVELOPER");
+		assertThat(authorities).contains("ROLE_MANAGER");
 	}
 
 	@Test
@@ -112,10 +112,10 @@ public class DefaultLdapAuthoritiesPopulatorTests {
 				new DistinguishedName("uid=ben,ou=people,dc=springframework,dc=org"));
 
 		Set<String> authorities = AuthorityUtils
-				.authorityListToSet(this.populator.getGrantedAuthorities(ctx, "manager"));
+			.authorityListToSet(this.populator.getGrantedAuthorities(ctx, "manager"));
 
 		assertThat(authorities).as("Should have 1 role").hasSize(1);
-		assertThat(authorities.contains("ROLE_MANAGER")).isTrue();
+		assertThat(authorities).contains("ROLE_MANAGER");
 	}
 
 	@Test
@@ -127,11 +127,11 @@ public class DefaultLdapAuthoritiesPopulatorTests {
 				new DistinguishedName("uid=ben,ou=people,dc=springframework,dc=org"));
 
 		Set<String> authorities = AuthorityUtils
-				.authorityListToSet(this.populator.getGrantedAuthorities(ctx, "manager"));
+			.authorityListToSet(this.populator.getGrantedAuthorities(ctx, "manager"));
 
 		assertThat(authorities).as("Should have 2 roles").hasSize(2);
-		assertThat(authorities.contains("ROLE_MANAGER")).isTrue();
-		assertThat(authorities.contains("ROLE_DEVELOPER")).isTrue();
+		assertThat(authorities).contains("ROLE_MANAGER");
+		assertThat(authorities).contains("ROLE_DEVELOPER");
 	}
 
 	@Test
@@ -144,12 +144,12 @@ public class DefaultLdapAuthoritiesPopulatorTests {
 				new DistinguishedName("uid=ben,ou=people,dc=springframework,dc=org"));
 
 		Set<String> authorities = AuthorityUtils
-				.authorityListToSet(this.populator.getGrantedAuthorities(ctx, "manager"));
+			.authorityListToSet(this.populator.getGrantedAuthorities(ctx, "manager"));
 
 		assertThat(authorities).as("Should have 3 roles").hasSize(3);
-		assertThat(authorities.contains("ROLE_MANAGER")).isTrue();
-		assertThat(authorities.contains("ROLE_SUBMANAGER")).isTrue();
-		assertThat(authorities.contains("ROLE_DEVELOPER")).isTrue();
+		assertThat(authorities).contains("ROLE_MANAGER");
+		assertThat(authorities).contains("ROLE_SUBMANAGER");
+		assertThat(authorities).contains("ROLE_DEVELOPER");
 	}
 
 	@Test
@@ -162,9 +162,9 @@ public class DefaultLdapAuthoritiesPopulatorTests {
 		};
 
 		Collection<GrantedAuthority> authorities = this.populator
-				.getGrantedAuthorities(new DirContextAdapter(new DistinguishedName("cn=notused")), "notused");
+			.getGrantedAuthorities(new DirContextAdapter(new DistinguishedName("cn=notused")), "notused");
 		assertThat(authorities).hasSize(1);
-		assertThat(AuthorityUtils.authorityListToSet(authorities).contains("ROLE_EXTRA")).isTrue();
+		assertThat(AuthorityUtils.authorityListToSet(authorities)).contains("ROLE_EXTRA");
 	}
 
 	@Test
@@ -177,10 +177,10 @@ public class DefaultLdapAuthoritiesPopulatorTests {
 				new DistinguishedName("cn=mouse\\, jerry,ou=people,dc=springframework,dc=org"));
 
 		Set<String> authorities = AuthorityUtils
-				.authorityListToSet(this.populator.getGrantedAuthorities(ctx, "notused"));
+			.authorityListToSet(this.populator.getGrantedAuthorities(ctx, "notused"));
 
 		assertThat(authorities).as("Should have 1 role").hasSize(1);
-		assertThat(authorities.contains("ROLE_MANAGER")).isTrue();
+		assertThat(authorities).contains("ROLE_MANAGER");
 	}
 
 	@Test

@@ -16,8 +16,8 @@
 
 package org.springframework.security.web.authentication;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -75,11 +75,11 @@ public class UsernamePasswordAuthenticationFilter extends AbstractAuthentication
 			throw new AuthenticationServiceException("Authentication method not supported: " + request.getMethod());
 		}
 		String username = obtainUsername(request);
-		username = (username != null) ? username : "";
-		username = username.trim();
+		username = (username != null) ? username.trim() : "";
 		String password = obtainPassword(request);
 		password = (password != null) ? password : "";
-		UsernamePasswordAuthenticationToken authRequest = new UsernamePasswordAuthenticationToken(username, password);
+		UsernamePasswordAuthenticationToken authRequest = UsernamePasswordAuthenticationToken.unauthenticated(username,
+				password);
 		// Allow subclasses to set the "details" property
 		setDetails(request, authRequest);
 		return this.getAuthenticationManager().authenticate(authRequest);

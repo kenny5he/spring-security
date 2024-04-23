@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,11 @@ package org.springframework.security.config.annotation.web.configurers.oauth2.se
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.function.Supplier;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.convert.converter.Converter;
@@ -39,20 +41,22 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider;
 import org.springframework.security.oauth2.server.resource.authentication.OpaqueTokenAuthenticationProvider;
-import org.springframework.security.oauth2.server.resource.introspection.NimbusOpaqueTokenIntrospector;
+import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
+import org.springframework.security.oauth2.server.resource.introspection.SpringOpaqueTokenIntrospector;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
-import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationFilter;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.access.BearerTokenAccessDeniedHandler;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
-import org.springframework.security.web.authentication.AuthenticationConverter;
+import org.springframework.security.web.access.AccessDeniedHandlerImpl;
+import org.springframework.security.web.access.DelegatingAccessDeniedHandler;
+import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.util.matcher.AndRequestMatcher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
@@ -80,8 +84,6 @@ import org.springframework.web.accept.HeaderContentNegotiationStrategy;
  * authentication failures are handled
  * <li>{@link #bearerTokenResolver(BearerTokenResolver)} - customizes how to resolve a
  * bearer token from the request</li>
- * <li>{@link #authenticationConverter(AuthenticationConverter)}</li> - customizes how to
- * convert a bearer token authentication from the request
  * <li>{@link #jwt(Customizer)} - enables Jwt-encoded bearer token support</li>
  * <li>{@link #opaqueToken(Customizer)} - enables opaque bearer token support</li>
  * </ul>
@@ -104,8 +106,8 @@ import org.springframework.web.accept.HeaderContentNegotiationStrategy;
  * </ul>
  *
  * <p>
- * When using {@link #opaqueToken(Customizer)}, supply an introspection endpoint and its
- * authentication configuration
+ * When using {@link #opaqueToken(Customizer)}, supply an introspection endpoint with its
+ * client credentials and an OpaqueTokenAuthenticationConverter
  * </p>
  *
  * <h2>Security Filters</h2>
@@ -135,6 +137,7 @@ import org.springframework.web.accept.HeaderContentNegotiationStrategy;
  *
  * @author Josh Cummings
  * @author Evgeniy Cheban
+ * @author Jerome Wacongne &lt;ch4mp@c4-soft.com&gt;
  * @since 5.1
  * @see BearerTokenAuthenticationFilter
  * @see JwtAuthenticationProvider
@@ -157,13 +160,13 @@ public final class OAuth2ResourceServerConfigurer<H extends HttpSecurityBuilder<
 
 	private OpaqueTokenConfigurer opaqueTokenConfigurer;
 
-	private AccessDeniedHandler accessDeniedHandler = new BearerTokenAccessDeniedHandler();
+	private AccessDeniedHandler accessDeniedHandler = new DelegatingAccessDeniedHandler(
+			new LinkedHashMap<>(Map.of(CsrfException.class, new AccessDeniedHandlerImpl())),
+			new BearerTokenAccessDeniedHandler());
 
 	private AuthenticationEntryPoint authenticationEntryPoint = new BearerTokenAuthenticationEntryPoint();
 
 	private BearerTokenRequestMatcher requestMatcher = new BearerTokenRequestMatcher();
-
-	private AuthenticationConverter authenticationConverter;
 
 	public OAuth2ResourceServerConfigurer(ApplicationContext context) {
 		Assert.notNull(context, "context cannot be null");
@@ -195,12 +198,13 @@ public final class OAuth2ResourceServerConfigurer<H extends HttpSecurityBuilder<
 		return this;
 	}
 
-	public OAuth2ResourceServerConfigurer<H> authenticationConverter(AuthenticationConverter authenticationConverter) {
-		Assert.notNull(authenticationConverter, "authenticationConverter cannot be null");
-		this.authenticationConverter = authenticationConverter;
-		return this;
-	}
-
+	/**
+	 * @deprecated For removal in 7.0. Use {@link #jwt(Customizer)} or
+	 * {@code jwt(Customizer.withDefaults())} to stick with defaults. See the <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
+	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public JwtConfigurer jwt() {
 		if (this.jwtConfigurer == null) {
 			this.jwtConfigurer = new JwtConfigurer(this.context);
@@ -222,6 +226,14 @@ public final class OAuth2ResourceServerConfigurer<H extends HttpSecurityBuilder<
 		return this;
 	}
 
+	/**
+	 * @deprecated For removal in 7.0. Use {@link #opaqueToken(Customizer)} or
+	 * {@code opaqueToken(Customizer.withDefaults())} to stick with defaults. See the
+	 * <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
+	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public OpaqueTokenConfigurer opaqueToken() {
 		if (this.opaqueTokenConfigurer == null) {
 			this.opaqueTokenConfigurer = new OpaqueTokenConfigurer(this.context);
@@ -265,11 +277,10 @@ public final class OAuth2ResourceServerConfigurer<H extends HttpSecurityBuilder<
 			resolver = (request) -> authenticationManager;
 		}
 
-		this.authenticationConverter = getAuthenticationConverter();
-
 		BearerTokenAuthenticationFilter filter = new BearerTokenAuthenticationFilter(resolver);
-		filter.setAuthenticationConverter(this.authenticationConverter);
+		filter.setBearerTokenResolver(bearerTokenResolver);
 		filter.setAuthenticationEntryPoint(this.authenticationEntryPoint);
+		filter.setSecurityContextHolderStrategy(getSecurityContextHolderStrategy());
 		filter = postProcess(filter);
 		http.addFilter(filter);
 	}
@@ -302,7 +313,7 @@ public final class OAuth2ResourceServerConfigurer<H extends HttpSecurityBuilder<
 		ExceptionHandlingConfigurer<H> exceptionHandling = http.getConfigurer(ExceptionHandlingConfigurer.class);
 		if (exceptionHandling != null) {
 			ContentNegotiationStrategy contentNegotiationStrategy = http
-					.getSharedObject(ContentNegotiationStrategy.class);
+				.getSharedObject(ContentNegotiationStrategy.class);
 			if (contentNegotiationStrategy == null) {
 				contentNegotiationStrategy = new HeaderContentNegotiationStrategy();
 			}
@@ -362,20 +373,6 @@ public final class OAuth2ResourceServerConfigurer<H extends HttpSecurityBuilder<
 		return this.bearerTokenResolver;
 	}
 
-	AuthenticationConverter getAuthenticationConverter() {
-		if (this.authenticationConverter == null) {
-			if (this.context.getBeanNamesForType(BearerTokenAuthenticationConverter.class).length > 0) {
-				this.authenticationConverter = this.context.getBean(BearerTokenAuthenticationConverter.class);
-			}
-			else {
-				BearerTokenAuthenticationConverter converter = new BearerTokenAuthenticationConverter();
-				converter.setBearerTokenResolver(getBearerTokenResolver());
-				this.authenticationConverter = converter;
-			}
-		}
-		return this.authenticationConverter;
-	}
-
 	public class JwtConfigurer {
 
 		private final ApplicationContext context;
@@ -412,6 +409,13 @@ public final class OAuth2ResourceServerConfigurer<H extends HttpSecurityBuilder<
 			return this;
 		}
 
+		/**
+		 * @deprecated For removal in 7.0. Use {@link #jwt(Customizer)} or
+		 * {@code jwt(Customizer.withDefaults())} to stick with defaults. See the <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
+		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public OAuth2ResourceServerConfigurer<H> and() {
 			return OAuth2ResourceServerConfigurer.this;
 		}
@@ -469,6 +473,8 @@ public final class OAuth2ResourceServerConfigurer<H extends HttpSecurityBuilder<
 
 		private Supplier<OpaqueTokenIntrospector> introspector;
 
+		private OpaqueTokenAuthenticationConverter authenticationConverter;
+
 		OpaqueTokenConfigurer(ApplicationContext context) {
 			this.context = context;
 		}
@@ -482,7 +488,7 @@ public final class OAuth2ResourceServerConfigurer<H extends HttpSecurityBuilder<
 		public OpaqueTokenConfigurer introspectionUri(String introspectionUri) {
 			Assert.notNull(introspectionUri, "introspectionUri cannot be null");
 			this.introspectionUri = introspectionUri;
-			this.introspector = () -> new NimbusOpaqueTokenIntrospector(this.introspectionUri, this.clientId,
+			this.introspector = () -> new SpringOpaqueTokenIntrospector(this.introspectionUri, this.clientId,
 					this.clientSecret);
 			return this;
 		}
@@ -492,7 +498,7 @@ public final class OAuth2ResourceServerConfigurer<H extends HttpSecurityBuilder<
 			Assert.notNull(clientSecret, "clientSecret cannot be null");
 			this.clientId = clientId;
 			this.clientSecret = clientSecret;
-			this.introspector = () -> new NimbusOpaqueTokenIntrospector(this.introspectionUri, this.clientId,
+			this.introspector = () -> new SpringOpaqueTokenIntrospector(this.introspectionUri, this.clientId,
 					this.clientSecret);
 			return this;
 		}
@@ -503,6 +509,13 @@ public final class OAuth2ResourceServerConfigurer<H extends HttpSecurityBuilder<
 			return this;
 		}
 
+		public OpaqueTokenConfigurer authenticationConverter(
+				OpaqueTokenAuthenticationConverter authenticationConverter) {
+			Assert.notNull(authenticationConverter, "authenticationConverter cannot be null");
+			this.authenticationConverter = authenticationConverter;
+			return this;
+		}
+
 		OpaqueTokenIntrospector getIntrospector() {
 			if (this.introspector != null) {
 				return this.introspector.get();
@@ -510,12 +523,28 @@ public final class OAuth2ResourceServerConfigurer<H extends HttpSecurityBuilder<
 			return this.context.getBean(OpaqueTokenIntrospector.class);
 		}
 
+		OpaqueTokenAuthenticationConverter getAuthenticationConverter() {
+			if (this.authenticationConverter != null) {
+				return this.authenticationConverter;
+			}
+			if (this.context.getBeanNamesForType(OpaqueTokenAuthenticationConverter.class).length > 0) {
+				return this.context.getBean(OpaqueTokenAuthenticationConverter.class);
+			}
+			return null;
+		}
+
 		AuthenticationProvider getAuthenticationProvider() {
 			if (this.authenticationManager != null) {
 				return null;
 			}
 			OpaqueTokenIntrospector introspector = getIntrospector();
-			return new OpaqueTokenAuthenticationProvider(introspector);
+			OpaqueTokenAuthenticationProvider opaqueTokenAuthenticationProvider = new OpaqueTokenAuthenticationProvider(
+					introspector);
+			OpaqueTokenAuthenticationConverter authenticationConverter = getAuthenticationConverter();
+			if (authenticationConverter != null) {
+				opaqueTokenAuthenticationProvider.setAuthenticationConverter(authenticationConverter);
+			}
+			return opaqueTokenAuthenticationProvider;
 		}
 
 		AuthenticationManager getAuthenticationManager(H http) {

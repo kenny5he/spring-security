@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2016 the original author or authors.
+ * Copyright 2011-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,15 @@ import java.security.SecureRandom;
 import java.util.Random;
 import java.util.UUID;
 
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.crypto.codec.Hex;
 import org.springframework.security.crypto.encrypt.AesBytesEncryptor.CipherAlgorithm;
 import org.springframework.security.crypto.keygen.BytesKeyGenerator;
 import org.springframework.security.crypto.keygen.KeyGenerators;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class BouncyCastleAesBytesEncryptorEquivalencyTests {
 
@@ -39,7 +40,7 @@ public class BouncyCastleAesBytesEncryptorEquivalencyTests {
 
 	private SecureRandom secureRandom = new SecureRandom();
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		// generate random password, salt, and test data
 		this.password = UUID.randomUUID().toString();
@@ -50,7 +51,7 @@ public class BouncyCastleAesBytesEncryptorEquivalencyTests {
 	}
 
 	@Test
-	public void bouncyCastleAesCbcWithPredictableIvEquvalent() throws Exception {
+	public void bouncyCastleAesCbcWithPredictableIvEquivalent() throws Exception {
 		CryptoAssumptions.assumeCBCJCE();
 		BytesEncryptor bcEncryptor = new BouncyCastleAesCbcBytesEncryptor(this.password, this.salt,
 				new PredictableRandomBytesKeyGenerator(16));
@@ -69,7 +70,7 @@ public class BouncyCastleAesBytesEncryptorEquivalencyTests {
 	}
 
 	@Test
-	public void bouncyCastleAesGcmWithPredictableIvEquvalent() throws Exception {
+	public void bouncyCastleAesGcmWithPredictableIvEquivalent() throws Exception {
 		CryptoAssumptions.assumeGCMJCE();
 		BytesEncryptor bcEncryptor = new BouncyCastleAesGcmBytesEncryptor(this.password, this.salt,
 				new PredictableRandomBytesKeyGenerator(16));
@@ -96,11 +97,11 @@ public class BouncyCastleAesBytesEncryptorEquivalencyTests {
 			// and can decrypt back to the original input
 			byte[] leftEncrypted = left.encrypt(this.testData);
 			byte[] rightEncrypted = right.encrypt(this.testData);
-			Assert.assertArrayEquals(leftEncrypted, rightEncrypted);
+			assertThat(rightEncrypted).containsExactly(leftEncrypted);
 			byte[] leftDecrypted = left.decrypt(leftEncrypted);
 			byte[] rightDecrypted = right.decrypt(rightEncrypted);
-			Assert.assertArrayEquals(this.testData, leftDecrypted);
-			Assert.assertArrayEquals(this.testData, rightDecrypted);
+			assertThat(leftDecrypted).containsExactly(this.testData);
+			assertThat(rightDecrypted).containsExactly(this.testData);
 		}
 	}
 
@@ -114,8 +115,8 @@ public class BouncyCastleAesBytesEncryptorEquivalencyTests {
 			byte[] rightEncrypted = right.encrypt(this.testData);
 			byte[] leftDecrypted = left.decrypt(rightEncrypted);
 			byte[] rightDecrypted = right.decrypt(leftEncrypted);
-			Assert.assertArrayEquals(this.testData, leftDecrypted);
-			Assert.assertArrayEquals(this.testData, rightDecrypted);
+			assertThat(leftDecrypted).containsExactly(this.testData);
+			assertThat(rightDecrypted).containsExactly(this.testData);
 		}
 	}
 

@@ -16,7 +16,7 @@
 
 package org.springframework.security.access;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.access.event.AuthenticationCredentialsNotFoundEvent;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
@@ -40,15 +40,15 @@ public class AuthenticationCredentialsNotFoundEventTests {
 	@Test
 	public void testRejectsNulls2() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new AuthenticationCredentialsNotFoundEvent(new SimpleMethodInvocation(), null,
-						new AuthenticationCredentialsNotFoundException("test")));
+			.isThrownBy(() -> new AuthenticationCredentialsNotFoundEvent(new SimpleMethodInvocation(), null,
+					new AuthenticationCredentialsNotFoundException("test")));
 	}
 
 	@Test
 	public void testRejectsNulls3() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new AuthenticationCredentialsNotFoundEvent(new SimpleMethodInvocation(),
-						SecurityConfig.createList("TEST"), null));
+			.isThrownBy(() -> new AuthenticationCredentialsNotFoundEvent(new SimpleMethodInvocation(),
+					SecurityConfig.createList("TEST"), null));
 	}
 
 }

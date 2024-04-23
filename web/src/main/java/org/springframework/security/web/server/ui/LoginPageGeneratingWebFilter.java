@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,8 +63,10 @@ public class LoginPageGeneratingWebFilter implements WebFilter {
 
 	@Override
 	public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-		return this.matcher.matches(exchange).filter(ServerWebExchangeMatcher.MatchResult::isMatch)
-				.switchIfEmpty(chain.filter(exchange).then(Mono.empty())).flatMap((matchResult) -> render(exchange));
+		return this.matcher.matches(exchange)
+			.filter(ServerWebExchangeMatcher.MatchResult::isMatch)
+			.switchIfEmpty(chain.filter(exchange).then(Mono.empty()))
+			.flatMap((matchResult) -> render(exchange));
 	}
 
 	private Mono<Void> render(ServerWebExchange exchange) {
@@ -99,7 +101,7 @@ public class LoginPageGeneratingWebFilter implements WebFilter {
 				+ "rel=\"stylesheet\" integrity=\"sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M\" "
 				+ "crossorigin=\"anonymous\">\n");
 		page.append("    <link href=\"https://getbootstrap.com/docs/4.0/examples/signin/signin.css\" "
-				+ "rel=\"stylesheet\" crossorigin=\"anonymous\"/>\n");
+				+ "rel=\"stylesheet\" integrity=\"sha384-oOE/3m0LUMPub4kaC09mrdEhIc+e3exm4xOGxAmuFXhBNF4hcg/6MiAXAf5p0P56\" crossorigin=\"anonymous\"/>\n");
 		page.append("  </head>\n");
 		page.append("  <body>\n");
 		page.append("     <div class=\"container\">\n");
@@ -148,7 +150,7 @@ public class LoginPageGeneratingWebFilter implements WebFilter {
 		sb.append(createError(isError));
 		sb.append("<table class=\"table table-striped\">\n");
 		for (Map.Entry<String, String> clientAuthenticationUrlToClientName : oauth2AuthenticationUrlToClientName
-				.entrySet()) {
+			.entrySet()) {
 			sb.append(" <tr><td>");
 			String url = clientAuthenticationUrlToClientName.getKey();
 			sb.append("<a href=\"").append(contextPath).append(url).append("\">");

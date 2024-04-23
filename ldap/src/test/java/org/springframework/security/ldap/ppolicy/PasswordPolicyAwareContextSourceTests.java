@@ -24,8 +24,8 @@ import javax.naming.directory.DirContext;
 import javax.naming.ldap.Control;
 import javax.naming.ldap.LdapContext;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.ldap.UncategorizedLdapException;
 
@@ -46,7 +46,7 @@ public class PasswordPolicyAwareContextSourceTests {
 
 	private final LdapContext ctx = mock(LdapContext.class);
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		reset(this.ctx);
 		this.ctxSource = new PasswordPolicyAwareContextSource("ldap://blah:789/dc=springframework,dc=org") {
@@ -72,7 +72,7 @@ public class PasswordPolicyAwareContextSourceTests {
 	public void standardExceptionIsPropagatedWhenExceptionRaisedAndNoControlsAreSet() throws Exception {
 		willThrow(new NamingException("some LDAP exception")).given(this.ctx).reconnect(any(Control[].class));
 		assertThatExceptionOfType(UncategorizedLdapException.class)
-				.isThrownBy(() -> this.ctxSource.getContext("user", "ignored"));
+			.isThrownBy(() -> this.ctxSource.getContext("user", "ignored"));
 	}
 
 	@Test
@@ -81,7 +81,7 @@ public class PasswordPolicyAwareContextSourceTests {
 				new PasswordPolicyResponseControl(PasswordPolicyResponseControlTests.OPENLDAP_LOCKED_CTRL) });
 		willThrow(new NamingException("locked message")).given(this.ctx).reconnect(any(Control[].class));
 		assertThatExceptionOfType(PasswordPolicyException.class)
-				.isThrownBy(() -> this.ctxSource.getContext("user", "ignored"));
+			.isThrownBy(() -> this.ctxSource.getContext("user", "ignored"));
 	}
 
 }

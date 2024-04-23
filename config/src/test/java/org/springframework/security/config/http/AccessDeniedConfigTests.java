@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,24 +16,22 @@
 
 package org.springframework.security.config.http;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.http.HttpStatus;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.parsing.BeanDefinitionParsingException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.config.test.SpringTestContext;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.test.context.annotation.SecurityTestExecutionListeners;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.security.web.access.AccessDeniedHandler;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -44,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Luke Taylor
  * @author Josh Cummings
  */
-@RunWith(SpringJUnit4ClassRunner.class)
+@ExtendWith({ SpringExtension.class, SpringTestContextExtension.class })
 @SecurityTestExecutionListeners
 public class AccessDeniedConfigTests {
 
@@ -53,14 +51,20 @@ public class AccessDeniedConfigTests {
 	@Autowired
 	MockMvc mvc;
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Test
 	public void configureWhenAccessDeniedHandlerIsMissingLeadingSlashThenException() {
 		SpringTestContext context = this.spring.configLocations(this.xml("NoLeadingSlash"));
+		/*
+		 * NOTE: Original error message "errorPage must begin with '/'" no longer shows up
+		 * in stack trace as of Spring Framework 6.x.
+		 *
+		 * See https://github.com/spring-projects/spring-framework/issues/25162.
+		 */
 		assertThatExceptionOfType(BeanCreationException.class).isThrownBy(() -> context.autowire())
-				.withMessageContaining("errorPage must begin with '/'");
+			.havingRootCause()
+			.withMessageContaining("Property 'errorPage' threw exception");
 	}
 
 	@Test
@@ -74,7 +78,7 @@ public class AccessDeniedConfigTests {
 	public void configureWhenAccessDeniedHandlerUsesPathAndRefThenException() {
 		SpringTestContext context = this.spring.configLocations(this.xml("UsesPathAndRef"));
 		assertThatExceptionOfType(BeanDefinitionParsingException.class).isThrownBy(() -> context.autowire())
-				.withMessageContaining("attribute error-page cannot be used together with the 'ref' attribute");
+			.withMessageContaining("attribute error-page cannot be used together with the 'ref' attribute");
 	}
 
 	private String xml(String configName) {

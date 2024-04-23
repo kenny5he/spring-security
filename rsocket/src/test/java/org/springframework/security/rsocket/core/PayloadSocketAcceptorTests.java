@@ -25,12 +25,12 @@ import io.rsocket.Payload;
 import io.rsocket.RSocket;
 import io.rsocket.SocketAcceptor;
 import io.rsocket.metadata.WellKnownMimeType;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
@@ -52,7 +52,7 @@ import static org.mockito.Mockito.verify;
 /**
  * @author Rob Winch
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class PayloadSocketAcceptorTests {
 
 	private PayloadSocketAcceptor acceptor;
@@ -74,7 +74,7 @@ public class PayloadSocketAcceptorTests {
 	@Mock
 	private Payload payload;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.interceptors = Arrays.asList(this.interceptor);
 		this.acceptor = new PayloadSocketAcceptor(this.delegate, this.interceptors);
@@ -84,27 +84,27 @@ public class PayloadSocketAcceptorTests {
 	public void constructorWhenNullDelegateThenException() {
 		this.delegate = null;
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new PayloadSocketAcceptor(this.delegate, this.interceptors));
+			.isThrownBy(() -> new PayloadSocketAcceptor(this.delegate, this.interceptors));
 	}
 
 	@Test
 	public void constructorWhenNullInterceptorsThenException() {
 		this.interceptors = null;
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new PayloadSocketAcceptor(this.delegate, this.interceptors));
+			.isThrownBy(() -> new PayloadSocketAcceptor(this.delegate, this.interceptors));
 	}
 
 	@Test
 	public void constructorWhenEmptyInterceptorsThenException() {
 		this.interceptors = Collections.emptyList();
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new PayloadSocketAcceptor(this.delegate, this.interceptors));
+			.isThrownBy(() -> new PayloadSocketAcceptor(this.delegate, this.interceptors));
 	}
 
 	@Test
 	public void acceptWhenDataMimeTypeNullThenException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> this.acceptor.accept(this.setupPayload, this.rSocket).block());
+			.isThrownBy(() -> this.acceptor.accept(this.setupPayload, this.rSocket).block());
 	}
 
 	@Test
@@ -112,7 +112,7 @@ public class PayloadSocketAcceptorTests {
 		given(this.setupPayload.dataMimeType()).willReturn(MediaType.APPLICATION_JSON_VALUE);
 		PayloadExchange exchange = captureExchange();
 		assertThat(exchange.getMetadataMimeType().toString())
-				.isEqualTo(WellKnownMimeType.MESSAGE_RSOCKET_COMPOSITE_METADATA.getString());
+			.isEqualTo(WellKnownMimeType.MESSAGE_RSOCKET_COMPOSITE_METADATA.getString());
 		assertThat(exchange.getDataMimeType()).isEqualTo(MediaType.APPLICATION_JSON);
 	}
 
@@ -130,7 +130,7 @@ public class PayloadSocketAcceptorTests {
 		this.acceptor.setDefaultDataMimeType(MediaType.APPLICATION_JSON);
 		PayloadExchange exchange = captureExchange();
 		assertThat(exchange.getMetadataMimeType().toString())
-				.isEqualTo(WellKnownMimeType.MESSAGE_RSOCKET_COMPOSITE_METADATA.getString());
+			.isEqualTo(WellKnownMimeType.MESSAGE_RSOCKET_COMPOSITE_METADATA.getString());
 		assertThat(exchange.getDataMimeType()).isEqualTo(MediaType.APPLICATION_JSON);
 	}
 
@@ -154,8 +154,8 @@ public class PayloadSocketAcceptorTests {
 				this.rSocket);
 		PayloadInterceptor authenticateInterceptor = (exchange, chain) -> {
 			Context withSecurityContext = ReactiveSecurityContextHolder
-					.withSecurityContext(Mono.just(expectedSecurityContext));
-			return chain.next(exchange).subscriberContext(withSecurityContext);
+				.withSecurityContext(Mono.just(expectedSecurityContext));
+			return chain.next(exchange).contextWrite(withSecurityContext);
 		};
 		List<PayloadInterceptor> interceptors = Arrays.asList(authenticateInterceptor);
 		this.acceptor = new PayloadSocketAcceptor(captureSecurityContext, interceptors);

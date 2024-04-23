@@ -19,12 +19,11 @@ package org.springframework.security.config.http;
 import java.lang.reflect.Method;
 import java.util.Base64;
 
-import javax.servlet.Filter;
-import javax.servlet.http.HttpServletResponse;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import jakarta.servlet.Filter;
+import jakarta.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 import org.springframework.context.ConfigurableApplicationContext;
@@ -32,8 +31,11 @@ import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.config.util.InMemoryXmlApplicationContext;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 
 /**
  * @author Rob Winch
@@ -53,7 +55,7 @@ public class NamespaceHttpBasicTests {
 
 	Filter springSecurityFilterChain;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.request = new MockHttpServletRequest("GET", "");
 		this.request.setMethod("GET");
@@ -61,7 +63,7 @@ public class NamespaceHttpBasicTests {
 		this.chain = new MockFilterChain();
 	}
 
-	@After
+	@AfterEach
 	public void teardown() {
 		if (this.context != null) {
 			this.context.close();
@@ -92,6 +94,30 @@ public class NamespaceHttpBasicTests {
 				"Basic " + Base64.getEncoder().encodeToString("user:test".getBytes("UTF-8")));
 		this.springSecurityFilterChain.doFilter(this.request, this.response, this.chain);
 		assertThat(this.response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
+	}
+
+	@Test
+	public void httpBasicCustomSecurityContextHolderStrategy() throws Exception {
+		// @formatter:off
+		loadContext("<http auto-config=\"true\" use-expressions=\"false\" security-context-holder-strategy-ref=\"ref\" use-authorization-manager=\"false\"/>\n"
+				+  "<authentication-manager id=\"authenticationManager\">\n"
+				+  "	<authentication-provider>\n"
+				+  "		<user-service>\n"
+				+  "			<user name=\"user\" password=\"{noop}test\" authorities=\"ROLE_USER\"/>\n"
+				+  "		</user-service>\n"
+				+  "	</authentication-provider>\n"
+				+  "</authentication-manager>\n"
+				+  "<b:bean id=\"ref\" class=\"org.mockito.Mockito\" factory-method=\"spy\">\n" +
+				"	<b:constructor-arg>\n" +
+				"		<b:bean class=\"org.springframework.security.config.MockSecurityContextHolderStrategy\"/>\n" +
+				"	</b:constructor-arg>\n" +
+				"</b:bean>");
+		// @formatter:on
+		this.request.addHeader("Authorization",
+				"Basic " + Base64.getEncoder().encodeToString("user:test".getBytes("UTF-8")));
+		this.springSecurityFilterChain.doFilter(this.request, this.response, this.chain);
+		assertThat(this.response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
+		verify(this.context.getBean(SecurityContextHolderStrategy.class), atLeastOnce()).getContext();
 	}
 
 	// gh-4220

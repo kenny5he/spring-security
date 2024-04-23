@@ -16,11 +16,19 @@
 
 package org.springframework.security.test.context.showcase;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.AliasFor;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
@@ -28,7 +36,7 @@ import org.springframework.security.test.context.showcase.service.HelloMessageSe
 import org.springframework.security.test.context.showcase.service.MessageService;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -36,7 +44,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 /**
  * @author Rob Winch
  */
-@RunWith(SpringJUnit4ClassRunner.class)
+@ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = WithMockUserTests.Config.class)
 public class WithMockUserTests {
 
@@ -46,7 +54,7 @@ public class WithMockUserTests {
 	@Test
 	public void getMessageUnauthenticated() {
 		assertThatExceptionOfType(AuthenticationCredentialsNotFoundException.class)
-				.isThrownBy(() -> this.messageService.getMessage());
+			.isThrownBy(() -> this.messageService.getMessage());
 	}
 
 	@Test
@@ -75,6 +83,25 @@ public class WithMockUserTests {
 	public void getMessageWithMockUserCustomAuthorities() {
 		String message = this.messageService.getMessage();
 		assertThat(message).contains("admin").contains("ADMIN").contains("USER").doesNotContain("ROLE_");
+	}
+
+	@Configuration
+	@Retention(RetentionPolicy.RUNTIME)
+	@Target(ElementType.METHOD)
+	@Inherited
+	@WithMockUser(roles = "ADMIN")
+	public @interface WithAdminUser {
+
+		@AliasFor(annotation = WithMockUser.class, attribute = "value")
+		String value();
+
+	}
+
+	@Test
+	@WithAdminUser("admin")
+	public void getMessageWithMetaAnnotationAdminUser() {
+		String message = this.messageService.getMessage();
+		assertThat(message).contains("admin").contains("ADMIN").contains("ROLE_ADMIN");
 	}
 
 	@EnableGlobalMethodSecurity(prePostEnabled = true)

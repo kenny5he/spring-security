@@ -16,21 +16,29 @@
 
 package org.springframework.security.web.authentication;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.stubbing.Answer;
 
+import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 /**
  * Tests {@link UsernamePasswordAuthenticationFilter}.
@@ -115,7 +123,23 @@ public class UsernamePasswordAuthenticationFilterTests {
 		given(am.authenticate(any(Authentication.class))).willThrow(new BadCredentialsException(""));
 		filter.setAuthenticationManager(am);
 		assertThatExceptionOfType(AuthenticationException.class)
-				.isThrownBy(() -> filter.attemptAuthentication(request, new MockHttpServletResponse()));
+			.isThrownBy(() -> filter.attemptAuthentication(request, new MockHttpServletResponse()));
+	}
+
+	@Test
+	public void testSecurityContextHolderStrategyUsed() throws Exception {
+		MockHttpServletRequest request = new MockHttpServletRequest("POST", "/login");
+		request.setServletPath("/login");
+		request.addParameter(UsernamePasswordAuthenticationFilter.SPRING_SECURITY_FORM_USERNAME_KEY, "rod");
+		request.addParameter(UsernamePasswordAuthenticationFilter.SPRING_SECURITY_FORM_PASSWORD_KEY, "koala");
+		UsernamePasswordAuthenticationFilter filter = new UsernamePasswordAuthenticationFilter();
+		filter.setAuthenticationManager(createAuthenticationManager());
+		SecurityContextHolderStrategy strategy = spy(SecurityContextHolder.getContextHolderStrategy());
+		filter.setSecurityContextHolderStrategy(strategy);
+		filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+		ArgumentCaptor<SecurityContext> captor = ArgumentCaptor.forClass(SecurityContext.class);
+		verify(strategy).setContext(captor.capture());
+		assertThat(captor.getValue().getAuthentication()).isInstanceOf(UsernamePasswordAuthenticationToken.class);
 	}
 
 	/**
@@ -135,7 +159,7 @@ public class UsernamePasswordAuthenticationFilterTests {
 	private AuthenticationManager createAuthenticationManager() {
 		AuthenticationManager am = mock(AuthenticationManager.class);
 		given(am.authenticate(any(Authentication.class)))
-				.willAnswer((Answer<Authentication>) (invocation) -> (Authentication) invocation.getArguments()[0]);
+			.willAnswer((Answer<Authentication>) (invocation) -> (Authentication) invocation.getArguments()[0]);
 		return am;
 	}
 

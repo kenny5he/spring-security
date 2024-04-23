@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,15 @@ package org.springframework.security.config.http;
 
 import java.util.Arrays;
 
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -47,12 +48,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Tim Ysewyn
  * @author Josh Cummings
  */
+@ExtendWith(SpringTestContextExtension.class)
 public class HttpCorsConfigTests {
 
 	private static final String CONFIG_LOCATION_PREFIX = "classpath:org/springframework/security/config/http/HttpCorsConfigTests";
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired
 	MockMvc mvc;
@@ -60,9 +61,10 @@ public class HttpCorsConfigTests {
 	@Test
 	public void autowireWhenMissingMvcThenGivesInformativeError() {
 		assertThatExceptionOfType(BeanCreationException.class)
-				.isThrownBy(() -> this.spring.configLocations(this.xml("RequiresMvc")).autowire())
-				.withMessageContaining(
-						"Please ensure Spring Security & Spring MVC are configured in a shared ApplicationContext");
+			.isThrownBy(() -> this.spring.configLocations(this.xml("RequiresMvc")).autowire())
+			.havingRootCause()
+			.withMessageContaining(
+					"Please ensure Spring Security & Spring MVC are configured in a shared ApplicationContext");
 	}
 
 	@Test

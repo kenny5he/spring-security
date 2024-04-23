@@ -21,7 +21,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.core.GrantedAuthority;
 
@@ -125,8 +125,8 @@ public class SimpleRoles2GrantedAuthoritiesMapperTests {
 		}
 		Collection<String> expectedColl = Arrays.asList(expectedGas);
 		assertThat(expectedColl.containsAll(resultColl) && resultColl.containsAll(expectedColl))
-				.withFailMessage("Role collections do not match; result: " + resultColl + ", expected: " + expectedColl)
-				.isTrue();
+			.withFailMessage("Role collections do not match; result: " + resultColl + ", expected: " + expectedColl)
+			.isTrue();
 	}
 
 	private SimpleAttributes2GrantedAuthoritiesMapper getDefaultMapper() {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,13 +18,13 @@ package org.springframework.security.web.util.matcher;
 
 import java.util.regex.Pattern;
 
-import javax.servlet.http.HttpServletRequest;
-
+import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import org.springframework.core.log.LogMessage;
 import org.springframework.http.HttpMethod;
+import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 /**
@@ -43,13 +43,47 @@ import org.springframework.util.StringUtils;
  */
 public final class RegexRequestMatcher implements RequestMatcher {
 
-	private static final int DEFAULT = 0;
+	private static final int DEFAULT = Pattern.DOTALL;
+
+	private static final int CASE_INSENSITIVE = DEFAULT | Pattern.CASE_INSENSITIVE;
 
 	private static final Log logger = LogFactory.getLog(RegexRequestMatcher.class);
 
 	private final Pattern pattern;
 
 	private final HttpMethod httpMethod;
+
+	/**
+	 * Creates a case-sensitive {@code Pattern} instance to match against the request.
+	 * @param pattern the regular expression to compile into a pattern.
+	 * @since 5.8
+	 */
+	public static RegexRequestMatcher regexMatcher(String pattern) {
+		Assert.hasText(pattern, "pattern cannot be empty");
+		return new RegexRequestMatcher(pattern, null);
+	}
+
+	/**
+	 * Creates an instance that matches to all requests with the same {@link HttpMethod}.
+	 * @param method the HTTP method to match. Must not be null.
+	 * @since 5.8
+	 */
+	public static RegexRequestMatcher regexMatcher(HttpMethod method) {
+		Assert.notNull(method, "method cannot be null");
+		return new RegexRequestMatcher(".*", method.name());
+	}
+
+	/**
+	 * Creates a case-sensitive {@code Pattern} instance to match against the request.
+	 * @param method the HTTP method to match. May be null to match all methods.
+	 * @param pattern the regular expression to compile into a pattern.
+	 * @since 5.8
+	 */
+	public static RegexRequestMatcher regexMatcher(HttpMethod method, String pattern) {
+		Assert.notNull(method, "method cannot be null");
+		Assert.hasText(pattern, "pattern cannot be empty");
+		return new RegexRequestMatcher(pattern, method.name());
+	}
 
 	/**
 	 * Creates a case-sensitive {@code Pattern} instance to match against the request.
@@ -68,7 +102,7 @@ public final class RegexRequestMatcher implements RequestMatcher {
 	 * {@link Pattern#CASE_INSENSITIVE} flag set.
 	 */
 	public RegexRequestMatcher(String pattern, String httpMethod, boolean caseInsensitive) {
-		this.pattern = Pattern.compile(pattern, caseInsensitive ? Pattern.CASE_INSENSITIVE : DEFAULT);
+		this.pattern = Pattern.compile(pattern, caseInsensitive ? CASE_INSENSITIVE : DEFAULT);
 		this.httpMethod = StringUtils.hasText(httpMethod) ? HttpMethod.valueOf(httpMethod) : null;
 	}
 
@@ -82,7 +116,7 @@ public final class RegexRequestMatcher implements RequestMatcher {
 	@Override
 	public boolean matches(HttpServletRequest request) {
 		if (this.httpMethod != null && request.getMethod() != null
-				&& this.httpMethod != HttpMethod.resolve(request.getMethod())) {
+				&& this.httpMethod != HttpMethod.valueOf(request.getMethod())) {
 			return false;
 		}
 		String url = request.getServletPath();

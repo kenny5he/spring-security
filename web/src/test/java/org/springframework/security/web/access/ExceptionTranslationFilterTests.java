@@ -19,15 +19,14 @@ package org.springframework.security.web.access;
 import java.io.IOException;
 import java.util.Locale;
 
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -45,6 +44,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.WebAttributes;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.savedrequest.SavedRequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,7 +55,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 /**
  * Tests {@link ExceptionTranslationFilter}.
@@ -64,8 +64,8 @@ import static org.mockito.Mockito.verifyZeroInteractions;
  */
 public class ExceptionTranslationFilterTests {
 
-	@After
-	@Before
+	@AfterEach
+	@BeforeEach
 	public void clearContext() {
 		SecurityContextHolder.clearContext();
 	}
@@ -92,12 +92,13 @@ public class ExceptionTranslationFilterTests {
 		request.setRequestURI("/mycontext/secure/page.html");
 		// Setup the FilterChain to thrown an access denied exception
 		FilterChain fc = mock(FilterChain.class);
-		willThrow(new AccessDeniedException("")).given(fc).doFilter(any(HttpServletRequest.class),
-				any(HttpServletResponse.class));
+		willThrow(new AccessDeniedException("")).given(fc)
+			.doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
 		// Setup SecurityContextHolder, as filter needs to check if user is
 		// anonymous
-		SecurityContextHolder.getContext().setAuthentication(
-				new AnonymousAuthenticationToken("ignored", "ignored", AuthorityUtils.createAuthorityList("IGNORED")));
+		SecurityContextHolder.getContext()
+			.setAuthentication(new AnonymousAuthenticationToken("ignored", "ignored",
+					AuthorityUtils.createAuthorityList("IGNORED")));
 		// Test
 		ExceptionTranslationFilter filter = new ExceptionTranslationFilter(this.mockEntryPoint);
 		filter.setAuthenticationTrustResolver(new AuthenticationTrustResolverImpl());
@@ -105,7 +106,6 @@ public class ExceptionTranslationFilterTests {
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		filter.doFilter(request, response, fc);
 		assertThat(response.getRedirectedUrl()).isEqualTo("/mycontext/login.jsp");
-		assertThat(getSavedRequestUrl(request)).isEqualTo("http://localhost/mycontext/secure/page.html");
 	}
 
 	@Test
@@ -120,19 +120,20 @@ public class ExceptionTranslationFilterTests {
 		request.setRequestURI("/mycontext/secure/page.html");
 		// Setup the FilterChain to thrown an access denied exception
 		FilterChain fc = mock(FilterChain.class);
-		willThrow(new AccessDeniedException("")).given(fc).doFilter(any(HttpServletRequest.class),
-				any(HttpServletResponse.class));
+		willThrow(new AccessDeniedException("")).given(fc)
+			.doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
 		// Setup SecurityContextHolder, as filter needs to check if user is remembered
 		SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
 		securityContext.setAuthentication(
 				new RememberMeAuthenticationToken("ignored", "ignored", AuthorityUtils.createAuthorityList("IGNORED")));
 		SecurityContextHolder.setContext(securityContext);
+		RequestCache requestCache = new HttpSessionRequestCache();
 		// Test
-		ExceptionTranslationFilter filter = new ExceptionTranslationFilter(this.mockEntryPoint);
+		ExceptionTranslationFilter filter = new ExceptionTranslationFilter(this.mockEntryPoint, requestCache);
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		filter.doFilter(request, response, fc);
 		assertThat(response.getRedirectedUrl()).isEqualTo("/mycontext/login.jsp");
-		assertThat(getSavedRequestUrl(request)).isEqualTo("http://localhost/mycontext/secure/page.html");
+		assertThat(getSavedRequestUrl(request)).isEqualTo(requestCache.getRequest(request, response).getRedirectUrl());
 	}
 
 	@Test
@@ -142,8 +143,8 @@ public class ExceptionTranslationFilterTests {
 		request.setServletPath("/secure/page.html");
 		// Setup the FilterChain to thrown an access denied exception
 		FilterChain fc = mock(FilterChain.class);
-		willThrow(new AccessDeniedException("")).given(fc).doFilter(any(HttpServletRequest.class),
-				any(HttpServletResponse.class));
+		willThrow(new AccessDeniedException("")).given(fc)
+			.doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
 		// Setup SecurityContextHolder, as filter needs to check if user is
 		// anonymous
 		SecurityContextHolder.clearContext();
@@ -157,7 +158,7 @@ public class ExceptionTranslationFilterTests {
 		filter.doFilter(request, response, fc);
 		assertThat(response.getStatus()).isEqualTo(403);
 		assertThat(request.getAttribute(WebAttributes.ACCESS_DENIED_403))
-				.isExactlyInstanceOf(AccessDeniedException.class);
+			.isExactlyInstanceOf(AccessDeniedException.class);
 	}
 
 	@Test
@@ -167,12 +168,13 @@ public class ExceptionTranslationFilterTests {
 		request.setServletPath("/secure/page.html");
 		// Setup the FilterChain to thrown an access denied exception
 		FilterChain fc = mock(FilterChain.class);
-		willThrow(new AccessDeniedException("")).given(fc).doFilter(any(HttpServletRequest.class),
-				any(HttpServletResponse.class));
+		willThrow(new AccessDeniedException("")).given(fc)
+			.doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
 		// Setup SecurityContextHolder, as filter needs to check if user is
 		// anonymous
-		SecurityContextHolder.getContext().setAuthentication(
-				new AnonymousAuthenticationToken("ignored", "ignored", AuthorityUtils.createAuthorityList("IGNORED")));
+		SecurityContextHolder.getContext()
+			.setAuthentication(new AnonymousAuthenticationToken("ignored", "ignored",
+					AuthorityUtils.createAuthorityList("IGNORED")));
 		// Test
 		ExceptionTranslationFilter filter = new ExceptionTranslationFilter(
 				(req, res, ae) -> res.sendError(403, ae.getMessage()));
@@ -182,7 +184,7 @@ public class ExceptionTranslationFilterTests {
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		filter.doFilter(request, response, fc);
 		assertThat(response.getErrorMessage())
-				.isEqualTo("Vollst\u00e4ndige Authentifikation wird ben\u00f6tigt um auf diese Resource zuzugreifen");
+			.isEqualTo("Vollst\u00e4ndige Authentifikation wird ben\u00f6tigt um auf diese Resource zuzugreifen");
 	}
 
 	@Test
@@ -197,15 +199,16 @@ public class ExceptionTranslationFilterTests {
 		request.setRequestURI("/mycontext/secure/page.html");
 		// Setup the FilterChain to thrown an authentication failure exception
 		FilterChain fc = mock(FilterChain.class);
-		willThrow(new BadCredentialsException("")).given(fc).doFilter(any(HttpServletRequest.class),
-				any(HttpServletResponse.class));
+		willThrow(new BadCredentialsException("")).given(fc)
+			.doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
 		// Test
-		ExceptionTranslationFilter filter = new ExceptionTranslationFilter(this.mockEntryPoint);
+		RequestCache requestCache = new HttpSessionRequestCache();
+		ExceptionTranslationFilter filter = new ExceptionTranslationFilter(this.mockEntryPoint, requestCache);
 		filter.afterPropertiesSet();
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		filter.doFilter(request, response, fc);
 		assertThat(response.getRedirectedUrl()).isEqualTo("/mycontext/login.jsp");
-		assertThat(getSavedRequestUrl(request)).isEqualTo("http://localhost/mycontext/secure/page.html");
+		assertThat(getSavedRequestUrl(request)).isEqualTo(requestCache.getRequest(request, response).getRedirectUrl());
 	}
 
 	@Test
@@ -221,8 +224,8 @@ public class ExceptionTranslationFilterTests {
 		request.setRequestURI("/mycontext/secure/page.html");
 		// Setup the FilterChain to thrown an authentication failure exception
 		FilterChain fc = mock(FilterChain.class);
-		willThrow(new BadCredentialsException("")).given(fc).doFilter(any(HttpServletRequest.class),
-				any(HttpServletResponse.class));
+		willThrow(new BadCredentialsException("")).given(fc)
+			.doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
 		// Test
 		HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
 		ExceptionTranslationFilter filter = new ExceptionTranslationFilter(this.mockEntryPoint, requestCache);
@@ -231,7 +234,6 @@ public class ExceptionTranslationFilterTests {
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		filter.doFilter(request, response, fc);
 		assertThat(response.getRedirectedUrl()).isEqualTo("/mycontext/login.jsp");
-		assertThat(getSavedRequestUrl(request)).isEqualTo("http://localhost:8080/mycontext/secure/page.html");
 	}
 
 	@Test
@@ -242,7 +244,7 @@ public class ExceptionTranslationFilterTests {
 	@Test
 	public void startupDetectsMissingRequestCache() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new ExceptionTranslationFilter(this.mockEntryPoint, null));
+			.isThrownBy(() -> new ExceptionTranslationFilter(this.mockEntryPoint, null));
 	}
 
 	@Test
@@ -266,8 +268,8 @@ public class ExceptionTranslationFilterTests {
 			FilterChain fc = mock(FilterChain.class);
 			willThrow(exception).given(fc).doFilter(any(HttpServletRequest.class), any(HttpServletResponse.class));
 			assertThatExceptionOfType(Exception.class)
-					.isThrownBy(() -> filter.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(), fc))
-					.isSameAs(exception);
+				.isThrownBy(() -> filter.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(), fc))
+				.isSameAs(exception);
 		}
 	}
 
@@ -283,8 +285,8 @@ public class ExceptionTranslationFilterTests {
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		ExceptionTranslationFilter filter = new ExceptionTranslationFilter(this.mockEntryPoint);
 		assertThatExceptionOfType(ServletException.class).isThrownBy(() -> filter.doFilter(request, response, chain))
-				.withCauseInstanceOf(AccessDeniedException.class);
-		verifyZeroInteractions(this.mockEntryPoint);
+			.withCauseInstanceOf(AccessDeniedException.class);
+		verifyNoMoreInteractions(this.mockEntryPoint);
 	}
 
 	@Test
@@ -304,6 +306,6 @@ public class ExceptionTranslationFilterTests {
 	}
 
 	private AuthenticationEntryPoint mockEntryPoint = (request, response, authException) -> response
-			.sendRedirect(request.getContextPath() + "/login.jsp");
+		.sendRedirect(request.getContextPath() + "/login.jsp");
 
 }

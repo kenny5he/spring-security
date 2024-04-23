@@ -16,7 +16,7 @@
 
 package org.springframework.security.crypto.encrypt;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -64,17 +64,6 @@ public class EncryptorsTests {
 		assertThat(result.equals("text")).isFalse();
 		assertThat(encryptor.decrypt(result)).isEqualTo("text");
 		assertThat(result.equals(encryptor.encrypt("text"))).isFalse();
-	}
-
-	@Test
-	public void queryableText() {
-		CryptoAssumptions.assumeCBCJCE();
-		TextEncryptor encryptor = Encryptors.queryableText("password", "5c0744940b5c369b");
-		String result = encryptor.encrypt("text");
-		assertThat(result).isNotNull();
-		assertThat(result.equals("text")).isFalse();
-		assertThat(encryptor.decrypt(result)).isEqualTo("text");
-		assertThat(result.equals(encryptor.encrypt("text"))).isTrue();
 	}
 
 	@Test

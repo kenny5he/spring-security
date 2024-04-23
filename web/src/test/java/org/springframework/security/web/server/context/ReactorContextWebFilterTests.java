@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,24 @@
 
 package org.springframework.security.web.server.context;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnJre;
+import org.junit.jupiter.api.condition.JRE;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 import reactor.test.publisher.TestPublisher;
 import reactor.util.context.Context;
 
+import org.springframework.core.task.VirtualThreadTaskExecutor;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.security.core.Authentication;
@@ -46,7 +54,7 @@ import static org.mockito.BDDMockito.given;
  * @author Rob Winch
  * @since 5.0
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class ReactorContextWebFilterTests {
 
 	@Mock
@@ -63,11 +71,10 @@ public class ReactorContextWebFilterTests {
 
 	private WebTestHandler handler;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.filter = new ReactorContextWebFilter(this.repository);
 		this.handler = WebTestHandler.bindToWebFilters(this.filter);
-		given(this.repository.load(any())).willReturn(this.securityContext.mono());
 	}
 
 	@Test
@@ -77,12 +84,14 @@ public class ReactorContextWebFilterTests {
 
 	@Test
 	public void filterWhenNoPrincipalAccessThenNoInteractions() {
+		given(this.repository.load(any())).willReturn(this.securityContext.mono());
 		this.handler.exchange(this.exchange);
 		this.securityContext.assertWasNotSubscribed();
 	}
 
 	@Test
 	public void filterWhenGetPrincipalMonoThenNoInteractions() {
+		given(this.repository.load(any())).willReturn(this.securityContext.mono());
 		this.handler = WebTestHandler.bindToWebFilters(this.filter, (e, c) -> {
 			ReactiveSecurityContextHolder.getContext();
 			return c.filter(e);
@@ -96,8 +105,10 @@ public class ReactorContextWebFilterTests {
 		SecurityContextImpl context = new SecurityContextImpl(this.principal);
 		given(this.repository.load(any())).willReturn(Mono.just(context));
 		this.handler = WebTestHandler.bindToWebFilters(this.filter,
-				(e, c) -> ReactiveSecurityContextHolder.getContext().map(SecurityContext::getAuthentication)
-						.doOnSuccess((p) -> assertThat(p).isSameAs(this.principal)).flatMap((p) -> c.filter(e)));
+				(e, c) -> ReactiveSecurityContextHolder.getContext()
+					.map(SecurityContext::getAuthentication)
+					.doOnSuccess((p) -> assertThat(p).isSameAs(this.principal))
+					.flatMap((p) -> c.filter(e)));
 		WebTestHandler.WebHandlerResult result = this.handler.exchange(this.exchange);
 		this.securityContext.assertWasNotSubscribed();
 	}
@@ -105,11 +116,41 @@ public class ReactorContextWebFilterTests {
 	@Test
 	// gh-4962
 	public void filterWhenMainContextThenDoesNotOverride() {
+		given(this.repository.load(any())).willReturn(this.securityContext.mono());
 		String contextKey = "main";
-		WebFilter mainContextWebFilter = (e, c) -> c.filter(e).subscriberContext(Context.of(contextKey, true));
-		WebFilterChain chain = new DefaultWebFilterChain((e) -> Mono.empty(), mainContextWebFilter, this.filter);
+		WebFilter mainContextWebFilter = (e, c) -> c.filter(e).contextWrite(Context.of(contextKey, true));
+		WebFilterChain chain = new DefaultWebFilterChain((e) -> Mono.empty(),
+				List.of(mainContextWebFilter, this.filter));
 		Mono<Void> filter = chain.filter(MockServerWebExchange.from(this.exchange.build()));
 		StepVerifier.create(filter).expectAccessibleContext().hasKey(contextKey).then().verifyComplete();
+	}
+
+	@Test
+	public void filterWhenThreadFactoryIsPlatformThenSecurityContextLoaded() {
+		ThreadFactory threadFactory = Executors.defaultThreadFactory();
+		assertSecurityContextLoaded(threadFactory);
+	}
+
+	@Test
+	@DisabledOnJre(JRE.JAVA_17)
+	public void filterWhenThreadFactoryIsVirtualThenSecurityContextLoaded() {
+		ThreadFactory threadFactory = new VirtualThreadTaskExecutor().getVirtualThreadFactory();
+		assertSecurityContextLoaded(threadFactory);
+	}
+
+	private void assertSecurityContextLoaded(ThreadFactory threadFactory) {
+		SecurityContextImpl context = new SecurityContextImpl(this.principal);
+		given(this.repository.load(any())).willReturn(Mono.just(context));
+		// @formatter:off
+		WebFilter subscribeOnThreadFactory = (exchange, chain) -> chain.filter(exchange)
+				.subscribeOn(Schedulers.newSingle(threadFactory));
+		WebFilter assertSecurityContext = (exchange, chain) -> ReactiveSecurityContextHolder.getContext()
+				.map(SecurityContext::getAuthentication)
+				.doOnSuccess((authentication) -> assertThat(authentication).isSameAs(this.principal))
+				.then(chain.filter(exchange));
+		// @formatter:on
+		this.handler = WebTestHandler.bindToWebFilters(subscribeOnThreadFactory, this.filter, assertSecurityContext);
+		this.handler.exchange(this.exchange);
 	}
 
 }

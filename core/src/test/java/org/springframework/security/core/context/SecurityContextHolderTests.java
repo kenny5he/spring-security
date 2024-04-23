@@ -16,13 +16,15 @@
 
 package org.springframework.security.core.context;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /**
  * Tests {@link SecurityContextHolder}.
@@ -31,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
  */
 public class SecurityContextHolderTests {
 
-	@Before
+	@BeforeEach
 	public final void setUp() {
 		SecurityContextHolder.setStrategyName(SecurityContextHolder.MODE_INHERITABLETHREADLOCAL);
 	}
@@ -39,7 +41,7 @@ public class SecurityContextHolderTests {
 	@Test
 	public void testContextHolderGetterSetterClearer() {
 		SecurityContext sc = new SecurityContextImpl();
-		sc.setAuthentication(new UsernamePasswordAuthenticationToken("Foobar", "pass"));
+		sc.setAuthentication(UsernamePasswordAuthenticationToken.unauthenticated("Foobar", "pass"));
 		SecurityContextHolder.setContext(sc);
 		assertThat(SecurityContextHolder.getContext()).isEqualTo(sc);
 		SecurityContextHolder.clearContext();
@@ -56,6 +58,20 @@ public class SecurityContextHolderTests {
 	@Test
 	public void testRejectsNulls() {
 		assertThatIllegalArgumentException().isThrownBy(() -> SecurityContextHolder.setContext(null));
+	}
+
+	@Test
+	public void setContextHolderStrategyWhenCalledThenUsed() {
+		SecurityContextHolderStrategy original = SecurityContextHolder.getContextHolderStrategy();
+		try {
+			SecurityContextHolderStrategy delegate = mock(SecurityContextHolderStrategy.class);
+			SecurityContextHolder.setContextHolderStrategy(delegate);
+			SecurityContextHolder.getContext();
+			verify(delegate).getContext();
+		}
+		finally {
+			SecurityContextHolder.setContextHolderStrategy(original);
+		}
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
-import com.nimbusds.oauth2.sdk.GrantType;
 import com.nimbusds.oauth2.sdk.ParseException;
 import com.nimbusds.oauth2.sdk.as.AuthorizationServerMetadata;
 import com.nimbusds.openid.connect.sdk.op.OIDCProviderMetadata;
@@ -31,6 +30,7 @@ import net.minidev.json.JSONObject;
 
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.RequestEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
@@ -58,6 +58,13 @@ public final class ClientRegistrations {
 	private static final String OAUTH_METADATA_PATH = "/.well-known/oauth-authorization-server";
 
 	private static final RestTemplate rest = new RestTemplate();
+
+	static {
+		SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+		requestFactory.setConnectTimeout(30_000);
+		requestFactory.setReadTimeout(30_000);
+		rest.setRequestFactory(requestFactory);
+	}
 
 	private static final ParameterizedTypeReference<Map<String, Object>> typeReference = new ParameterizedTypeReference<Map<String, Object>>() {
 	};
@@ -156,7 +163,7 @@ public final class ClientRegistrations {
 			Map<String, Object> configuration = rest.exchange(request, typeReference).getBody();
 			OIDCProviderMetadata metadata = parse(configuration, OIDCProviderMetadata::parse);
 			ClientRegistration.Builder builder = withProviderConfiguration(metadata, issuer.toASCIIString())
-					.jwkSetUri(metadata.getJWKSetURI().toASCIIString());
+				.jwkSetUri(metadata.getJWKSetURI().toASCIIString());
 			if (metadata.getUserInfoEndpointURI() != null) {
 				builder.userInfoUri(metadata.getUserInfoEndpointURI().toASCIIString());
 			}
@@ -240,15 +247,7 @@ public final class ClientRegistrations {
 				() -> "The Issuer \"" + metadataIssuer + "\" provided in the configuration metadata did "
 						+ "not match the requested issuer \"" + issuer + "\"");
 		String name = URI.create(issuer).getHost();
-		ClientAuthenticationMethod method = getClientAuthenticationMethod(issuer,
-				metadata.getTokenEndpointAuthMethods());
-		List<GrantType> grantTypes = metadata.getGrantTypes();
-		// If null, the default includes authorization_code
-		if (grantTypes != null && !grantTypes.contains(GrantType.AUTHORIZATION_CODE)) {
-			throw new IllegalArgumentException(
-					"Only AuthorizationGrantType.AUTHORIZATION_CODE is supported. The issuer \"" + issuer
-							+ "\" returned a configuration of " + grantTypes);
-		}
+		ClientAuthenticationMethod method = getClientAuthenticationMethod(metadata.getTokenEndpointAuthMethods());
 		Map<String, Object> configurationMetadata = new LinkedHashMap<>(metadata.toJSONObject());
 		// @formatter:off
 		return ClientRegistration.withRegistrationId(name)
@@ -256,7 +255,7 @@ public final class ClientRegistrations {
 				.authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
 				.clientAuthenticationMethod(method)
 				.redirectUri("{baseUrl}/{action}/oauth2/code/{registrationId}")
-				.authorizationUri(metadata.getAuthorizationEndpointURI().toASCIIString())
+				.authorizationUri((metadata.getAuthorizationEndpointURI() != null) ? metadata.getAuthorizationEndpointURI().toASCIIString() : null)
 				.providerConfigurationMetadata(configurationMetadata)
 				.tokenUri(metadata.getTokenEndpointURI().toASCIIString())
 				.issuerUri(issuer)
@@ -264,10 +263,10 @@ public final class ClientRegistrations {
 		// @formatter:on
 	}
 
-	private static ClientAuthenticationMethod getClientAuthenticationMethod(String issuer,
+	private static ClientAuthenticationMethod getClientAuthenticationMethod(
 			List<com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod> metadataAuthMethods) {
 		if (metadataAuthMethods == null || metadataAuthMethods
-				.contains(com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod.CLIENT_SECRET_BASIC)) {
+			.contains(com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod.CLIENT_SECRET_BASIC)) {
 			// If null, the default includes client_secret_basic
 			return ClientAuthenticationMethod.CLIENT_SECRET_BASIC;
 		}
@@ -277,10 +276,7 @@ public final class ClientRegistrations {
 		if (metadataAuthMethods.contains(com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod.NONE)) {
 			return ClientAuthenticationMethod.NONE;
 		}
-		throw new IllegalArgumentException(
-				"Only ClientAuthenticationMethod.CLIENT_SECRET_BASIC, ClientAuthenticationMethod.CLIENT_SECRET_POST and "
-						+ "ClientAuthenticationMethod.NONE are supported. The issuer \"" + issuer
-						+ "\" returned a configuration of " + metadataAuthMethods);
+		return null;
 	}
 
 	private interface ThrowingFunction<S, T, E extends Throwable> {

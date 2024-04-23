@@ -18,9 +18,9 @@ package org.springframework.security.oauth2.server.resource.authentication;
 
 import java.util.Collection;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -35,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
  *
  * @author Josh Cummings
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class JwtAuthenticationTokenTests {
 
 	@Test
@@ -55,7 +55,7 @@ public class JwtAuthenticationTokenTests {
 	@Test
 	public void constructorWhenJwtIsNullThenThrowsException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new JwtAuthenticationToken(null))
-				.withMessageContaining("token cannot be null");
+			.withMessageContaining("token cannot be null");
 	}
 
 	@Test

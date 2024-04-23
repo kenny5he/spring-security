@@ -16,8 +16,8 @@
 
 package org.springframework.security.oauth2.server.resource.web;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -39,7 +39,7 @@ public class BearerTokenAuthenticationEntryPointTests {
 
 	private BearerTokenAuthenticationEntryPoint authenticationEntryPoint;
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		this.authenticationEntryPoint = new BearerTokenAuthenticationEntryPoint();
 	}
@@ -83,7 +83,7 @@ public class BearerTokenAuthenticationEntryPointTests {
 		this.authenticationEntryPoint.commence(request, response, new OAuth2AuthenticationException(error));
 		assertThat(response.getStatus()).isEqualTo(400);
 		assertThat(response.getHeader("WWW-Authenticate"))
-				.isEqualTo("Bearer error=\"invalid_request\", error_description=\"The access token expired\"");
+			.isEqualTo("Bearer error=\"invalid_request\", error_description=\"The access token expired\"");
 	}
 
 	@Test
@@ -95,7 +95,7 @@ public class BearerTokenAuthenticationEntryPointTests {
 		this.authenticationEntryPoint.commence(request, response, new OAuth2AuthenticationException(error));
 		assertThat(response.getStatus()).isEqualTo(400);
 		assertThat(response.getHeader("WWW-Authenticate"))
-				.isEqualTo("Bearer error=\"invalid_request\", error_uri=\"https://example.com\"");
+			.isEqualTo("Bearer error=\"invalid_request\", error_uri=\"https://example.com\"");
 	}
 
 	@Test
@@ -129,7 +129,7 @@ public class BearerTokenAuthenticationEntryPointTests {
 		this.authenticationEntryPoint.commence(request, response, new OAuth2AuthenticationException(error));
 		assertThat(response.getStatus()).isEqualTo(403);
 		assertThat(response.getHeader("WWW-Authenticate"))
-				.isEqualTo("Bearer error=\"insufficient_scope\", scope=\"test.read test.write\"");
+			.isEqualTo("Bearer error=\"insufficient_scope\", scope=\"test.read test.write\"");
 	}
 
 	@Test
@@ -142,9 +142,9 @@ public class BearerTokenAuthenticationEntryPointTests {
 		this.authenticationEntryPoint.setRealmName("test");
 		this.authenticationEntryPoint.commence(request, response, new OAuth2AuthenticationException(error));
 		assertThat(response.getStatus()).isEqualTo(403);
-		assertThat(response.getHeader("WWW-Authenticate")).isEqualTo(
-				"Bearer realm=\"test\", error=\"insufficient_scope\", error_description=\"Insufficient scope\", "
-						+ "error_uri=\"https://example.com\", scope=\"test.read test.write\"");
+		assertThat(response.getHeader("WWW-Authenticate"))
+			.isEqualTo("Bearer realm=\"test\", error=\"insufficient_scope\", error_description=\"Insufficient scope\", "
+					+ "error_uri=\"https://example.com\", scope=\"test.read test.write\"");
 	}
 
 	@Test

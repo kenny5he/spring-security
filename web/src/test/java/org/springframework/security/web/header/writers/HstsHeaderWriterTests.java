@@ -16,8 +16,8 @@
 
 package org.springframework.security.web.header.writers;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -41,7 +41,7 @@ public class HstsHeaderWriterTests {
 
 	private static final String HSTS_HEADER_NAME = "Strict-Transport-Security";
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.request = new MockHttpServletRequest();
 		this.request.setSecure(true);
@@ -73,7 +73,7 @@ public class HstsHeaderWriterTests {
 		this.writer.writeHeaders(this.request, this.response);
 		assertThat(this.response.getHeaderNames()).hasSize(1);
 		assertThat(this.response.getHeader("Strict-Transport-Security"))
-				.isEqualTo("max-age=15768000 ; includeSubDomains");
+			.isEqualTo("max-age=15768000 ; includeSubDomains");
 	}
 
 	@Test
@@ -89,7 +89,7 @@ public class HstsHeaderWriterTests {
 		this.writer.writeHeaders(this.request, this.response);
 		assertThat(this.response.getHeaderNames()).hasSize(1);
 		assertThat(this.response.getHeader("Strict-Transport-Security"))
-				.isEqualTo("max-age=31536000 ; includeSubDomains");
+			.isEqualTo("max-age=31536000 ; includeSubDomains");
 	}
 
 	@Test
@@ -112,7 +112,7 @@ public class HstsHeaderWriterTests {
 	public void writeHeadersInsecureRequestDoesNotWriteHeader() {
 		this.request.setSecure(false);
 		this.writer.writeHeaders(this.request, this.response);
-		assertThat(this.response.getHeaderNames().isEmpty()).isTrue();
+		assertThat(this.response.getHeaderNames()).isEmpty();
 	}
 
 	@Test
@@ -122,7 +122,7 @@ public class HstsHeaderWriterTests {
 		this.writer.writeHeaders(this.request, this.response);
 		assertThat(this.response.getHeaderNames()).hasSize(1);
 		assertThat(this.response.getHeader("Strict-Transport-Security"))
-				.isEqualTo("max-age=31536000 ; includeSubDomains");
+			.isEqualTo("max-age=31536000 ; includeSubDomains");
 	}
 
 	@Test

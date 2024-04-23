@@ -16,7 +16,7 @@
 
 package org.springframework.security.authorization;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.TestingAuthenticationToken;
@@ -59,7 +59,8 @@ public class AuthorizationManagerTests {
 		Object object = new Object();
 
 		assertThatExceptionOfType(AccessDeniedException.class)
-				.isThrownBy(() -> manager.verify(() -> authentication, object)).withMessage("Access Denied");
+			.isThrownBy(() -> manager.verify(() -> authentication, object))
+			.withMessage("Access Denied");
 	}
 
 }

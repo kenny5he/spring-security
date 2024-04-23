@@ -16,7 +16,7 @@
 
 package org.springframework.security.crypto.password;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.crypto.keygen.KeyGenerators;
 
@@ -102,7 +102,7 @@ public class LdapShaPasswordEncoderTests {
 	public void malformedPrefixIsRejected() {
 		// No right brace
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> this.sha.matches("somepassword", "{SSHA25ro4PKC8jhQZ26jVsozhX/xaP0suHgX"));
+			.isThrownBy(() -> this.sha.matches("somepassword", "{SSHA25ro4PKC8jhQZ26jVsozhX/xaP0suHgX"));
 	}
 
 }

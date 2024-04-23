@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,21 @@
 
 package org.springframework.security.oauth2.server.resource.authentication;
 
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 import com.nimbusds.jwt.JWTParser;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.core.log.LogMessage;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
@@ -35,7 +38,6 @@ import org.springframework.security.authentication.ReactiveAuthenticationManager
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoders;
-import org.springframework.security.oauth2.server.resource.BearerTokenAuthenticationToken;
 import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 import org.springframework.util.Assert;
 import org.springframework.web.server.ServerWebExchange;
@@ -46,10 +48,10 @@ import org.springframework.web.server.ServerWebExchange;
  * "https://openid.net/specs/openid-connect-core-1_0.html#IssuerIdentifier">Issuer</a> in
  * a signed JWT (JWS).
  *
- * To use, this class must be able to determine whether or not the `iss` claim is trusted.
- * Recall that anyone can stand up an authorization server and issue valid tokens to a
- * resource server. The simplest way to achieve this is to supply a list of trusted
- * issuers in the constructor.
+ * To use, this class must be able to determine whether the `iss` claim is trusted. Recall
+ * that anyone can stand up an authorization server and issue valid tokens to a resource
+ * server. The simplest way to achieve this is to supply a set of trusted issuers in the
+ * constructor.
  *
  * This class derives the Issuer from the `iss` claim found in the
  * {@link ServerWebExchange}'s
@@ -68,21 +70,58 @@ public final class JwtIssuerReactiveAuthenticationManagerResolver
 	/**
 	 * Construct a {@link JwtIssuerReactiveAuthenticationManagerResolver} using the
 	 * provided parameters
-	 * @param trustedIssuers a list of trusted issuers
+	 * @param trustedIssuers an array of trusted issuers
+	 * @deprecated use {@link #fromTrustedIssuers(String...)}
 	 */
+	@Deprecated(since = "6.2", forRemoval = true)
 	public JwtIssuerReactiveAuthenticationManagerResolver(String... trustedIssuers) {
-		this(Arrays.asList(trustedIssuers));
+		this(Set.of(trustedIssuers));
 	}
 
 	/**
 	 * Construct a {@link JwtIssuerReactiveAuthenticationManagerResolver} using the
 	 * provided parameters
 	 * @param trustedIssuers a collection of trusted issuers
+	 * @deprecated use {@link #fromTrustedIssuers(Collection)}
 	 */
+	@Deprecated(since = "6.2", forRemoval = true)
 	public JwtIssuerReactiveAuthenticationManagerResolver(Collection<String> trustedIssuers) {
 		Assert.notEmpty(trustedIssuers, "trustedIssuers cannot be empty");
 		this.authenticationManager = new ResolvingAuthenticationManager(
-				new TrustedIssuerJwtAuthenticationManagerResolver(new ArrayList<>(trustedIssuers)::contains));
+				new TrustedIssuerJwtAuthenticationManagerResolver(Set.copyOf(trustedIssuers)::contains));
+	}
+
+	/**
+	 * Construct a {@link JwtIssuerReactiveAuthenticationManagerResolver} using the
+	 * provided parameters
+	 * @param trustedIssuers an array of trusted issuers
+	 * @since 6.2
+	 */
+	public static JwtIssuerReactiveAuthenticationManagerResolver fromTrustedIssuers(String... trustedIssuers) {
+		return fromTrustedIssuers(Set.of(trustedIssuers));
+	}
+
+	/**
+	 * Construct a {@link JwtIssuerReactiveAuthenticationManagerResolver} using the
+	 * provided parameters
+	 * @param trustedIssuers a collection of trusted issuers
+	 * @since 6.2
+	 */
+	public static JwtIssuerReactiveAuthenticationManagerResolver fromTrustedIssuers(Collection<String> trustedIssuers) {
+		Assert.notEmpty(trustedIssuers, "trustedIssuers cannot be empty");
+		return fromTrustedIssuers(Set.copyOf(trustedIssuers)::contains);
+	}
+
+	/**
+	 * Construct a {@link JwtIssuerReactiveAuthenticationManagerResolver} using the
+	 * provided parameters
+	 * @param trustedIssuers a predicate to validate issuers
+	 * @since 6.2
+	 */
+	public static JwtIssuerReactiveAuthenticationManagerResolver fromTrustedIssuers(Predicate<String> trustedIssuers) {
+		Assert.notNull(trustedIssuers, "trustedIssuers cannot be null");
+		return new JwtIssuerReactiveAuthenticationManagerResolver(
+				new TrustedIssuerJwtAuthenticationManagerResolver(trustedIssuers));
 	}
 
 	/**
@@ -91,7 +130,7 @@ public final class JwtIssuerReactiveAuthenticationManagerResolver
 	 *
 	 * Note that the {@link ReactiveAuthenticationManagerResolver} provided in this
 	 * constructor will need to verify that the issuer is trusted. This should be done via
-	 * an allowed list of issuers.
+	 * an allowed set of issuers.
 	 *
 	 * One way to achieve this is with a {@link Map} where the keys are the known issuers:
 	 * <pre>
@@ -99,7 +138,7 @@ public final class JwtIssuerReactiveAuthenticationManagerResolver
 	 *     authenticationManagers.put("https://issuerOne.example.org", managerOne);
 	 *     authenticationManagers.put("https://issuerTwo.example.org", managerTwo);
 	 *     JwtIssuerReactiveAuthenticationManagerResolver resolver = new JwtIssuerReactiveAuthenticationManagerResolver
-	 *     	((issuer) -> Mono.justOrEmpty(authenticationManagers.get(issuer));
+	 *     	((issuer) -&gt; Mono.justOrEmpty(authenticationManagers.get(issuer));
 	 * </pre>
 	 *
 	 * The keys in the {@link Map} are the trusted issuers.
@@ -141,9 +180,9 @@ public final class JwtIssuerReactiveAuthenticationManagerResolver
 					"Authentication must be of type BearerTokenAuthenticationToken");
 			BearerTokenAuthenticationToken token = (BearerTokenAuthenticationToken) authentication;
 			return this.issuerConverter.convert(token)
-					.flatMap((issuer) -> this.issuerAuthenticationManagerResolver.resolve(issuer).switchIfEmpty(
-							Mono.error(() -> new InvalidBearerTokenException("Invalid issuer " + issuer))))
-					.flatMap((manager) -> manager.authenticate(authentication));
+				.flatMap((issuer) -> this.issuerAuthenticationManagerResolver.resolve(issuer)
+					.switchIfEmpty(Mono.error(() -> new InvalidBearerTokenException("Invalid issuer " + issuer))))
+				.flatMap((manager) -> manager.authenticate(authentication));
 		}
 
 	}
@@ -169,6 +208,8 @@ public final class JwtIssuerReactiveAuthenticationManagerResolver
 	static class TrustedIssuerJwtAuthenticationManagerResolver
 			implements ReactiveAuthenticationManagerResolver<String> {
 
+		private final Log logger = LogFactory.getLog(getClass());
+
 		private final Map<String, Mono<ReactiveAuthenticationManager>> authenticationManagers = new ConcurrentHashMap<>();
 
 		private final Predicate<String> trustedIssuer;
@@ -180,13 +221,15 @@ public final class JwtIssuerReactiveAuthenticationManagerResolver
 		@Override
 		public Mono<ReactiveAuthenticationManager> resolve(String issuer) {
 			if (!this.trustedIssuer.test(issuer)) {
+				this.logger.debug("Did not resolve AuthenticationManager since issuer is not trusted");
 				return Mono.empty();
 			}
 			// @formatter:off
 			return this.authenticationManagers.computeIfAbsent(issuer,
 					(k) -> Mono.<ReactiveAuthenticationManager>fromCallable(() -> new JwtReactiveAuthenticationManager(ReactiveJwtDecoders.fromIssuerLocation(k)))
+							.doOnNext((manager) -> this.logger.debug(LogMessage.format("Resolved AuthenticationManager for issuer '%s'", issuer)))
 							.subscribeOn(Schedulers.boundedElastic())
-							.cache()
+							.cache((manager) -> Duration.ofMillis(Long.MAX_VALUE), (ex) -> Duration.ZERO, () -> Duration.ZERO)
 			);
 			// @formatter:on
 		}

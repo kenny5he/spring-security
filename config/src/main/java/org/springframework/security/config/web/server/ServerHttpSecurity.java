@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -28,9 +29,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import io.micrometer.observation.ObservationRegistry;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
@@ -41,6 +46,7 @@ import org.springframework.core.ResolvableType;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.authentication.DelegatingReactiveAuthenticationManager;
@@ -49,12 +55,15 @@ import org.springframework.security.authentication.ReactiveAuthenticationManager
 import org.springframework.security.authorization.AuthenticatedReactiveAuthorizationManager;
 import org.springframework.security.authorization.AuthorityReactiveAuthorizationManager;
 import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.ObservationReactiveAuthorizationManager;
 import org.springframework.security.authorization.ReactiveAuthorizationManager;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.configurers.oauth2.client.OidcLogoutConfigurer;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMapper;
+import org.springframework.security.core.session.ReactiveSessionRegistry;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
 import org.springframework.security.oauth2.client.InMemoryReactiveOAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.ReactiveOAuth2AuthorizedClientService;
@@ -64,6 +73,9 @@ import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCo
 import org.springframework.security.oauth2.client.endpoint.ReactiveOAuth2AccessTokenResponseClient;
 import org.springframework.security.oauth2.client.endpoint.WebClientReactiveAuthorizationCodeTokenResponseClient;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeReactiveAuthenticationManager;
+import org.springframework.security.oauth2.client.oidc.server.session.InMemoryReactiveOidcSessionRegistry;
+import org.springframework.security.oauth2.client.oidc.server.session.ReactiveOidcSessionRegistry;
+import org.springframework.security.oauth2.client.oidc.session.OidcSessionInformation;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcReactiveOAuth2UserService;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -80,6 +92,7 @@ import org.springframework.security.oauth2.client.web.server.ServerOAuth2Authori
 import org.springframework.security.oauth2.client.web.server.ServerOAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.client.web.server.WebSessionOAuth2ServerAuthorizationRequestRepository;
 import org.springframework.security.oauth2.client.web.server.authentication.OAuth2LoginAuthenticationWebFilter;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthorizationException;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
@@ -89,38 +102,51 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoderFactory;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtReactiveAuthenticationManager;
 import org.springframework.security.oauth2.server.resource.authentication.OpaqueTokenReactiveAuthenticationManager;
-import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
+import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.introspection.NimbusReactiveOpaqueTokenIntrospector;
+import org.springframework.security.oauth2.server.resource.introspection.ReactiveOpaqueTokenAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.introspection.ReactiveOpaqueTokenIntrospector;
 import org.springframework.security.oauth2.server.resource.web.access.server.BearerTokenServerAccessDeniedHandler;
 import org.springframework.security.oauth2.server.resource.web.server.BearerTokenServerAuthenticationEntryPoint;
-import org.springframework.security.oauth2.server.resource.web.server.ServerBearerTokenAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.server.authentication.ServerBearerTokenAuthenticationConverter;
 import org.springframework.security.web.PortMapper;
+import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.security.web.authentication.preauth.x509.SubjectDnX509PrincipalExtractor;
 import org.springframework.security.web.authentication.preauth.x509.X509PrincipalExtractor;
+import org.springframework.security.web.server.DefaultServerRedirectStrategy;
 import org.springframework.security.web.server.DelegatingServerAuthenticationEntryPoint;
 import org.springframework.security.web.server.DelegatingServerAuthenticationEntryPoint.DelegateEntry;
+import org.springframework.security.web.server.ExchangeMatcherRedirectWebFilter;
 import org.springframework.security.web.server.MatcherSecurityWebFilterChain;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.ServerAuthenticationEntryPoint;
+import org.springframework.security.web.server.ServerRedirectStrategy;
+import org.springframework.security.web.server.WebFilterExchange;
 import org.springframework.security.web.server.authentication.AnonymousAuthenticationWebFilter;
 import org.springframework.security.web.server.authentication.AuthenticationConverterServerWebExchangeMatcher;
 import org.springframework.security.web.server.authentication.AuthenticationWebFilter;
+import org.springframework.security.web.server.authentication.ConcurrentSessionControlServerAuthenticationSuccessHandler;
+import org.springframework.security.web.server.authentication.DelegatingServerAuthenticationSuccessHandler;
 import org.springframework.security.web.server.authentication.HttpBasicServerAuthenticationEntryPoint;
+import org.springframework.security.web.server.authentication.HttpStatusServerEntryPoint;
+import org.springframework.security.web.server.authentication.InvalidateLeastUsedServerMaximumSessionsExceededHandler;
 import org.springframework.security.web.server.authentication.ReactivePreAuthenticatedAuthenticationManager;
 import org.springframework.security.web.server.authentication.RedirectServerAuthenticationEntryPoint;
 import org.springframework.security.web.server.authentication.RedirectServerAuthenticationFailureHandler;
 import org.springframework.security.web.server.authentication.RedirectServerAuthenticationSuccessHandler;
+import org.springframework.security.web.server.authentication.RegisterSessionServerAuthenticationSuccessHandler;
 import org.springframework.security.web.server.authentication.ServerAuthenticationConverter;
 import org.springframework.security.web.server.authentication.ServerAuthenticationEntryPointFailureHandler;
 import org.springframework.security.web.server.authentication.ServerAuthenticationFailureHandler;
 import org.springframework.security.web.server.authentication.ServerAuthenticationSuccessHandler;
 import org.springframework.security.web.server.authentication.ServerFormLoginAuthenticationConverter;
 import org.springframework.security.web.server.authentication.ServerHttpBasicAuthenticationConverter;
+import org.springframework.security.web.server.authentication.ServerMaximumSessionsExceededHandler;
 import org.springframework.security.web.server.authentication.ServerX509AuthenticationConverter;
+import org.springframework.security.web.server.authentication.SessionLimit;
+import org.springframework.security.web.server.authentication.WebFilterChainServerAuthenticationSuccessHandler;
 import org.springframework.security.web.server.authentication.logout.DelegatingServerLogoutHandler;
 import org.springframework.security.web.server.authentication.logout.LogoutWebFilter;
 import org.springframework.security.web.server.authentication.logout.SecurityContextServerLogoutHandler;
@@ -130,6 +156,7 @@ import org.springframework.security.web.server.authorization.AuthorizationContex
 import org.springframework.security.web.server.authorization.AuthorizationWebFilter;
 import org.springframework.security.web.server.authorization.DelegatingReactiveAuthorizationManager;
 import org.springframework.security.web.server.authorization.ExceptionTranslationWebFilter;
+import org.springframework.security.web.server.authorization.IpAddressReactiveAuthorizationManager;
 import org.springframework.security.web.server.authorization.ServerAccessDeniedHandler;
 import org.springframework.security.web.server.authorization.ServerWebExchangeDelegatingServerAccessDeniedHandler;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
@@ -138,13 +165,21 @@ import org.springframework.security.web.server.context.SecurityContextServerWebE
 import org.springframework.security.web.server.context.ServerSecurityContextRepository;
 import org.springframework.security.web.server.context.WebSessionServerSecurityContextRepository;
 import org.springframework.security.web.server.csrf.CsrfServerLogoutHandler;
+import org.springframework.security.web.server.csrf.CsrfToken;
 import org.springframework.security.web.server.csrf.CsrfWebFilter;
 import org.springframework.security.web.server.csrf.ServerCsrfTokenRepository;
+import org.springframework.security.web.server.csrf.ServerCsrfTokenRequestHandler;
 import org.springframework.security.web.server.csrf.WebSessionServerCsrfTokenRepository;
 import org.springframework.security.web.server.header.CacheControlServerHttpHeadersWriter;
 import org.springframework.security.web.server.header.CompositeServerHttpHeadersWriter;
 import org.springframework.security.web.server.header.ContentSecurityPolicyServerHttpHeadersWriter;
 import org.springframework.security.web.server.header.ContentTypeOptionsServerHttpHeadersWriter;
+import org.springframework.security.web.server.header.CrossOriginEmbedderPolicyServerHttpHeadersWriter;
+import org.springframework.security.web.server.header.CrossOriginEmbedderPolicyServerHttpHeadersWriter.CrossOriginEmbedderPolicy;
+import org.springframework.security.web.server.header.CrossOriginOpenerPolicyServerHttpHeadersWriter;
+import org.springframework.security.web.server.header.CrossOriginOpenerPolicyServerHttpHeadersWriter.CrossOriginOpenerPolicy;
+import org.springframework.security.web.server.header.CrossOriginResourcePolicyServerHttpHeadersWriter;
+import org.springframework.security.web.server.header.CrossOriginResourcePolicyServerHttpHeadersWriter.CrossOriginResourcePolicy;
 import org.springframework.security.web.server.header.FeaturePolicyServerHttpHeadersWriter;
 import org.springframework.security.web.server.header.HttpHeaderWriterWebFilter;
 import org.springframework.security.web.server.header.PermissionsPolicyServerHttpHeadersWriter;
@@ -175,9 +210,15 @@ import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.CorsProcessor;
 import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.DefaultCorsProcessor;
+import org.springframework.web.reactive.result.method.annotation.RequestMappingHandlerMapping;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.ServerWebExchangeDecorator;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
+import org.springframework.web.server.WebSession;
+import org.springframework.web.server.adapter.WebHttpHandlerBuilder;
+import org.springframework.web.server.session.DefaultWebSessionManager;
+import org.springframework.web.util.pattern.PathPatternParser;
 
 /**
  * A {@link ServerHttpSecurity} is similar to Spring Security's {@code HttpSecurity} but
@@ -188,6 +229,7 @@ import org.springframework.web.server.WebFilterChain;
  * A minimal configuration can be found below:
  *
  * <pre class="code">
+ * &#064;Configuration
  * &#064;EnableWebFluxSecurity
  * public class MyMinimalSecurityConfiguration {
  *
@@ -207,6 +249,7 @@ import org.springframework.web.server.WebFilterChain;
  * {@code ServerHttpSecurity}.
  *
  * <pre class="code">
+ * &#064;Configuration
  * &#064;EnableWebFluxSecurity
  * public class MyExplicitSecurityConfiguration {
  *
@@ -239,6 +282,8 @@ import org.springframework.web.server.WebFilterChain;
  * @author Eddú Meléndez
  * @author Joe Grandja
  * @author Parikshit Dutta
+ * @author Ankur Pathak
+ * @author Alexey Nesterov
  * @since 5.0
  */
 public class ServerHttpSecurity {
@@ -259,6 +304,8 @@ public class ServerHttpSecurity {
 
 	private HttpBasicSpec httpBasic;
 
+	private PasswordManagementSpec passwordManagement;
+
 	private X509Spec x509;
 
 	private final RequestCacheSpec requestCache = new RequestCacheSpec();
@@ -271,9 +318,13 @@ public class ServerHttpSecurity {
 
 	private OAuth2ClientSpec client;
 
+	private OidcLogoutSpec oidcLogout;
+
 	private LogoutSpec logout = new LogoutSpec();
 
 	private LoginPageSpec loginPage = new LoginPageSpec();
+
+	private SessionManagementSpec sessionManagement;
 
 	private ReactiveAuthenticationManager authenticationManager;
 
@@ -323,12 +374,12 @@ public class ServerHttpSecurity {
 	}
 
 	/**
+	 *
 	 * Adds a {@link WebFilter} before specific position.
 	 * @param webFilter the {@link WebFilter} to add
 	 * @param order the place before which to insert the {@link WebFilter}
 	 * @return the {@link ServerHttpSecurity} to continue configuring
 	 * @since 5.2.0
-	 * @author Ankur Pathak
 	 */
 	public ServerHttpSecurity addFilterBefore(WebFilter webFilter, SecurityWebFiltersOrder order) {
 		this.webFilters.add(new OrderedWebFilter(webFilter, order.getOrder() - 1));
@@ -341,7 +392,6 @@ public class ServerHttpSecurity {
 	 * @param order the place after which to insert the {@link WebFilter}
 	 * @return the {@link ServerHttpSecurity} to continue configuring
 	 * @since 5.2.0
-	 * @author Ankur Pathak
 	 */
 	public ServerHttpSecurity addFilterAfter(WebFilter webFilter, SecurityWebFiltersOrder order) {
 		this.webFilters.add(new OrderedWebFilter(webFilter, order.getOrder() + 1));
@@ -395,13 +445,19 @@ public class ServerHttpSecurity {
 	 * 	    http
 	 * 	        // ...
 	 * 	        .redirectToHttps()
-	 * 	            .httpsRedirectWhen((serverWebExchange) ->
+	 * 	            .httpsRedirectWhen((serverWebExchange) -&gt;
 	 * 	            	serverWebExchange.getRequest().getHeaders().containsKey("X-Requires-Https"))
 	 * 	    return http.build();
 	 * 	}
 	 * </pre>
 	 * @return the {@link HttpsRedirectSpec} to customize
+	 * @deprecated For removal in 7.0. Use {@link #redirectToHttps(Customizer)} or
+	 * {@code redirectToHttps(Customizer.withDefaults())} to stick with defaults. See the
+	 * <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public HttpsRedirectSpec redirectToHttps() {
 		this.httpsRedirectSpec = new HttpsRedirectSpec();
 		return this.httpsRedirectSpec;
@@ -430,9 +486,9 @@ public class ServerHttpSecurity {
 	 * 	public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 * 	    http
 	 * 	        // ...
-	 * 	        .redirectToHttps((redirectToHttps) ->
+	 * 	        .redirectToHttps((redirectToHttps) -&gt;
 	 * 	        	redirectToHttps
-	 * 	            	.httpsRedirectWhen((serverWebExchange) ->
+	 * 	            	.httpsRedirectWhen((serverWebExchange) -&gt;
 	 * 	            		serverWebExchange.getRequest().getHeaders().containsKey("X-Requires-Https"))
 	 * 	            );
 	 * 	    return http.build();
@@ -482,7 +538,12 @@ public class ServerHttpSecurity {
 	 *  }
 	 * </pre>
 	 * @return the {@link CsrfSpec} to customize
+	 * @deprecated For removal in 7.0. Use {@link #csrf(Customizer)} or
+	 * {@code csrf(Customizer.withDefaults())} to stick with defaults. See the <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public CsrfSpec csrf() {
 		if (this.csrf == null) {
 			this.csrf = new CsrfSpec();
@@ -500,7 +561,7 @@ public class ServerHttpSecurity {
 	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 *      http
 	 *          // ...
-	 *          .csrf((csrf) ->
+	 *          .csrf((csrf) -&gt;
 	 *              csrf.disabled()
 	 *          );
 	 *      return http.build();
@@ -515,7 +576,7 @@ public class ServerHttpSecurity {
 	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 *      http
 	 *          // ...
-	 *          .csrf((csrf) ->
+	 *          .csrf((csrf) -&gt;
 	 *              csrf
 	 *                  // Handle CSRF failures
 	 *                  .accessDeniedHandler(accessDeniedHandler)
@@ -546,7 +607,12 @@ public class ServerHttpSecurity {
 	 * used instead. If neither has been configured, the Cors configuration will do
 	 * nothing.
 	 * @return the {@link CorsSpec} to customize
+	 * @deprecated For removal in 7.0. Use {@link #cors(Customizer)} or
+	 * {@code cors(Customizer.withDefaults())} to stick with defaults. See the <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public CorsSpec cors() {
 		if (this.cors == null) {
 			this.cors = new CorsSpec();
@@ -588,8 +654,13 @@ public class ServerHttpSecurity {
 	 * </pre>
 	 * @return the {@link AnonymousSpec} to customize
 	 * @since 5.2.0
-	 * @author Ankur Pathak
+	 * @deprecated For removal in 7.0. Use {@link #anonymous(Customizer)} or
+	 * {@code anonymous(Customizer.withDefaults())} to stick with defaults. See the
+	 * <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public AnonymousSpec anonymous() {
 		if (this.anonymous == null) {
 			this.anonymous = new AnonymousSpec();
@@ -606,7 +677,7 @@ public class ServerHttpSecurity {
 	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 *      http
 	 *          // ...
-	 *          .anonymous((anonymous) ->
+	 *          .anonymous((anonymous) -&gt;
 	 *              anonymous
 	 *                  .key("key")
 	 *                  .authorities("ROLE_ANONYMOUS")
@@ -643,7 +714,13 @@ public class ServerHttpSecurity {
 	 *  }
 	 * </pre>
 	 * @return the {@link HttpBasicSpec} to customize
+	 * @deprecated For removal in 7.0. Use {@link #httpBasic(Customizer)} or
+	 * {@code httpBasic(Customizer.withDefaults())} to stick with defaults. See the
+	 * <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public HttpBasicSpec httpBasic() {
 		if (this.httpBasic == null) {
 			this.httpBasic = new HttpBasicSpec();
@@ -659,7 +736,7 @@ public class ServerHttpSecurity {
 	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 *      http
 	 *          // ...
-	 *          .httpBasic((httpBasic) ->
+	 *          .httpBasic((httpBasic) -&gt;
 	 *              httpBasic
 	 *                  // used for authenticating the credentials
 	 *                  .authenticationManager(authenticationManager)
@@ -678,6 +755,92 @@ public class ServerHttpSecurity {
 			this.httpBasic = new HttpBasicSpec();
 		}
 		httpBasicCustomizer.customize(this.httpBasic);
+		return this;
+	}
+
+	/**
+	 * Configures Session Management. An example configuration is provided below:
+	 * <pre class="code">
+	 *  &#064;Bean
+	 *  SecurityWebFilterChain filterChain(ServerHttpSecurity http, ReactiveSessionRegistry sessionRegistry) {
+	 *      http
+	 *          // ...
+	 *          .sessionManagement((sessionManagement) -> sessionManagement
+	 *              .concurrentSessions((concurrentSessions) -> concurrentSessions
+	 *                  .maxSessions(1)
+	 *                  .maxSessionsPreventsLogin(true)
+	 *                  .sessionRegistry(sessionRegistry)
+	 *              )
+	 *          );
+	 *      return http.build();
+	 *  }
+	 * </pre>
+	 * @param customizer the {@link Customizer} to provide more options for the
+	 * {@link SessionManagementSpec}
+	 * @return the {@link ServerHttpSecurity} to continue configuring
+	 * @since 6.3
+	 */
+	public ServerHttpSecurity sessionManagement(Customizer<SessionManagementSpec> customizer) {
+		if (this.sessionManagement == null) {
+			this.sessionManagement = new SessionManagementSpec();
+		}
+		customizer.customize(this.sessionManagement);
+		return this;
+	}
+
+	/**
+	 * Configures password management. An example configuration is provided below:
+	 *
+	 * <pre class="code">
+	 *  &#064;Bean
+	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+	 *      http
+	 *          // ...
+	 *          .passwordManagement();
+	 *      return http.build();
+	 *  }
+	 * </pre>
+	 * @return the {@link PasswordManagementSpec} to customize
+	 * @since 5.6
+	 * @deprecated For removal in 7.0. Use {@link #passwordManagement(Customizer)} or
+	 * {@code passwordManagement(Customizer.withDefaults())} to stick with defaults. See
+	 * the <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
+	 */
+	@Deprecated(since = "6.1", forRemoval = true)
+	public PasswordManagementSpec passwordManagement() {
+		if (this.passwordManagement == null) {
+			this.passwordManagement = new PasswordManagementSpec();
+		}
+		return this.passwordManagement;
+	}
+
+	/**
+	 * Configures password management. An example configuration is provided below:
+	 *
+	 * <pre class="code">
+	 *  &#064;Bean
+	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+	 *      http
+	 *          // ...
+	 *          .passwordManagement(passwordManagement -&gt;
+	 *          	// Custom change password page.
+	 *          	passwordManagement.changePasswordPage("/custom-change-password-page")
+	 *          );
+	 *      return http.build();
+	 *  }
+	 * </pre>
+	 * @param passwordManagementCustomizer the {@link Customizer} to provide more options
+	 * for the {@link PasswordManagementSpec}
+	 * @return the {@link ServerHttpSecurity} to customize
+	 * @since 5.6
+	 */
+	public ServerHttpSecurity passwordManagement(Customizer<PasswordManagementSpec> passwordManagementCustomizer) {
+		if (this.passwordManagement == null) {
+			this.passwordManagement = new PasswordManagementSpec();
+		}
+		passwordManagementCustomizer.customize(this.passwordManagement);
 		return this;
 	}
 
@@ -702,7 +865,13 @@ public class ServerHttpSecurity {
 	 *  }
 	 * </pre>
 	 * @return the {@link FormLoginSpec} to customize
+	 * @deprecated For removal in 7.0. Use {@link #formLogin(Customizer)} or
+	 * {@code formLogin(Customizer.withDefaults())} to stick with defaults. See the
+	 * <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public FormLoginSpec formLogin() {
 		if (this.formLogin == null) {
 			this.formLogin = new FormLoginSpec();
@@ -718,7 +887,7 @@ public class ServerHttpSecurity {
 	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 *      http
 	 *          // ...
-	 *          .formLogin((formLogin) ->
+	 *          .formLogin((formLogin) -&gt;
 	 *              formLogin
 	 *              	// used for authenticating the credentials
 	 *              	.authenticationManager(authenticationManager)
@@ -762,9 +931,13 @@ public class ServerHttpSecurity {
 	 * will be used. If authenticationManager is not specified,
 	 * {@link ReactivePreAuthenticatedAuthenticationManager} will be used.
 	 * @return the {@link X509Spec} to customize
-	 * @author Alexey Nesterov
 	 * @since 5.2
+	 * @deprecated For removal in 7.0. Use {@link #x509(Customizer)} or
+	 * {@code x509(Customizer.withDefaults())} to stick with defaults. See the <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public X509Spec x509() {
 		if (this.x509 == null) {
 			this.x509 = new X509Spec();
@@ -780,7 +953,7 @@ public class ServerHttpSecurity {
 	 *  &#064;Bean
 	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 *      http
-	 *          .x509((x509) ->
+	 *          .x509((x509) -&gt;
 	 *              x509
 	 *          	    .authenticationManager(authenticationManager)
 	 *                  .principalExtractor(principalExtractor)
@@ -821,7 +994,13 @@ public class ServerHttpSecurity {
 	 *  }
 	 * </pre>
 	 * @return the {@link OAuth2LoginSpec} to customize
+	 * @deprecated For removal in 7.0. Use {@link #oauth2Login(Customizer)} or
+	 * {@code oauth2Login(Customizer.withDefaults())} to stick with defaults. See the
+	 * <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public OAuth2LoginSpec oauth2Login() {
 		if (this.oauth2Login == null) {
 			this.oauth2Login = new OAuth2LoginSpec();
@@ -838,7 +1017,7 @@ public class ServerHttpSecurity {
 	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 *      http
 	 *          // ...
-	 *          .oauth2Login((oauth2Login) ->
+	 *          .oauth2Login((oauth2Login) -&gt;
 	 *              oauth2Login
 	 *                  .authenticationConverter(authenticationConverter)
 	 *                  .authenticationManager(manager)
@@ -873,7 +1052,13 @@ public class ServerHttpSecurity {
 	 *  }
 	 * </pre>
 	 * @return the {@link OAuth2ClientSpec} to customize
+	 * @deprecated For removal in 7.0. Use {@link #oauth2Client(Customizer)} or
+	 * {@code oauth2Client(Customizer.withDefaults())} to stick with defaults. See the
+	 * <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public OAuth2ClientSpec oauth2Client() {
 		if (this.client == null) {
 			this.client = new OAuth2ClientSpec();
@@ -889,7 +1074,7 @@ public class ServerHttpSecurity {
 	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 *      http
 	 *          // ...
-	 *          .oauth2Client((oauth2Client) ->
+	 *          .oauth2Client((oauth2Client) -&gt;
 	 *              oauth2Client
 	 *                  .clientRegistrationRepository(clientRegistrationRepository)
 	 *                  .authorizedClientRepository(authorizedClientRepository)
@@ -924,7 +1109,10 @@ public class ServerHttpSecurity {
 	 *  }
 	 * </pre>
 	 * @return the {@link OAuth2ResourceServerSpec} to customize
+	 * @deprecated For removal in 7.0. Use {@link #oauth2ResourceServer(Customizer)}
+	 * instead
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public OAuth2ResourceServerSpec oauth2ResourceServer() {
 		if (this.resourceServer == null) {
 			this.resourceServer = new OAuth2ResourceServerSpec();
@@ -940,9 +1128,9 @@ public class ServerHttpSecurity {
 	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 *      http
 	 *          // ...
-	 *          .oauth2ResourceServer((oauth2ResourceServer) ->
+	 *          .oauth2ResourceServer((oauth2ResourceServer) -&gt;
 	 *              oauth2ResourceServer
-	 *                  .jwt((jwt) ->
+	 *                  .jwt((jwt) -&gt;
 	 *                      jwt
 	 *                          .publicKey(publicKey())
 	 *                  )
@@ -964,6 +1152,33 @@ public class ServerHttpSecurity {
 	}
 
 	/**
+	 * Configures OIDC Connect 1.0 Logout support.
+	 *
+	 * <pre class="code">
+	 *  &#064;Bean
+	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
+	 *      http
+	 *          // ...
+	 *          .oidcLogout((logout) -&gt; logout
+	 *              .backChannel(Customizer.withDefaults())
+	 *          );
+	 *      return http.build();
+	 *  }
+	 * </pre>
+	 * @param oidcLogoutCustomizer the {@link Customizer} to provide more options for the
+	 * {@link OidcLogoutSpec}
+	 * @return the {@link ServerHttpSecurity} to customize
+	 * @since 6.2
+	 */
+	public ServerHttpSecurity oidcLogout(Customizer<OidcLogoutSpec> oidcLogoutCustomizer) {
+		if (this.oidcLogout == null) {
+			this.oidcLogout = new OidcLogoutSpec();
+		}
+		oidcLogoutCustomizer.customize(this.oidcLogout);
+		return this;
+	}
+
+	/**
 	 * Configures HTTP Response Headers. The default headers are:
 	 *
 	 * <pre>
@@ -973,7 +1188,7 @@ public class ServerHttpSecurity {
 	 * X-Content-Type-Options: nosniff
 	 * Strict-Transport-Security: max-age=31536000 ; includeSubDomains
 	 * X-Frame-Options: DENY
-	 * X-XSS-Protection: 1; mode=block
+	 * X-XSS-Protection: 0
 	 * </pre>
 	 *
 	 * such that "Strict-Transport-Security" is only added on secure requests.
@@ -996,7 +1211,12 @@ public class ServerHttpSecurity {
 	 *  }
 	 * </pre>
 	 * @return the {@link HeaderSpec} to customize
+	 * @deprecated For removal in 7.0. Use {@link #headers(Customizer)} or
+	 * {@code headers(Customizer.withDefaults())} to stick with defaults. See the <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public HeaderSpec headers() {
 		if (this.headers == null) {
 			this.headers = new HeaderSpec();
@@ -1014,7 +1234,7 @@ public class ServerHttpSecurity {
 	 * X-Content-Type-Options: nosniff
 	 * Strict-Transport-Security: max-age=31536000 ; includeSubDomains
 	 * X-Frame-Options: DENY
-	 * X-XSS-Protection: 1; mode=block
+	 * X-XSS-Protection: 0
 	 * </pre>
 	 *
 	 * such that "Strict-Transport-Security" is only added on secure requests.
@@ -1026,15 +1246,15 @@ public class ServerHttpSecurity {
 	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 *      http
 	 *          // ...
-	 *          .headers((headers) ->
+	 *          .headers((headers) -&gt;
 	 *              headers
 	 *                  // customize frame options to be same origin
-	 *                  .frameOptions((frameOptions) ->
+	 *                  .frameOptions((frameOptions) -&gt;
 	 *                      frameOptions
 	 *                          .mode(XFrameOptionsServerHttpHeadersWriter.Mode.SAMEORIGIN)
 	 *                   )
 	 *                  // disable cache control
-	 *                  .cache((cache) ->
+	 *                  .cache((cache) -&gt;
 	 *                      cache
 	 *                          .disable()
 	 *                  )
@@ -1070,7 +1290,13 @@ public class ServerHttpSecurity {
 	 *  }
 	 * </pre>
 	 * @return the {@link ExceptionHandlingSpec} to customize
+	 * @deprecated For removal in 7.0. Use {@link #exceptionHandling(Customizer)} or
+	 * {@code exceptionHandling(Customizer.withDefaults())} to stick with defaults. See
+	 * the <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public ExceptionHandlingSpec exceptionHandling() {
 		if (this.exceptionHandling == null) {
 			this.exceptionHandling = new ExceptionHandlingSpec();
@@ -1087,7 +1313,7 @@ public class ServerHttpSecurity {
 	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 *      http
 	 *          // ...
-	 *          .exceptionHandling((exceptionHandling) ->
+	 *          .exceptionHandling((exceptionHandling) -&gt;
 	 *              exceptionHandling
 	 *                  // customize how to request for authentication
 	 *                  .authenticationEntryPoint(entryPoint)
@@ -1122,10 +1348,10 @@ public class ServerHttpSecurity {
 	 *              .pathMatchers(HttpMethod.POST, "/users").hasAuthority("USER_POST")
 	 *              // a request to /users/{username} requires the current authentication's username
 	 *              // to be equal to the {username}
-	 *              .pathMatchers("/users/{username}").access((authentication, context) ->
+	 *              .pathMatchers("/users/{username}").access((authentication, context) -&gt;
 	 *                  authentication
 	 *                      .map(Authentication::getName)
-	 *                      .map((username) -> username.equals(context.getVariables().get("username")))
+	 *                      .map((username) -&gt; username.equals(context.getVariables().get("username")))
 	 *                      .map(AuthorizationDecision::new)
 	 *              )
 	 *              // allows providing a custom matching strategy that requires the role "ROLE_CUSTOM"
@@ -1136,7 +1362,13 @@ public class ServerHttpSecurity {
 	 *  }
 	 * </pre>
 	 * @return the {@link AuthorizeExchangeSpec} to customize
+	 * @deprecated For removal in 7.0. Use {@link #authorizeExchange(Customizer)} or
+	 * {@code authorizeExchange(Customizer.withDefaults())} to stick with defaults. See
+	 * the <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public AuthorizeExchangeSpec authorizeExchange() {
 		if (this.authorizeExchange == null) {
 			this.authorizeExchange = new AuthorizeExchangeSpec();
@@ -1152,7 +1384,7 @@ public class ServerHttpSecurity {
 	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 *      http
 	 *          // ...
-	 *          .authorizeExchange((exchanges) ->
+	 *          .authorizeExchange((exchanges) -&gt;
 	 *              exchanges
 	 *                  // any URL that starts with /admin/ requires the role "ROLE_ADMIN"
 	 *                  .pathMatchers("/admin/**").hasRole("ADMIN")
@@ -1160,10 +1392,10 @@ public class ServerHttpSecurity {
 	 *                  .pathMatchers(HttpMethod.POST, "/users").hasAuthority("USER_POST")
 	 *                  // a request to /users/{username} requires the current authentication's username
 	 *                  // to be equal to the {username}
-	 *                  .pathMatchers("/users/{username}").access((authentication, context) ->
+	 *                  .pathMatchers("/users/{username}").access((authentication, context) -&gt;
 	 *                      authentication
 	 *                          .map(Authentication::getName)
-	 *                          .map((username) -> username.equals(context.getVariables().get("username")))
+	 *                          .map((username) -&gt; username.equals(context.getVariables().get("username")))
 	 *                          .map(AuthorizationDecision::new)
 	 *                  )
 	 *                  // allows providing a custom matching strategy that requires the role "ROLE_CUSTOM"
@@ -1205,7 +1437,12 @@ public class ServerHttpSecurity {
 	 *  }
 	 * </pre>
 	 * @return the {@link LogoutSpec} to customize
+	 * @deprecated For removal in 7.0. Use {@link #logout(Customizer)} or
+	 * {@code logout(Customizer.withDefaults())} to stick with defaults. See the <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public LogoutSpec logout() {
 		if (this.logout == null) {
 			this.logout = new LogoutSpec();
@@ -1221,7 +1458,7 @@ public class ServerHttpSecurity {
 	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 *      http
 	 *          // ...
-	 *          .logout((logout) ->
+	 *          .logout((logout) -&gt;
 	 *              logout
 	 *                  // configures how log out is done
 	 *                  .logoutHandler(logoutHandler)
@@ -1262,7 +1499,13 @@ public class ServerHttpSecurity {
 	 *  }
 	 * </pre>
 	 * @return the {@link RequestCacheSpec} to customize
+	 * @deprecated For removal in 7.0. Use {@link #requestCache(Customizer)} or
+	 * {@code requestCache(Customizer.withDefaults())} to stick with defaults. See the
+	 * <a href=
+	 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+	 * for more details.
 	 */
+	@Deprecated(since = "6.1", forRemoval = true)
 	public RequestCacheSpec requestCache() {
 		return this.requestCache;
 	}
@@ -1277,7 +1520,7 @@ public class ServerHttpSecurity {
 	 *  public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
 	 *      http
 	 *          // ...
-	 *          .requestCache((requestCache) ->
+	 *          .requestCache((requestCache) -&gt;
 	 *              requestCache
 	 *                  // configures how the request is cached
 	 *                  .requestCache(customRequestCache)
@@ -1319,6 +1562,9 @@ public class ServerHttpSecurity {
 		}
 		WebFilter securityContextRepositoryWebFilter = securityContextRepositoryWebFilter();
 		this.webFilters.add(securityContextRepositoryWebFilter);
+		if (this.sessionManagement != null) {
+			this.sessionManagement.configure(this);
+		}
 		if (this.httpsRedirectSpec != null) {
 			this.httpsRedirectSpec.configure(this);
 		}
@@ -1345,6 +1591,9 @@ public class ServerHttpSecurity {
 				this.httpBasic.securityContextRepository(NoOpServerSecurityContextRepository.getInstance());
 			}
 			this.httpBasic.configure(this);
+		}
+		if (this.passwordManagement != null) {
+			this.passwordManagement.configure(this);
 		}
 		if (this.formLogin != null) {
 			if (this.formLogin.authenticationManager == null) {
@@ -1375,6 +1624,9 @@ public class ServerHttpSecurity {
 		}
 		if (this.resourceServer != null) {
 			this.resourceServer.configure(this);
+		}
+		if (this.oidcLogout != null) {
+			this.oidcLogout.configure(this);
 		}
 		if (this.client != null) {
 			this.client.configure(this);
@@ -1452,8 +1704,9 @@ public class ServerHttpSecurity {
 		}
 		ServerWebExchangeDelegatingServerAccessDeniedHandler result = new ServerWebExchangeDelegatingServerAccessDeniedHandler(
 				this.defaultAccessDeniedHandlers);
-		result.setDefaultAccessDeniedHandler(this.defaultAccessDeniedHandlers
-				.get(this.defaultAccessDeniedHandlers.size() - 1).getAccessDeniedHandler());
+		result.setDefaultAccessDeniedHandler(
+				this.defaultAccessDeniedHandlers.get(this.defaultAccessDeniedHandlers.size() - 1)
+					.getAccessDeniedHandler());
 		return result;
 	}
 
@@ -1479,6 +1732,14 @@ public class ServerHttpSecurity {
 		return this.context.getBean(beanClass);
 	}
 
+	private <T> T getBeanOrDefault(Class<T> beanClass, T defaultInstance) {
+		T bean = getBeanOrNull(beanClass);
+		if (bean == null) {
+			return defaultInstance;
+		}
+		return bean;
+	}
+
 	private <T> T getBeanOrNull(Class<T> beanClass) {
 		return getBeanOrNull(ResolvableType.forClass(beanClass));
 	}
@@ -1494,6 +1755,25 @@ public class ServerHttpSecurity {
 		return null;
 	}
 
+	private <T> T getBeanOrNull(String beanName, Class<T> requiredClass) {
+		if (this.context == null) {
+			return null;
+		}
+		try {
+			return this.context.getBean(beanName, requiredClass);
+		}
+		catch (Exception ex) {
+			return null;
+		}
+	}
+
+	private <T> String[] getBeanNamesForTypeOrEmpty(Class<T> beanClass) {
+		if (this.context == null) {
+			return new String[0];
+		}
+		return this.context.getBeanNamesForType(beanClass);
+	}
+
 	protected void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
 		this.context = applicationContext;
 	}
@@ -1507,17 +1787,24 @@ public class ServerHttpSecurity {
 	 */
 	public class AuthorizeExchangeSpec extends AbstractServerWebExchangeMatcherRegistry<AuthorizeExchangeSpec.Access> {
 
+		private static final String REQUEST_MAPPING_HANDLER_MAPPING_BEAN_NAME = "requestMappingHandlerMapping";
+
 		private DelegatingReactiveAuthorizationManager.Builder managerBldr = DelegatingReactiveAuthorizationManager
-				.builder();
+			.builder();
 
 		private ServerWebExchangeMatcher matcher;
 
 		private boolean anyExchangeRegistered;
 
+		private PathPatternParser pathPatternParser;
+
 		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
 		 * @return the {@link ServerHttpSecurity} to continue configuring
+		 * @deprecated For removal in 7.0. Use {@link #authorizeExchange(Customizer)}
+		 * instead
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}
@@ -1534,6 +1821,22 @@ public class ServerHttpSecurity {
 		}
 
 		@Override
+		protected PathPatternParser getPathPatternParser() {
+			if (this.pathPatternParser != null) {
+				return this.pathPatternParser;
+			}
+			RequestMappingHandlerMapping requestMappingHandlerMapping = getBeanOrNull(
+					REQUEST_MAPPING_HANDLER_MAPPING_BEAN_NAME, RequestMappingHandlerMapping.class);
+			if (requestMappingHandlerMapping != null) {
+				this.pathPatternParser = requestMappingHandlerMapping.getPathPatternParser();
+			}
+			if (this.pathPatternParser == null) {
+				this.pathPatternParser = PathPatternParser.defaultInstance;
+			}
+			return this.pathPatternParser;
+		}
+
+		@Override
 		protected Access registerMatcher(ServerWebExchangeMatcher matcher) {
 			Assert.state(!this.anyExchangeRegistered, () -> "Cannot register " + matcher
 					+ " which would be unreachable because anyExchange() has already been registered.");
@@ -1546,7 +1849,12 @@ public class ServerHttpSecurity {
 		protected void configure(ServerHttpSecurity http) {
 			Assert.state(this.matcher == null,
 					() -> "The matcher " + this.matcher + " does not have an access rule defined");
-			AuthorizationWebFilter result = new AuthorizationWebFilter(this.managerBldr.build());
+			ReactiveAuthorizationManager<ServerWebExchange> manager = this.managerBldr.build();
+			ObservationRegistry registry = getBeanOrDefault(ObservationRegistry.class, ObservationRegistry.NOOP);
+			if (!registry.isNoop()) {
+				manager = new ObservationReactiveAuthorizationManager<>(registry, manager);
+			}
+			AuthorizationWebFilter result = new AuthorizationWebFilter(manager);
 			http.addFilterAt(result, SecurityWebFiltersOrder.AUTHORIZATION);
 		}
 
@@ -1620,15 +1928,291 @@ public class ServerHttpSecurity {
 			}
 
 			/**
+			 * Require a specific IP address or range using an IP/Netmask (e.g.
+			 * 192.168.1.0/24).
+			 * @param ipAddress the address or range of addresses from which the request
+			 * must come.
+			 * @return the {@link AuthorizeExchangeSpec} to configure
+			 * @since 5.7
+			 */
+			public AuthorizeExchangeSpec hasIpAddress(String ipAddress) {
+				return access(IpAddressReactiveAuthorizationManager.hasIpAddress(ipAddress));
+			}
+
+			/**
 			 * Allows plugging in a custom authorization strategy
 			 * @param manager the authorization manager to use
 			 * @return the {@link AuthorizeExchangeSpec} to configure
 			 */
 			public AuthorizeExchangeSpec access(ReactiveAuthorizationManager<AuthorizationContext> manager) {
 				AuthorizeExchangeSpec.this.managerBldr
-						.add(new ServerWebExchangeMatcherEntry<>(AuthorizeExchangeSpec.this.matcher, manager));
+					.add(new ServerWebExchangeMatcherEntry<>(AuthorizeExchangeSpec.this.matcher, manager));
 				AuthorizeExchangeSpec.this.matcher = null;
 				return AuthorizeExchangeSpec.this;
+			}
+
+		}
+
+	}
+
+	/**
+	 * Configures how sessions are managed.
+	 */
+	public class SessionManagementSpec {
+
+		private ConcurrentSessionsSpec concurrentSessions;
+
+		private ServerAuthenticationSuccessHandler authenticationSuccessHandler;
+
+		private ReactiveSessionRegistry sessionRegistry;
+
+		private SessionLimit sessionLimit = SessionLimit.UNLIMITED;
+
+		private ServerMaximumSessionsExceededHandler maximumSessionsExceededHandler;
+
+		/**
+		 * Configures how many sessions are allowed for a given user.
+		 * @param customizer the customizer to provide more options
+		 * @return the {@link SessionManagementSpec} to customize
+		 */
+		public SessionManagementSpec concurrentSessions(Customizer<ConcurrentSessionsSpec> customizer) {
+			if (this.concurrentSessions == null) {
+				this.concurrentSessions = new ConcurrentSessionsSpec();
+			}
+			customizer.customize(this.concurrentSessions);
+			return this;
+		}
+
+		void configure(ServerHttpSecurity http) {
+			if (this.concurrentSessions != null) {
+				ReactiveSessionRegistry reactiveSessionRegistry = getSessionRegistry();
+				ConcurrentSessionControlServerAuthenticationSuccessHandler concurrentSessionControlStrategy = new ConcurrentSessionControlServerAuthenticationSuccessHandler(
+						reactiveSessionRegistry, getMaximumSessionsExceededHandler());
+				concurrentSessionControlStrategy.setSessionLimit(this.sessionLimit);
+				RegisterSessionServerAuthenticationSuccessHandler registerSessionAuthenticationStrategy = new RegisterSessionServerAuthenticationSuccessHandler(
+						reactiveSessionRegistry);
+				this.authenticationSuccessHandler = new DelegatingServerAuthenticationSuccessHandler(
+						concurrentSessionControlStrategy, registerSessionAuthenticationStrategy);
+				SessionRegistryWebFilter sessionRegistryWebFilter = new SessionRegistryWebFilter(
+						reactiveSessionRegistry);
+				configureSuccessHandlerOnAuthenticationFilters();
+				http.addFilterAfter(sessionRegistryWebFilter, SecurityWebFiltersOrder.HTTP_HEADERS_WRITER);
+			}
+		}
+
+		private ServerMaximumSessionsExceededHandler getMaximumSessionsExceededHandler() {
+			if (this.maximumSessionsExceededHandler != null) {
+				return this.maximumSessionsExceededHandler;
+			}
+			DefaultWebSessionManager webSessionManager = getBeanOrNull(
+					WebHttpHandlerBuilder.WEB_SESSION_MANAGER_BEAN_NAME, DefaultWebSessionManager.class);
+			if (webSessionManager != null) {
+				this.maximumSessionsExceededHandler = new InvalidateLeastUsedServerMaximumSessionsExceededHandler(
+						webSessionManager.getSessionStore());
+			}
+			if (this.maximumSessionsExceededHandler == null) {
+				throw new IllegalStateException(
+						"Could not create a default ServerMaximumSessionsExceededHandler. Please provide "
+								+ "a ServerMaximumSessionsExceededHandler via DSL");
+			}
+			return this.maximumSessionsExceededHandler;
+		}
+
+		private void configureSuccessHandlerOnAuthenticationFilters() {
+			if (ServerHttpSecurity.this.formLogin != null) {
+				ServerHttpSecurity.this.formLogin.defaultSuccessHandlers.add(0, this.authenticationSuccessHandler);
+			}
+			if (ServerHttpSecurity.this.oauth2Login != null) {
+				ServerHttpSecurity.this.oauth2Login.defaultSuccessHandlers.add(0, this.authenticationSuccessHandler);
+			}
+			if (ServerHttpSecurity.this.httpBasic != null) {
+				ServerHttpSecurity.this.httpBasic.defaultSuccessHandlers.add(0, this.authenticationSuccessHandler);
+			}
+		}
+
+		private ReactiveSessionRegistry getSessionRegistry() {
+			if (this.sessionRegistry == null) {
+				this.sessionRegistry = getBeanOrNull(ReactiveSessionRegistry.class);
+			}
+			if (this.sessionRegistry == null) {
+				throw new IllegalStateException(
+						"A ReactiveSessionRegistry is needed for concurrent session management");
+			}
+			return this.sessionRegistry;
+		}
+
+		/**
+		 * Configures how many sessions are allowed for a given user.
+		 */
+		public class ConcurrentSessionsSpec {
+
+			/**
+			 * Sets the {@link ReactiveSessionRegistry} to use.
+			 * @param reactiveSessionRegistry the {@link ReactiveSessionRegistry} to use
+			 * @return the {@link ConcurrentSessionsSpec} to continue customizing
+			 */
+			public ConcurrentSessionsSpec sessionRegistry(ReactiveSessionRegistry reactiveSessionRegistry) {
+				SessionManagementSpec.this.sessionRegistry = reactiveSessionRegistry;
+				return this;
+			}
+
+			/**
+			 * Sets the maximum number of sessions allowed for any user. You can use
+			 * {@link SessionLimit#of(int)} to specify a positive integer or
+			 * {@link SessionLimit#UNLIMITED} to allow unlimited sessions. To customize
+			 * the maximum number of sessions on a per-user basis, you can provide a
+			 * custom {@link SessionLimit} implementation, like so: <pre>
+			 *     http
+			 *         .sessionManagement((sessions) -> sessions
+			 *             .concurrentSessions((concurrency) -> concurrency
+			 *                 .maximumSessions((authentication) -> {
+			 *                     if (authentication.getName().equals("admin")) {
+			 *                         return Mono.empty() // unlimited sessions for admin
+			 *                     }
+			 *                     return Mono.just(1); // one session for every other user
+			 *                 })
+			 *             )
+			 *         )
+			 * </pre>
+			 * @param sessionLimit the maximum number of sessions allowed for any user
+			 * @return the {@link ConcurrentSessionsSpec} to continue customizing
+			 */
+			public ConcurrentSessionsSpec maximumSessions(SessionLimit sessionLimit) {
+				Assert.notNull(sessionLimit, "sessionLimit cannot be null");
+				SessionManagementSpec.this.sessionLimit = sessionLimit;
+				return this;
+			}
+
+			/**
+			 * Sets the {@link ServerMaximumSessionsExceededHandler} to use when the
+			 * maximum number of sessions is exceeded.
+			 * @param maximumSessionsExceededHandler the
+			 * {@link ServerMaximumSessionsExceededHandler} to use
+			 * @return the {@link ConcurrentSessionsSpec} to continue customizing
+			 */
+			public ConcurrentSessionsSpec maximumSessionsExceededHandler(
+					ServerMaximumSessionsExceededHandler maximumSessionsExceededHandler) {
+				Assert.notNull(maximumSessionsExceededHandler, "maximumSessionsExceededHandler cannot be null");
+				SessionManagementSpec.this.maximumSessionsExceededHandler = maximumSessionsExceededHandler;
+				return this;
+			}
+
+		}
+
+		private static final class SessionRegistryWebFilter implements WebFilter {
+
+			private final ReactiveSessionRegistry sessionRegistry;
+
+			private SessionRegistryWebFilter(ReactiveSessionRegistry sessionRegistry) {
+				Assert.notNull(sessionRegistry, "sessionRegistry cannot be null");
+				this.sessionRegistry = sessionRegistry;
+			}
+
+			@Override
+			public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+				return chain.filter(new SessionRegistryWebExchange(exchange));
+			}
+
+			private final class SessionRegistryWebExchange extends ServerWebExchangeDecorator {
+
+				private final Mono<WebSession> sessionMono;
+
+				private SessionRegistryWebExchange(ServerWebExchange delegate) {
+					super(delegate);
+					this.sessionMono = delegate.getSession()
+						.flatMap((session) -> SessionRegistryWebFilter.this.sessionRegistry
+							.updateLastAccessTime(session.getId())
+							.thenReturn(session))
+						.map(SessionRegistryWebSession::new);
+				}
+
+				@Override
+				public Mono<WebSession> getSession() {
+					return this.sessionMono;
+				}
+
+			}
+
+			private final class SessionRegistryWebSession implements WebSession {
+
+				private final WebSession session;
+
+				private SessionRegistryWebSession(WebSession session) {
+					this.session = session;
+				}
+
+				@Override
+				public String getId() {
+					return this.session.getId();
+				}
+
+				@Override
+				public Map<String, Object> getAttributes() {
+					return this.session.getAttributes();
+				}
+
+				@Override
+				public void start() {
+					this.session.start();
+				}
+
+				@Override
+				public boolean isStarted() {
+					return this.session.isStarted();
+				}
+
+				@Override
+				public Mono<Void> changeSessionId() {
+					String currentId = this.session.getId();
+					return this.session.changeSessionId()
+						.then(Mono.defer(
+								() -> SessionRegistryWebFilter.this.sessionRegistry.removeSessionInformation(currentId)
+									.flatMap((information) -> {
+										information = information.withSessionId(this.session.getId());
+										return SessionRegistryWebFilter.this.sessionRegistry
+											.saveSessionInformation(information);
+									})));
+				}
+
+				@Override
+				public Mono<Void> invalidate() {
+					String currentId = this.session.getId();
+					return this.session.invalidate()
+						.then(Mono.defer(() -> SessionRegistryWebFilter.this.sessionRegistry
+							.removeSessionInformation(currentId)))
+						.then();
+				}
+
+				@Override
+				public Mono<Void> save() {
+					return this.session.save();
+				}
+
+				@Override
+				public boolean isExpired() {
+					return this.session.isExpired();
+				}
+
+				@Override
+				public Instant getCreationTime() {
+					return this.session.getCreationTime();
+				}
+
+				@Override
+				public Instant getLastAccessTime() {
+					return this.session.getLastAccessTime();
+				}
+
+				@Override
+				public void setMaxIdleTime(Duration maxIdleTime) {
+					this.session.setMaxIdleTime(maxIdleTime);
+				}
+
+				@Override
+				public Duration getMaxIdleTime() {
+					return this.session.getMaxIdleTime();
+				}
+
 			}
 
 		}
@@ -1698,7 +2282,9 @@ public class ServerHttpSecurity {
 		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
 		 * @return the {@link ServerHttpSecurity} to continue configuring
+		 * @deprecated use {@link #redirectToHttps(Customizer)}
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}
@@ -1762,21 +2348,27 @@ public class ServerHttpSecurity {
 		}
 
 		/**
-		 * Specifies if {@link CsrfWebFilter} should try to resolve the actual CSRF token
-		 * from the body of multipart data requests.
-		 * @param enabled true if should read from multipart form body, else false.
-		 * Default is false
+		 * Specifies a {@link ServerCsrfTokenRequestHandler} that is used to make the
+		 * {@code CsrfToken} available as an exchange attribute.
+		 * @param requestHandler the {@link ServerCsrfTokenRequestHandler} to use
 		 * @return the {@link CsrfSpec} for additional configuration
+		 * @since 5.8
 		 */
-		public CsrfSpec tokenFromMultipartDataEnabled(boolean enabled) {
-			this.filter.setTokenFromMultipartDataEnabled(enabled);
+		public CsrfSpec csrfTokenRequestHandler(ServerCsrfTokenRequestHandler requestHandler) {
+			this.filter.setRequestHandler(requestHandler);
 			return this;
 		}
 
 		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
 		 * @return the {@link ServerHttpSecurity} to continue configuring
+		 * @deprecated For removal in 7.0. Use {@link #csrf(Customizer)} or
+		 * {@code csrf(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}
@@ -1796,7 +2388,7 @@ public class ServerHttpSecurity {
 				this.filter.setCsrfTokenRepository(this.csrfTokenRepository);
 				if (ServerHttpSecurity.this.logout != null) {
 					ServerHttpSecurity.this.logout
-							.addLogoutHandler(new CsrfServerLogoutHandler(this.csrfTokenRepository));
+						.addLogoutHandler(new CsrfServerLogoutHandler(this.csrfTokenRepository));
 				}
 			}
 			http.addFilterAt(this.filter, SecurityWebFiltersOrder.CSRF);
@@ -1842,7 +2434,10 @@ public class ServerHttpSecurity {
 		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
 		 * @return the {@link ServerHttpSecurity} to continue configuring
+		 * @deprecated For removal in 7.0. Use {@link #exceptionHandling(Customizer)}
+		 * instead
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}
@@ -1884,7 +2479,13 @@ public class ServerHttpSecurity {
 		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
 		 * @return the {@link ServerHttpSecurity} to continue configuring
+		 * @deprecated For removal in 7.0. Use {@link #requestCache(Customizer)} or
+		 * {@code requestCache(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}
@@ -1909,13 +2510,66 @@ public class ServerHttpSecurity {
 	 */
 	public final class HttpBasicSpec {
 
+		private final ServerWebExchangeMatcher xhrMatcher = (exchange) -> Mono.just(exchange.getRequest().getHeaders())
+			.filter((h) -> h.getOrEmpty("X-Requested-With").contains("XMLHttpRequest"))
+			.flatMap((h) -> ServerWebExchangeMatcher.MatchResult.match())
+			.switchIfEmpty(ServerWebExchangeMatcher.MatchResult.notMatch());
+
 		private ReactiveAuthenticationManager authenticationManager;
 
 		private ServerSecurityContextRepository securityContextRepository;
 
-		private ServerAuthenticationEntryPoint entryPoint = new HttpBasicServerAuthenticationEntryPoint();
+		private ServerAuthenticationEntryPoint entryPoint;
+
+		private ServerAuthenticationFailureHandler authenticationFailureHandler;
+
+		private final List<ServerAuthenticationSuccessHandler> defaultSuccessHandlers = new ArrayList<>(
+				List.of(new WebFilterChainServerAuthenticationSuccessHandler()));
+
+		private List<ServerAuthenticationSuccessHandler> authenticationSuccessHandlers = new ArrayList<>();
 
 		private HttpBasicSpec() {
+			List<DelegateEntry> entryPoints = new ArrayList<>();
+			entryPoints
+				.add(new DelegateEntry(this.xhrMatcher, new HttpStatusServerEntryPoint(HttpStatus.UNAUTHORIZED)));
+			DelegatingServerAuthenticationEntryPoint defaultEntryPoint = new DelegatingServerAuthenticationEntryPoint(
+					entryPoints);
+			defaultEntryPoint.setDefaultEntryPoint(new HttpBasicServerAuthenticationEntryPoint());
+			this.entryPoint = defaultEntryPoint;
+		}
+
+		/**
+		 * The {@link ServerAuthenticationSuccessHandler} used after authentication
+		 * success. Defaults to {@link WebFilterChainServerAuthenticationSuccessHandler}.
+		 * Note that this method clears previously added success handlers via
+		 * {@link #authenticationSuccessHandler(Consumer)}
+		 * @param authenticationSuccessHandler the success handler to use
+		 * @return the {@link HttpBasicSpec} to continue configuring
+		 * @since 6.3
+		 */
+		public HttpBasicSpec authenticationSuccessHandler(
+				ServerAuthenticationSuccessHandler authenticationSuccessHandler) {
+			Assert.notNull(authenticationSuccessHandler, "authenticationSuccessHandler cannot be null");
+			authenticationSuccessHandler((handlers) -> {
+				handlers.clear();
+				handlers.add(authenticationSuccessHandler);
+			});
+			return this;
+		}
+
+		/**
+		 * Allows customizing the list of {@link ServerAuthenticationSuccessHandler}. The
+		 * default list contains a
+		 * {@link WebFilterChainServerAuthenticationSuccessHandler}.
+		 * @param handlersConsumer the handlers consumer
+		 * @return the {@link HttpBasicSpec} to continue configuring
+		 * @since 6.3
+		 */
+		public HttpBasicSpec authenticationSuccessHandler(
+				Consumer<List<ServerAuthenticationSuccessHandler>> handlersConsumer) {
+			Assert.notNull(handlersConsumer, "handlersConsumer cannot be null");
+			handlersConsumer.accept(this.authenticationSuccessHandlers);
+			return this;
 		}
 
 		/**
@@ -1949,7 +2603,6 @@ public class ServerHttpSecurity {
 		 * use
 		 * @return {@link HttpBasicSpec} for additional customization
 		 * @since 5.2.0
-		 * @author Ankur Pathak
 		 */
 		public HttpBasicSpec authenticationEntryPoint(ServerAuthenticationEntryPoint authenticationEntryPoint) {
 			Assert.notNull(authenticationEntryPoint, "authenticationEntryPoint cannot be null");
@@ -1957,10 +2610,23 @@ public class ServerHttpSecurity {
 			return this;
 		}
 
+		public HttpBasicSpec authenticationFailureHandler(
+				ServerAuthenticationFailureHandler authenticationFailureHandler) {
+			Assert.notNull(authenticationFailureHandler, "authenticationFailureHandler cannot be null");
+			this.authenticationFailureHandler = authenticationFailureHandler;
+			return this;
+		}
+
 		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
 		 * @return the {@link ServerHttpSecurity} to continue configuring
+		 * @deprecated For removal in 7.0. Use {@link #httpBasic(Customizer)} or
+		 * {@code httpBasic(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}
@@ -1980,13 +2646,83 @@ public class ServerHttpSecurity {
 					MediaType.APPLICATION_OCTET_STREAM, MediaType.APPLICATION_XML, MediaType.MULTIPART_FORM_DATA,
 					MediaType.TEXT_XML);
 			restMatcher.setIgnoredMediaTypes(Collections.singleton(MediaType.ALL));
-			ServerHttpSecurity.this.defaultEntryPoints.add(new DelegateEntry(restMatcher, this.entryPoint));
+			ServerWebExchangeMatcher notHtmlMatcher = new NegatedServerWebExchangeMatcher(
+					new MediaTypeServerWebExchangeMatcher(MediaType.TEXT_HTML));
+			ServerWebExchangeMatcher restNotHtmlMatcher = new AndServerWebExchangeMatcher(
+					Arrays.asList(notHtmlMatcher, restMatcher));
+			ServerWebExchangeMatcher preferredMatcher = new OrServerWebExchangeMatcher(
+					Arrays.asList(this.xhrMatcher, restNotHtmlMatcher));
+			ServerHttpSecurity.this.defaultEntryPoints.add(new DelegateEntry(preferredMatcher, this.entryPoint));
 			AuthenticationWebFilter authenticationFilter = new AuthenticationWebFilter(this.authenticationManager);
-			authenticationFilter
-					.setAuthenticationFailureHandler(new ServerAuthenticationEntryPointFailureHandler(this.entryPoint));
+			authenticationFilter.setAuthenticationFailureHandler(authenticationFailureHandler());
 			authenticationFilter.setAuthenticationConverter(new ServerHttpBasicAuthenticationConverter());
 			authenticationFilter.setSecurityContextRepository(this.securityContextRepository);
+			authenticationFilter.setAuthenticationSuccessHandler(getAuthenticationSuccessHandler(http));
 			http.addFilterAt(authenticationFilter, SecurityWebFiltersOrder.HTTP_BASIC);
+		}
+
+		private ServerAuthenticationSuccessHandler getAuthenticationSuccessHandler(ServerHttpSecurity http) {
+			if (this.authenticationSuccessHandlers.isEmpty()) {
+				return new DelegatingServerAuthenticationSuccessHandler(this.defaultSuccessHandlers);
+			}
+			return new DelegatingServerAuthenticationSuccessHandler(this.authenticationSuccessHandlers);
+		}
+
+		private ServerAuthenticationFailureHandler authenticationFailureHandler() {
+			if (this.authenticationFailureHandler != null) {
+				return this.authenticationFailureHandler;
+			}
+			return new ServerAuthenticationEntryPointFailureHandler(this.entryPoint);
+		}
+
+	}
+
+	/**
+	 * Configures password management.
+	 *
+	 * @author Evgeniy Cheban
+	 * @since 5.6
+	 * @see #passwordManagement()
+	 */
+	public final class PasswordManagementSpec {
+
+		private static final String WELL_KNOWN_CHANGE_PASSWORD_PATTERN = "/.well-known/change-password";
+
+		private static final String DEFAULT_CHANGE_PASSWORD_PAGE = "/change-password";
+
+		private String changePasswordPage = DEFAULT_CHANGE_PASSWORD_PAGE;
+
+		/**
+		 * Sets the change password page. Defaults to
+		 * {@link PasswordManagementSpec#DEFAULT_CHANGE_PASSWORD_PAGE}.
+		 * @param changePasswordPage the change password page
+		 * @return the {@link PasswordManagementSpec} to continue configuring
+		 */
+		public PasswordManagementSpec changePasswordPage(String changePasswordPage) {
+			Assert.hasText(changePasswordPage, "changePasswordPage cannot be empty");
+			this.changePasswordPage = changePasswordPage;
+			return this;
+		}
+
+		/**
+		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}.
+		 * @return the {@link ServerHttpSecurity} to continue configuring
+		 * @deprecated For removal in 7.0. Use {@link #passwordManagement(Customizer)}
+		 * instead
+		 */
+		@Deprecated(since = "6.1", forRemoval = true)
+		public ServerHttpSecurity and() {
+			return ServerHttpSecurity.this;
+		}
+
+		protected void configure(ServerHttpSecurity http) {
+			ExchangeMatcherRedirectWebFilter changePasswordWebFilter = new ExchangeMatcherRedirectWebFilter(
+					new PathPatternParserServerWebExchangeMatcher(WELL_KNOWN_CHANGE_PASSWORD_PATTERN),
+					this.changePasswordPage);
+			http.addFilterBefore(changePasswordWebFilter, SecurityWebFiltersOrder.AUTHENTICATION);
+		}
+
+		private PasswordManagementSpec() {
 		}
 
 	}
@@ -2003,6 +2739,9 @@ public class ServerHttpSecurity {
 		private final RedirectServerAuthenticationSuccessHandler defaultSuccessHandler = new RedirectServerAuthenticationSuccessHandler(
 				"/");
 
+		private final List<ServerAuthenticationSuccessHandler> defaultSuccessHandlers = new ArrayList<>(
+				List.of(this.defaultSuccessHandler));
+
 		private RedirectServerAuthenticationEntryPoint defaultEntryPoint;
 
 		private ReactiveAuthenticationManager authenticationManager;
@@ -2017,7 +2756,7 @@ public class ServerHttpSecurity {
 
 		private ServerAuthenticationFailureHandler authenticationFailureHandler;
 
-		private ServerAuthenticationSuccessHandler authenticationSuccessHandler = this.defaultSuccessHandler;
+		private List<ServerAuthenticationSuccessHandler> authenticationSuccessHandlers = new ArrayList<>();
 
 		private FormLoginSpec() {
 		}
@@ -2035,14 +2774,34 @@ public class ServerHttpSecurity {
 
 		/**
 		 * The {@link ServerAuthenticationSuccessHandler} used after authentication
-		 * success. Defaults to {@link RedirectServerAuthenticationSuccessHandler}.
+		 * success. Defaults to {@link RedirectServerAuthenticationSuccessHandler}. Note
+		 * that this method clears previously added success handlers via
+		 * {@link #authenticationSuccessHandler(Consumer)}
 		 * @param authenticationSuccessHandler the success handler to use
 		 * @return the {@link FormLoginSpec} to continue configuring
 		 */
 		public FormLoginSpec authenticationSuccessHandler(
 				ServerAuthenticationSuccessHandler authenticationSuccessHandler) {
 			Assert.notNull(authenticationSuccessHandler, "authenticationSuccessHandler cannot be null");
-			this.authenticationSuccessHandler = authenticationSuccessHandler;
+			authenticationSuccessHandler((handlers) -> {
+				handlers.clear();
+				handlers.add(authenticationSuccessHandler);
+			});
+			return this;
+		}
+
+		/**
+		 * Allows customizing the list of {@link ServerAuthenticationSuccessHandler}. The
+		 * default list contains a {@link RedirectServerAuthenticationSuccessHandler} that
+		 * redirects to "/".
+		 * @param handlersConsumer the handlers consumer
+		 * @return the {@link FormLoginSpec} to continue configuring
+		 * @since 6.3
+		 */
+		public FormLoginSpec authenticationSuccessHandler(
+				Consumer<List<ServerAuthenticationSuccessHandler>> handlersConsumer) {
+			Assert.notNull(handlersConsumer, "handlersConsumer cannot be null");
+			handlersConsumer.accept(this.authenticationSuccessHandlers);
 			return this;
 		}
 
@@ -2052,7 +2811,7 @@ public class ServerHttpSecurity {
 		 * generate a log in page at "/login" and a log out page at "/logout". If this is
 		 * customized:
 		 * <ul>
-		 * <li>The default log in & log out page are no longer provided</li>
+		 * <li>The default log in &amp; log out page are no longer provided</li>
 		 * <li>The application must render a log in page at the provided URL</li>
 		 * <li>The application must render an authentication error page at the provided
 		 * URL + "?error"</li>
@@ -2132,7 +2891,13 @@ public class ServerHttpSecurity {
 		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
 		 * @return the {@link ServerHttpSecurity} to continue configuring
+		 * @deprecated For removal in 7.0. Use {@link #formLogin(Customizer)} or
+		 * {@code formLogin(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}
@@ -2169,9 +2934,16 @@ public class ServerHttpSecurity {
 			authenticationFilter.setRequiresAuthenticationMatcher(this.requiresAuthenticationMatcher);
 			authenticationFilter.setAuthenticationFailureHandler(this.authenticationFailureHandler);
 			authenticationFilter.setAuthenticationConverter(new ServerFormLoginAuthenticationConverter());
-			authenticationFilter.setAuthenticationSuccessHandler(this.authenticationSuccessHandler);
+			authenticationFilter.setAuthenticationSuccessHandler(getAuthenticationSuccessHandler(http));
 			authenticationFilter.setSecurityContextRepository(this.securityContextRepository);
 			http.addFilterAt(authenticationFilter, SecurityWebFiltersOrder.FORM_LOGIN);
+		}
+
+		private ServerAuthenticationSuccessHandler getAuthenticationSuccessHandler(ServerHttpSecurity http) {
+			if (this.authenticationSuccessHandlers.isEmpty()) {
+				return new DelegatingServerAuthenticationSuccessHandler(this.defaultSuccessHandlers);
+			}
+			return new DelegatingServerAuthenticationSuccessHandler(this.authenticationSuccessHandlers);
 		}
 
 	}
@@ -2202,7 +2974,10 @@ public class ServerHttpSecurity {
 			}
 			if (loginPage != null) {
 				http.addFilterAt(loginPage, SecurityWebFiltersOrder.LOGIN_PAGE_GENERATING);
-				http.addFilterAt(new LogoutPageGeneratingWebFilter(), SecurityWebFiltersOrder.LOGOUT_PAGE_GENERATING);
+				if (http.logout != null) {
+					http.addFilterAt(new LogoutPageGeneratingWebFilter(),
+							SecurityWebFiltersOrder.LOGOUT_PAGE_GENERATING);
+				}
 			}
 		}
 
@@ -2237,16 +3012,29 @@ public class ServerHttpSecurity {
 
 		private ReferrerPolicyServerHttpHeadersWriter referrerPolicy = new ReferrerPolicyServerHttpHeadersWriter();
 
+		private CrossOriginOpenerPolicyServerHttpHeadersWriter crossOriginOpenerPolicy = new CrossOriginOpenerPolicyServerHttpHeadersWriter();
+
+		private CrossOriginEmbedderPolicyServerHttpHeadersWriter crossOriginEmbedderPolicy = new CrossOriginEmbedderPolicyServerHttpHeadersWriter();
+
+		private CrossOriginResourcePolicyServerHttpHeadersWriter crossOriginResourcePolicy = new CrossOriginResourcePolicyServerHttpHeadersWriter();
+
 		private HeaderSpec() {
 			this.writers = new ArrayList<>(Arrays.asList(this.cacheControl, this.contentTypeOptions, this.hsts,
 					this.frameOptions, this.xss, this.featurePolicy, this.permissionsPolicy, this.contentSecurityPolicy,
-					this.referrerPolicy));
+					this.referrerPolicy, this.crossOriginOpenerPolicy, this.crossOriginEmbedderPolicy,
+					this.crossOriginResourcePolicy));
 		}
 
 		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
 		 * @return the {@link ServerHttpSecurity} to continue configuring
+		 * @deprecated For removal in 7.0. Use {@link #headers(Customizer)} or
+		 * {@code headers(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}
@@ -2263,7 +3051,13 @@ public class ServerHttpSecurity {
 		/**
 		 * Configures cache control headers
 		 * @return the {@link CacheSpec} to configure
+		 * @deprecated For removal in 7.0. Use {@link #cache(Customizer)} or
+		 * {@code cache(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public CacheSpec cache() {
 			return new CacheSpec();
 		}
@@ -2282,7 +3076,10 @@ public class ServerHttpSecurity {
 		/**
 		 * Configures content type response headers
 		 * @return the {@link ContentTypeOptionsSpec} to configure
+		 * @deprecated For removal in 7.0. Use {@link #contentTypeOptions(Customizer)}
+		 * instead
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ContentTypeOptionsSpec contentTypeOptions() {
 			return new ContentTypeOptionsSpec();
 		}
@@ -2301,7 +3098,13 @@ public class ServerHttpSecurity {
 		/**
 		 * Configures frame options response headers
 		 * @return the {@link FrameOptionsSpec} to configure
+		 * @deprecated For removal in 7.0. Use {@link #frameOptions(Customizer)} or
+		 * {@code frameOptions(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public FrameOptionsSpec frameOptions() {
 			return new FrameOptionsSpec();
 		}
@@ -2323,7 +3126,6 @@ public class ServerHttpSecurity {
 		 * custom headers writer
 		 * @return the {@link HeaderSpec} to customize
 		 * @since 5.3.0
-		 * @author Ankur Pathak
 		 */
 		public HeaderSpec writer(ServerHttpHeadersWriter serverHttpHeadersWriter) {
 			Assert.notNull(serverHttpHeadersWriter, "serverHttpHeadersWriter cannot be null");
@@ -2334,7 +3136,13 @@ public class ServerHttpSecurity {
 		/**
 		 * Configures the Strict Transport Security response headers
 		 * @return the {@link HstsSpec} to configure
+		 * @deprecated For removal in 7.0. Use {@link #hsts(Customizer)} or
+		 * {@code hsts(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public HstsSpec hsts() {
 			return new HstsSpec();
 		}
@@ -2359,7 +3167,13 @@ public class ServerHttpSecurity {
 		/**
 		 * Configures x-xss-protection response header.
 		 * @return the {@link XssProtectionSpec} to configure
+		 * @deprecated For removal in 7.0. Use {@link #xssProtection(Customizer)} or
+		 * {@code xssProtection(Customizer.withDefaults())} to stick with defaults. See
+		 * the <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public XssProtectionSpec xssProtection() {
 			return new XssProtectionSpec();
 		}
@@ -2379,7 +3193,10 @@ public class ServerHttpSecurity {
 		 * Configures {@code Content-Security-Policy} response header.
 		 * @param policyDirectives the policy directive(s)
 		 * @return the {@link ContentSecurityPolicySpec} to configure
+		 * @deprecated For removal in 7.0. Use {@link #contentSecurityPolicy(Customizer)}
+		 * instead.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ContentSecurityPolicySpec contentSecurityPolicy(String policyDirectives) {
 			return new ContentSecurityPolicySpec(policyDirectives);
 		}
@@ -2399,7 +3216,10 @@ public class ServerHttpSecurity {
 		 * Configures {@code Feature-Policy} response header.
 		 * @param policyDirectives the policy
 		 * @return the {@link FeaturePolicySpec} to configure
+		 * @deprecated For removal in 7.0. Use {@link #permissionsPolicy(Customizer)}
+		 * instead.
 		 */
+		@Deprecated
 		public FeaturePolicySpec featurePolicy(String policyDirectives) {
 			return new FeaturePolicySpec(policyDirectives);
 		}
@@ -2407,7 +3227,10 @@ public class ServerHttpSecurity {
 		/**
 		 * Configures {@code Permissions-Policy} response header.
 		 * @return the {@link PermissionsPolicySpec} to configure
+		 * @deprecated For removal in 7.0. Use {@link #permissionsPolicy(Customizer)}
+		 * instead.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public PermissionsPolicySpec permissionsPolicy() {
 			return new PermissionsPolicySpec();
 		}
@@ -2427,7 +3250,10 @@ public class ServerHttpSecurity {
 		 * Configures {@code Referrer-Policy} response header.
 		 * @param referrerPolicy the policy to use
 		 * @return the {@link ReferrerPolicySpec} to configure
+		 * @deprecated For removal in 7.0. Use {@link #referrerPolicy(Customizer)}
+		 * instead.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ReferrerPolicySpec referrerPolicy(ReferrerPolicy referrerPolicy) {
 			return new ReferrerPolicySpec(referrerPolicy);
 		}
@@ -2435,7 +3261,10 @@ public class ServerHttpSecurity {
 		/**
 		 * Configures {@code Referrer-Policy} response header.
 		 * @return the {@link ReferrerPolicySpec} to configure
+		 * @deprecated For removal in 7.0. Use {@link #referrerPolicy(Customizer)}
+		 * instead.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ReferrerPolicySpec referrerPolicy() {
 			return new ReferrerPolicySpec();
 		}
@@ -2448,6 +3277,93 @@ public class ServerHttpSecurity {
 		 */
 		public HeaderSpec referrerPolicy(Customizer<ReferrerPolicySpec> referrerPolicyCustomizer) {
 			referrerPolicyCustomizer.customize(new ReferrerPolicySpec());
+			return this;
+		}
+
+		/**
+		 * Configures the <a href=
+		 * "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Opener-Policy">
+		 * Cross-Origin-Opener-Policy</a> header.
+		 * @return the {@link CrossOriginOpenerPolicySpec} to configure
+		 * @since 5.7
+		 * @deprecated For removal in 7.0. Use
+		 * {@link #crossOriginOpenerPolicy(Customizer)} instead.
+		 * @see CrossOriginOpenerPolicyServerHttpHeadersWriter
+		 */
+		@Deprecated(since = "6.1", forRemoval = true)
+		public CrossOriginOpenerPolicySpec crossOriginOpenerPolicy() {
+			return new CrossOriginOpenerPolicySpec();
+		}
+
+		/**
+		 * Configures the <a href=
+		 * "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Opener-Policy">
+		 * Cross-Origin-Opener-Policy</a> header.
+		 * @return the {@link HeaderSpec} to customize
+		 * @since 5.7
+		 * @see CrossOriginOpenerPolicyServerHttpHeadersWriter
+		 */
+		public HeaderSpec crossOriginOpenerPolicy(
+				Customizer<CrossOriginOpenerPolicySpec> crossOriginOpenerPolicyCustomizer) {
+			crossOriginOpenerPolicyCustomizer.customize(new CrossOriginOpenerPolicySpec());
+			return this;
+		}
+
+		/**
+		 * Configures the <a href=
+		 * "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Embedder-Policy">
+		 * Cross-Origin-Embedder-Policy</a> header.
+		 * @return the {@link CrossOriginEmbedderPolicySpec} to configure
+		 * @since 5.7
+		 * @deprecated For removal in 7.0. Use
+		 * {@link #crossOriginEmbedderPolicy(Customizer)} instead.
+		 * @see CrossOriginEmbedderPolicyServerHttpHeadersWriter
+		 */
+		@Deprecated(since = "6.1", forRemoval = true)
+		public CrossOriginEmbedderPolicySpec crossOriginEmbedderPolicy() {
+			return new CrossOriginEmbedderPolicySpec();
+		}
+
+		/**
+		 * Configures the <a href=
+		 * "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Embedder-Policy">
+		 * Cross-Origin-Embedder-Policy</a> header.
+		 * @return the {@link HeaderSpec} to customize
+		 * @since 5.7
+		 * @see CrossOriginEmbedderPolicyServerHttpHeadersWriter
+		 */
+		public HeaderSpec crossOriginEmbedderPolicy(
+				Customizer<CrossOriginEmbedderPolicySpec> crossOriginEmbedderPolicyCustomizer) {
+			crossOriginEmbedderPolicyCustomizer.customize(new CrossOriginEmbedderPolicySpec());
+			return this;
+		}
+
+		/**
+		 * Configures the <a href=
+		 * "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Resource-Policy">
+		 * Cross-Origin-Resource-Policy</a> header.
+		 * @return the {@link CrossOriginResourcePolicySpec} to configure
+		 * @since 5.7
+		 * @deprecated For removal in 7.0. Use
+		 * {@link #crossOriginResourcePolicy(Customizer)} instead.
+		 * @see CrossOriginResourcePolicyServerHttpHeadersWriter
+		 */
+		@Deprecated(since = "6.1", forRemoval = true)
+		public CrossOriginResourcePolicySpec crossOriginResourcePolicy() {
+			return new CrossOriginResourcePolicySpec();
+		}
+
+		/**
+		 * Configures the <a href=
+		 * "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Resource-Policy">
+		 * Cross-Origin-Resource-Policy</a> header.
+		 * @return the {@link HeaderSpec} to customize
+		 * @since 5.7
+		 * @see CrossOriginResourcePolicyServerHttpHeadersWriter
+		 */
+		public HeaderSpec crossOriginResourcePolicy(
+				Customizer<CrossOriginResourcePolicySpec> crossOriginResourcePolicyCustomizer) {
+			crossOriginResourcePolicyCustomizer.customize(new CrossOriginResourcePolicySpec());
 			return this;
 		}
 
@@ -2518,7 +3434,10 @@ public class ServerHttpSecurity {
 			 * Allows method chaining to continue configuring the
 			 * {@link ServerHttpSecurity}
 			 * @return the {@link HeaderSpec} to continue configuring
+			 * @deprecated For removal in 7.0. Use {@link #frameOptions(Customizer)}
+			 * instead
 			 */
+			@Deprecated(since = "6.1", forRemoval = true)
 			private HeaderSpec and() {
 				return HeaderSpec.this;
 			}
@@ -2576,7 +3495,6 @@ public class ServerHttpSecurity {
 			 * @param preload if subdomains should be included
 			 * @return the {@link HstsSpec} to continue configuring
 			 * @since 5.2.0
-			 * @author Ankur Pathak
 			 */
 			public HstsSpec preload(boolean preload) {
 				HeaderSpec.this.hsts.setPreload(preload);
@@ -2587,7 +3505,13 @@ public class ServerHttpSecurity {
 			 * Allows method chaining to continue configuring the
 			 * {@link ServerHttpSecurity}
 			 * @return the {@link HeaderSpec} to continue configuring
+			 * @deprecated For removal in 7.0. Use {@link #hsts(Customizer)} or
+			 * {@code hsts(Customizer.withDefaults())} to stick with defaults. See the
+			 * <a href=
+			 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+			 * for more details.
 			 */
+			@Deprecated(since = "6.1", forRemoval = true)
 			public HeaderSpec and() {
 				return HeaderSpec.this;
 			}
@@ -2619,6 +3543,18 @@ public class ServerHttpSecurity {
 			 */
 			public HeaderSpec disable() {
 				HeaderSpec.this.writers.remove(HeaderSpec.this.xss);
+				return HeaderSpec.this;
+			}
+
+			/**
+			 * Sets the value of x-xss-protection header. OWASP recommends using
+			 * {@link XXssProtectionServerHttpHeadersWriter.HeaderValue#DISABLED}.
+			 * @param headerValue the headerValue
+			 * @return the {@link HeaderSpec} to continue configuring
+			 * @since 5.8
+			 */
+			public HeaderSpec headerValue(XXssProtectionServerHttpHeadersWriter.HeaderValue headerValue) {
+				HeaderSpec.this.xss.setHeaderValue(headerValue);
 				return HeaderSpec.this;
 			}
 
@@ -2664,7 +3600,10 @@ public class ServerHttpSecurity {
 			 * Allows method chaining to continue configuring the
 			 * {@link ServerHttpSecurity}.
 			 * @return the {@link HeaderSpec} to continue configuring
+			 * @deprecated For removal in 7.0. Use
+			 * {@link #contentSecurityPolicy(Customizer)} instead
 			 */
+			@Deprecated(since = "6.1", forRemoval = true)
 			public HeaderSpec and() {
 				return HeaderSpec.this;
 			}
@@ -2691,7 +3630,10 @@ public class ServerHttpSecurity {
 			 * Allows method chaining to continue configuring the
 			 * {@link ServerHttpSecurity}.
 			 * @return the {@link HeaderSpec} to continue configuring
+			 * @deprecated For removal in 7.0. Use {@link #featurePolicy(Customizer)}
+			 * instead
 			 */
+			@Deprecated(since = "6.1", forRemoval = true)
 			public HeaderSpec and() {
 				return HeaderSpec.this;
 			}
@@ -2723,7 +3665,10 @@ public class ServerHttpSecurity {
 			 * Allows method chaining to continue configuring the
 			 * {@link ServerHttpSecurity}.
 			 * @return the {@link HeaderSpec} to continue configuring
+			 * @deprecated For removal in 7.0. Use {@link #permissionsPolicy(Customizer)}
+			 * instead
 			 */
+			@Deprecated(since = "6.1", forRemoval = true)
 			public HeaderSpec and() {
 				return HeaderSpec.this;
 			}
@@ -2760,7 +3705,112 @@ public class ServerHttpSecurity {
 			 * Allows method chaining to continue configuring the
 			 * {@link ServerHttpSecurity}.
 			 * @return the {@link HeaderSpec} to continue configuring
+			 * @deprecated For removal in 7.0. Use {@link #referrerPolicy(Customizer)}
+			 * instead
 			 */
+			@Deprecated(since = "6.1", forRemoval = true)
+			public HeaderSpec and() {
+				return HeaderSpec.this;
+			}
+
+		}
+
+		/**
+		 * Configures the Cross-Origin-Opener-Policy header
+		 *
+		 * @since 5.7
+		 */
+		public final class CrossOriginOpenerPolicySpec {
+
+			private CrossOriginOpenerPolicySpec() {
+			}
+
+			/**
+			 * Sets the value to be used in the `Cross-Origin-Opener-Policy` header
+			 * @param openerPolicy a opener policy
+			 * @return the {@link CrossOriginOpenerPolicySpec} to continue configuring
+			 */
+			public CrossOriginOpenerPolicySpec policy(CrossOriginOpenerPolicy openerPolicy) {
+				HeaderSpec.this.crossOriginOpenerPolicy.setPolicy(openerPolicy);
+				return this;
+			}
+
+			/**
+			 * Allows method chaining to continue configuring the
+			 * {@link ServerHttpSecurity}.
+			 * @return the {@link HeaderSpec} to continue configuring
+			 * @deprecated For removal in 7.0. Use
+			 * {@link #crossOriginOpenerPolicy(Customizer)} instead
+			 */
+			@Deprecated(since = "6.1", forRemoval = true)
+			public HeaderSpec and() {
+				return HeaderSpec.this;
+			}
+
+		}
+
+		/**
+		 * Configures the Cross-Origin-Embedder-Policy header
+		 *
+		 * @since 5.7
+		 */
+		public final class CrossOriginEmbedderPolicySpec {
+
+			private CrossOriginEmbedderPolicySpec() {
+			}
+
+			/**
+			 * Sets the value to be used in the `Cross-Origin-Embedder-Policy` header
+			 * @param embedderPolicy a opener policy
+			 * @return the {@link CrossOriginEmbedderPolicySpec} to continue configuring
+			 */
+			public CrossOriginEmbedderPolicySpec policy(CrossOriginEmbedderPolicy embedderPolicy) {
+				HeaderSpec.this.crossOriginEmbedderPolicy.setPolicy(embedderPolicy);
+				return this;
+			}
+
+			/**
+			 * Allows method chaining to continue configuring the
+			 * {@link ServerHttpSecurity}.
+			 * @return the {@link HeaderSpec} to continue configuring
+			 * @deprecated For removal in 7.0. Use
+			 * {@link #crossOriginEmbedderPolicy(Customizer)} instead
+			 */
+			@Deprecated(since = "6.1", forRemoval = true)
+			public HeaderSpec and() {
+				return HeaderSpec.this;
+			}
+
+		}
+
+		/**
+		 * Configures the Cross-Origin-Resource-Policy header
+		 *
+		 * @since 5.7
+		 */
+		public final class CrossOriginResourcePolicySpec {
+
+			private CrossOriginResourcePolicySpec() {
+			}
+
+			/**
+			 * Sets the value to be used in the `Cross-Origin-Resource-Policy` header
+			 * @param resourcePolicy a opener policy
+			 * @return the {@link CrossOriginResourcePolicySpec} to continue configuring
+			 */
+			public CrossOriginResourcePolicySpec policy(CrossOriginResourcePolicy resourcePolicy) {
+				HeaderSpec.this.crossOriginResourcePolicy.setPolicy(resourcePolicy);
+				return this;
+			}
+
+			/**
+			 * Allows method chaining to continue configuring the
+			 * {@link ServerHttpSecurity}.
+			 * @return the {@link HeaderSpec} to continue configuring
+			 * @deprecated For removal in 7.0. Use
+			 * {@link #crossOriginResourcePolicy(Customizer)} instead
+			 */
+			@Deprecated(since = "6.1", forRemoval = true)
 			public HeaderSpec and() {
 				return HeaderSpec.this;
 			}
@@ -2836,7 +3886,13 @@ public class ServerHttpSecurity {
 		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
 		 * @return the {@link ServerHttpSecurity} to continue configuring
+		 * @deprecated For removal in 7.0. Use {@link #logout(Customizer)} or
+		 * {@code logout(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}
@@ -2909,7 +3965,7 @@ public class ServerHttpSecurity {
 
 		@Override
 		public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-			return chain.filter(exchange).subscriberContext(Context.of(ServerWebExchange.class, exchange));
+			return chain.filter(exchange).contextWrite(Context.of(ServerWebExchange.class, exchange));
 		}
 
 	}
@@ -2947,7 +4003,13 @@ public class ServerHttpSecurity {
 		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
 		 * @return the {@link ServerHttpSecurity} to continue configuring
+		 * @deprecated For removal in 7.0. Use {@link #cors(Customizer)} or
+		 * {@code cors(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}
@@ -3003,6 +4065,14 @@ public class ServerHttpSecurity {
 			return this;
 		}
 
+		/**
+		 * @deprecated For removal in 7.0. Use {@link #x509(Customizer)} or
+		 * {@code x509(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
+		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}
@@ -3048,9 +4118,18 @@ public class ServerHttpSecurity {
 
 		private ServerOAuth2AuthorizationRequestResolver authorizationRequestResolver;
 
+		private ServerRedirectStrategy authorizationRedirectStrategy;
+
 		private ServerWebExchangeMatcher authenticationMatcher;
 
-		private ServerAuthenticationSuccessHandler authenticationSuccessHandler;
+		private ReactiveOidcSessionRegistry oidcSessionRegistry;
+
+		private final RedirectServerAuthenticationSuccessHandler defaultAuthenticationSuccessHandler = new RedirectServerAuthenticationSuccessHandler();
+
+		private final List<ServerAuthenticationSuccessHandler> defaultSuccessHandlers = new ArrayList<>(
+				List.of(this.defaultAuthenticationSuccessHandler));
+
+		private List<ServerAuthenticationSuccessHandler> authenticationSuccessHandlers = new ArrayList<>();
 
 		private ServerAuthenticationFailureHandler authenticationFailureHandler;
 
@@ -3082,9 +4161,24 @@ public class ServerHttpSecurity {
 		}
 
 		/**
+		 * Configures the {@link ReactiveOidcSessionRegistry} to use when logins use OIDC.
+		 * Default is to look the value up as a Bean, or else use an
+		 * {@link InMemoryReactiveOidcSessionRegistry}.
+		 * @param oidcSessionRegistry the registry to use
+		 * @return the {@link OidcLogoutSpec} to customize
+		 * @since 6.2
+		 */
+		public OAuth2LoginSpec oidcSessionRegistry(ReactiveOidcSessionRegistry oidcSessionRegistry) {
+			Assert.notNull(oidcSessionRegistry, "oidcSessionRegistry cannot be null");
+			this.oidcSessionRegistry = oidcSessionRegistry;
+			return this;
+		}
+
+		/**
 		 * The {@link ServerAuthenticationSuccessHandler} used after authentication
 		 * success. Defaults to {@link RedirectServerAuthenticationSuccessHandler}
-		 * redirecting to "/".
+		 * redirecting to "/". Note that this method clears previously added success
+		 * handlers via {@link #authenticationSuccessHandler(Consumer)}
 		 * @param authenticationSuccessHandler the success handler to use
 		 * @return the {@link OAuth2LoginSpec} to customize
 		 * @since 5.2
@@ -3092,7 +4186,25 @@ public class ServerHttpSecurity {
 		public OAuth2LoginSpec authenticationSuccessHandler(
 				ServerAuthenticationSuccessHandler authenticationSuccessHandler) {
 			Assert.notNull(authenticationSuccessHandler, "authenticationSuccessHandler cannot be null");
-			this.authenticationSuccessHandler = authenticationSuccessHandler;
+			authenticationSuccessHandler((handlers) -> {
+				handlers.clear();
+				handlers.add(authenticationSuccessHandler);
+			});
+			return this;
+		}
+
+		/**
+		 * Allows customizing the list of {@link ServerAuthenticationSuccessHandler}. The
+		 * default list contains a {@link RedirectServerAuthenticationSuccessHandler} that
+		 * redirects to "/".
+		 * @param handlersConsumer the handlers consumer
+		 * @return the {@link OAuth2LoginSpec} to continue configuring
+		 * @since 6.3
+		 */
+		public OAuth2LoginSpec authenticationSuccessHandler(
+				Consumer<List<ServerAuthenticationSuccessHandler>> handlersConsumer) {
+			Assert.notNull(handlersConsumer, "handlersConsumer cannot be null");
+			handlersConsumer.accept(this.authenticationSuccessHandlers);
 			return this;
 		}
 
@@ -3133,7 +4245,7 @@ public class ServerHttpSecurity {
 				oauth2Manager.setAuthoritiesMapper(authoritiesMapper);
 			}
 			boolean oidcAuthenticationProviderEnabled = ClassUtils
-					.isPresent("org.springframework.security.oauth2.jwt.JwtDecoder", this.getClass().getClassLoader());
+				.isPresent("org.springframework.security.oauth2.jwt.JwtDecoder", this.getClass().getClassLoader());
 			if (!oidcAuthenticationProviderEnabled) {
 				return oauth2Manager;
 			}
@@ -3169,9 +4281,9 @@ public class ServerHttpSecurity {
 			ServerOAuth2AuthorizationCodeAuthenticationTokenConverter delegate = new ServerOAuth2AuthorizationCodeAuthenticationTokenConverter(
 					clientRegistrationRepository);
 			delegate.setAuthorizationRequestRepository(getAuthorizationRequestRepository());
-			ServerAuthenticationConverter authenticationConverter = (exchange) -> delegate.convert(exchange).onErrorMap(
-					OAuth2AuthorizationException.class,
-					(e) -> new OAuth2AuthenticationException(e.getError(), e.getError().toString()));
+			ServerAuthenticationConverter authenticationConverter = (exchange) -> delegate.convert(exchange)
+				.onErrorMap(OAuth2AuthorizationException.class,
+						(e) -> new OAuth2AuthenticationException(e.getError(), e.getError().toString()));
 			this.authenticationConverter = authenticationConverter;
 			return authenticationConverter;
 		}
@@ -3221,6 +4333,16 @@ public class ServerHttpSecurity {
 		}
 
 		/**
+		 * Sets the redirect strategy for Authorization Endpoint redirect URI.
+		 * @param authorizationRedirectStrategy the redirect strategy
+		 * @return the {@link OAuth2LoginSpec} for further configuration
+		 */
+		public OAuth2LoginSpec authorizationRedirectStrategy(ServerRedirectStrategy authorizationRedirectStrategy) {
+			this.authorizationRedirectStrategy = authorizationRedirectStrategy;
+			return this;
+		}
+
+		/**
 		 * Sets the {@link ServerWebExchangeMatcher matcher} used for determining if the
 		 * request is an authentication request.
 		 * @param authenticationMatcher the {@link ServerWebExchangeMatcher matcher} used
@@ -3243,7 +4365,13 @@ public class ServerHttpSecurity {
 		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
 		 * @return the {@link ServerHttpSecurity} to continue configuring
+		 * @deprecated For removal in 7.0. Use {@link #oauth2Login(Customizer)} or
+		 * {@code oauth2Login(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}
@@ -3254,17 +4382,27 @@ public class ServerHttpSecurity {
 			OAuth2AuthorizationRequestRedirectWebFilter oauthRedirectFilter = getRedirectWebFilter();
 			ServerAuthorizationRequestRepository<OAuth2AuthorizationRequest> authorizationRequestRepository = getAuthorizationRequestRepository();
 			oauthRedirectFilter.setAuthorizationRequestRepository(authorizationRequestRepository);
+			oauthRedirectFilter.setAuthorizationRedirectStrategy(getAuthorizationRedirectStrategy());
 			oauthRedirectFilter.setRequestCache(http.requestCache.requestCache);
+
 			ReactiveAuthenticationManager manager = getAuthenticationManager();
-			AuthenticationWebFilter authenticationFilter = new OAuth2LoginAuthenticationWebFilter(manager,
-					authorizedClientRepository);
+			ReactiveOidcSessionRegistry sessionRegistry = getOidcSessionRegistry();
+			AuthenticationWebFilter authenticationFilter = (sessionRegistry != null)
+					? new OidcSessionRegistryAuthenticationWebFilter(manager, authorizedClientRepository,
+							sessionRegistry)
+					: new OAuth2LoginAuthenticationWebFilter(manager, authorizedClientRepository);
 			authenticationFilter.setRequiresAuthenticationMatcher(getAuthenticationMatcher());
 			authenticationFilter
-					.setServerAuthenticationConverter(getAuthenticationConverter(clientRegistrationRepository));
+				.setServerAuthenticationConverter(getAuthenticationConverter(clientRegistrationRepository));
 			authenticationFilter.setAuthenticationSuccessHandler(getAuthenticationSuccessHandler(http));
 			authenticationFilter.setAuthenticationFailureHandler(getAuthenticationFailureHandler());
 			authenticationFilter.setSecurityContextRepository(this.securityContextRepository);
+
 			setDefaultEntryPoints(http);
+			if (sessionRegistry != null) {
+				http.addFilterAfter(new OidcSessionRegistryWebFilter(sessionRegistry),
+						SecurityWebFiltersOrder.HTTP_HEADERS_WRITER);
+			}
 			http.addFilterAt(oauthRedirectFilter, SecurityWebFiltersOrder.HTTP_BASIC);
 			http.addFilterAt(authenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION);
 		}
@@ -3309,13 +4447,25 @@ public class ServerHttpSecurity {
 			http.defaultEntryPoints.add(new DelegateEntry(defaultEntryPointMatcher, defaultEntryPoint));
 		}
 
-		private ServerAuthenticationSuccessHandler getAuthenticationSuccessHandler(ServerHttpSecurity http) {
-			if (this.authenticationSuccessHandler == null) {
-				RedirectServerAuthenticationSuccessHandler handler = new RedirectServerAuthenticationSuccessHandler();
-				handler.setRequestCache(http.requestCache.requestCache);
-				this.authenticationSuccessHandler = handler;
+		private ReactiveOidcSessionRegistry getOidcSessionRegistry() {
+			if (ServerHttpSecurity.this.oidcLogout == null && this.oidcSessionRegistry == null) {
+				return null;
 			}
-			return this.authenticationSuccessHandler;
+			if (this.oidcSessionRegistry == null) {
+				this.oidcSessionRegistry = getBeanOrNull(ReactiveOidcSessionRegistry.class);
+			}
+			if (this.oidcSessionRegistry == null) {
+				this.oidcSessionRegistry = new InMemoryReactiveOidcSessionRegistry();
+			}
+			return this.oidcSessionRegistry;
+		}
+
+		private ServerAuthenticationSuccessHandler getAuthenticationSuccessHandler(ServerHttpSecurity http) {
+			this.defaultAuthenticationSuccessHandler.setRequestCache(http.requestCache.requestCache);
+			if (this.authenticationSuccessHandlers.isEmpty()) {
+				return new DelegatingServerAuthenticationSuccessHandler(this.defaultSuccessHandlers);
+			}
+			return new DelegatingServerAuthenticationSuccessHandler(this.authenticationSuccessHandlers);
 		}
 
 		private ServerAuthenticationFailureHandler getAuthenticationFailureHandler() {
@@ -3356,8 +4506,11 @@ public class ServerHttpSecurity {
 				return Collections.emptyMap();
 			}
 			Map<String, String> result = new HashMap<>();
-			registrations.iterator().forEachRemaining(
-					(r) -> result.put("/oauth2/authorization/" + r.getRegistrationId(), r.getClientName()));
+			registrations.iterator().forEachRemaining((r) -> {
+				if (AuthorizationGrantType.AUTHORIZATION_CODE.equals(r.getAuthorizationGrantType())) {
+					result.put("/oauth2/authorization/" + r.getRegistrationId(), r.getClientName());
+				}
+			});
 			return result;
 		}
 
@@ -3407,12 +4560,169 @@ public class ServerHttpSecurity {
 			return this.authorizationRequestRepository;
 		}
 
+		private ServerRedirectStrategy getAuthorizationRedirectStrategy() {
+			if (this.authorizationRedirectStrategy == null) {
+				this.authorizationRedirectStrategy = new DefaultServerRedirectStrategy();
+			}
+			return this.authorizationRedirectStrategy;
+		}
+
 		private ReactiveOAuth2AuthorizedClientService getAuthorizedClientService() {
 			ReactiveOAuth2AuthorizedClientService bean = getBeanOrNull(ReactiveOAuth2AuthorizedClientService.class);
 			if (bean != null) {
 				return bean;
 			}
 			return new InMemoryReactiveOAuth2AuthorizedClientService(getClientRegistrationRepository());
+		}
+
+		private static final class OidcSessionRegistryWebFilter implements WebFilter {
+
+			private final ReactiveOidcSessionRegistry oidcSessionRegistry;
+
+			OidcSessionRegistryWebFilter(ReactiveOidcSessionRegistry oidcSessionRegistry) {
+				this.oidcSessionRegistry = oidcSessionRegistry;
+			}
+
+			@Override
+			public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+				return chain.filter(new OidcSessionRegistryServerWebExchange(exchange));
+			}
+
+			private final class OidcSessionRegistryServerWebExchange extends ServerWebExchangeDecorator {
+
+				private final Mono<WebSession> sessionMono;
+
+				protected OidcSessionRegistryServerWebExchange(ServerWebExchange delegate) {
+					super(delegate);
+					this.sessionMono = delegate.getSession().map(OidcSessionRegistryWebSession::new);
+				}
+
+				@Override
+				public Mono<WebSession> getSession() {
+					return this.sessionMono;
+				}
+
+				private final class OidcSessionRegistryWebSession implements WebSession {
+
+					private final WebSession session;
+
+					OidcSessionRegistryWebSession(WebSession session) {
+						this.session = session;
+					}
+
+					@Override
+					public String getId() {
+						return this.session.getId();
+					}
+
+					@Override
+					public Map<String, Object> getAttributes() {
+						return this.session.getAttributes();
+					}
+
+					@Override
+					public void start() {
+						this.session.start();
+					}
+
+					@Override
+					public boolean isStarted() {
+						return this.session.isStarted();
+					}
+
+					@Override
+					public Mono<Void> changeSessionId() {
+						String currentId = this.session.getId();
+						return this.session.changeSessionId()
+							.then(Mono.defer(() -> OidcSessionRegistryWebFilter.this.oidcSessionRegistry
+								.removeSessionInformation(currentId)
+								.flatMap((information) -> {
+									information = information.withSessionId(this.session.getId());
+									return OidcSessionRegistryWebFilter.this.oidcSessionRegistry
+										.saveSessionInformation(information);
+								})));
+					}
+
+					@Override
+					public Mono<Void> invalidate() {
+						String currentId = this.session.getId();
+						return this.session.invalidate()
+							.then(Mono.defer(() -> OidcSessionRegistryWebFilter.this.oidcSessionRegistry
+								.removeSessionInformation(currentId)
+								.then(Mono.empty())));
+					}
+
+					@Override
+					public Mono<Void> save() {
+						return this.session.save();
+					}
+
+					@Override
+					public boolean isExpired() {
+						return this.session.isExpired();
+					}
+
+					@Override
+					public Instant getCreationTime() {
+						return this.session.getCreationTime();
+					}
+
+					@Override
+					public Instant getLastAccessTime() {
+						return this.session.getLastAccessTime();
+					}
+
+					@Override
+					public void setMaxIdleTime(Duration maxIdleTime) {
+						this.session.setMaxIdleTime(maxIdleTime);
+					}
+
+					@Override
+					public Duration getMaxIdleTime() {
+						return this.session.getMaxIdleTime();
+					}
+
+				}
+
+			}
+
+		}
+
+		static final class OidcSessionRegistryAuthenticationWebFilter extends OAuth2LoginAuthenticationWebFilter {
+
+			private final Log logger = LogFactory.getLog(getClass());
+
+			private final ReactiveOidcSessionRegistry oidcSessionRegistry;
+
+			OidcSessionRegistryAuthenticationWebFilter(ReactiveAuthenticationManager authenticationManager,
+					ServerOAuth2AuthorizedClientRepository authorizedClientRepository,
+					ReactiveOidcSessionRegistry oidcSessionRegistry) {
+				super(authenticationManager, authorizedClientRepository);
+				this.oidcSessionRegistry = oidcSessionRegistry;
+			}
+
+			@Override
+			protected Mono<Void> onAuthenticationSuccess(Authentication authentication,
+					WebFilterExchange webFilterExchange) {
+				if (!(authentication.getPrincipal() instanceof OidcUser user)) {
+					return super.onAuthenticationSuccess(authentication, webFilterExchange);
+				}
+				return webFilterExchange.getExchange().getSession().doOnNext((session) -> {
+					if (this.logger.isTraceEnabled()) {
+						this.logger.trace(String.format("Linking a provider [%s] session to this client's session",
+								user.getIssuer()));
+					}
+				}).flatMap((session) -> {
+					Mono<CsrfToken> csrfToken = webFilterExchange.getExchange().getAttribute(CsrfToken.class.getName());
+					return (csrfToken != null)
+							? csrfToken.map((token) -> new OidcSessionInformation(session.getId(),
+									Map.of(token.getHeaderName(), token.getToken()), user))
+							: Mono.just(new OidcSessionInformation(session.getId(), Map.of(), user));
+				})
+					.flatMap(this.oidcSessionRegistry::saveSessionInformation)
+					.then(super.onAuthenticationSuccess(authentication, webFilterExchange));
+			}
+
 		}
 
 	}
@@ -3428,6 +4738,10 @@ public class ServerHttpSecurity {
 		private ReactiveAuthenticationManager authenticationManager;
 
 		private ServerAuthorizationRequestRepository<OAuth2AuthorizationRequest> authorizationRequestRepository;
+
+		private ServerOAuth2AuthorizationRequestResolver authorizationRequestResolver;
+
+		private ServerRedirectStrategy authorizationRedirectStrategy;
 
 		private OAuth2ClientSpec() {
 		}
@@ -3522,15 +4836,57 @@ public class ServerHttpSecurity {
 		}
 
 		/**
+		 * Sets the resolver used for resolving {@link OAuth2AuthorizationRequest}'s.
+		 * @param authorizationRequestResolver the resolver used for resolving
+		 * {@link OAuth2AuthorizationRequest}'s
+		 * @return the {@link OAuth2ClientSpec} to customize
+		 * @since 6.1
+		 */
+		public OAuth2ClientSpec authorizationRequestResolver(
+				ServerOAuth2AuthorizationRequestResolver authorizationRequestResolver) {
+			this.authorizationRequestResolver = authorizationRequestResolver;
+			return this;
+		}
+
+		private OAuth2AuthorizationRequestRedirectWebFilter getRedirectWebFilter() {
+			if (this.authorizationRequestResolver != null) {
+				return new OAuth2AuthorizationRequestRedirectWebFilter(this.authorizationRequestResolver);
+			}
+			return new OAuth2AuthorizationRequestRedirectWebFilter(getClientRegistrationRepository());
+		}
+
+		/**
+		 * Sets the redirect strategy for Authorization Endpoint redirect URI.
+		 * @param authorizationRedirectStrategy the redirect strategy
+		 * @return the {@link OAuth2ClientSpec} for further configuration
+		 */
+		public OAuth2ClientSpec authorizationRedirectStrategy(ServerRedirectStrategy authorizationRedirectStrategy) {
+			this.authorizationRedirectStrategy = authorizationRedirectStrategy;
+			return this;
+		}
+
+		private ServerRedirectStrategy getAuthorizationRedirectStrategy() {
+			if (this.authorizationRedirectStrategy == null) {
+				this.authorizationRedirectStrategy = new DefaultServerRedirectStrategy();
+			}
+			return this.authorizationRedirectStrategy;
+		}
+
+		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
 		 * @return the {@link ServerHttpSecurity} to continue configuring
+		 * @deprecated For removal in 7.0. Use {@link #oauth2Client(Customizer)} or
+		 * {@code oauth2Client(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}
 
 		protected void configure(ServerHttpSecurity http) {
-			ReactiveClientRegistrationRepository clientRegistrationRepository = getClientRegistrationRepository();
 			ServerOAuth2AuthorizedClientRepository authorizedClientRepository = getAuthorizedClientRepository();
 			ServerAuthenticationConverter authenticationConverter = getAuthenticationConverter();
 			ReactiveAuthenticationManager authenticationManager = getAuthenticationManager();
@@ -3540,12 +4896,14 @@ public class ServerHttpSecurity {
 			if (http.requestCache != null) {
 				codeGrantWebFilter.setRequestCache(http.requestCache.requestCache);
 			}
-			OAuth2AuthorizationRequestRedirectWebFilter oauthRedirectFilter = new OAuth2AuthorizationRequestRedirectWebFilter(
-					clientRegistrationRepository);
+
+			OAuth2AuthorizationRequestRedirectWebFilter oauthRedirectFilter = getRedirectWebFilter();
 			oauthRedirectFilter.setAuthorizationRequestRepository(getAuthorizationRequestRepository());
+			oauthRedirectFilter.setAuthorizationRedirectStrategy(getAuthorizationRedirectStrategy());
 			if (http.requestCache != null) {
 				oauthRedirectFilter.setRequestCache(http.requestCache.requestCache);
 			}
+
 			http.addFilterAt(codeGrantWebFilter, SecurityWebFiltersOrder.OAUTH2_AUTHORIZATION_CODE);
 			http.addFilterAt(oauthRedirectFilter, SecurityWebFiltersOrder.HTTP_BASIC);
 		}
@@ -3589,6 +4947,8 @@ public class ServerHttpSecurity {
 
 		private ServerAuthenticationEntryPoint entryPoint = new BearerTokenServerAuthenticationEntryPoint();
 
+		private ServerAuthenticationFailureHandler authenticationFailureHandler;
+
 		private ServerAccessDeniedHandler accessDeniedHandler = new BearerTokenServerAccessDeniedHandler();
 
 		private ServerAuthenticationConverter bearerTokenConverter = new ServerBearerTokenAuthenticationConverter();
@@ -3631,6 +4991,12 @@ public class ServerHttpSecurity {
 			return this;
 		}
 
+		public OAuth2ResourceServerSpec authenticationFailureHandler(
+				ServerAuthenticationFailureHandler authenticationFailureHandler) {
+			this.authenticationFailureHandler = authenticationFailureHandler;
+			return this;
+		}
+
 		/**
 		 * Configures the {@link ServerAuthenticationConverter} to use for requests
 		 * authenticating with
@@ -3663,7 +5029,12 @@ public class ServerHttpSecurity {
 		/**
 		 * Enables JWT Resource Server support.
 		 * @return the {@link JwtSpec} for additional configuration
+		 * @deprecated For removal in 7.0. Use {@link #jwt(Customizer)} or
+		 * {@code jwt(Customizer.withDefaults())} to stick with defaults. See the <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public JwtSpec jwt() {
 			if (this.jwt == null) {
 				this.jwt = new JwtSpec();
@@ -3688,7 +5059,13 @@ public class ServerHttpSecurity {
 		/**
 		 * Enables Opaque Token Resource Server support.
 		 * @return the {@link OpaqueTokenSpec} for additional configuration
+		 * @deprecated For removal in 7.0. Use {@link #opaqueToken(Customizer)} or
+		 * {@code opaqueToken(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public OpaqueTokenSpec opaqueToken() {
 			if (this.opaqueToken == null) {
 				this.opaqueToken = new OpaqueTokenSpec();
@@ -3720,8 +5097,7 @@ public class ServerHttpSecurity {
 			if (this.authenticationManagerResolver != null) {
 				AuthenticationWebFilter oauth2 = new AuthenticationWebFilter(this.authenticationManagerResolver);
 				oauth2.setServerAuthenticationConverter(this.bearerTokenConverter);
-				oauth2.setAuthenticationFailureHandler(
-						new ServerAuthenticationEntryPointFailureHandler(this.entryPoint));
+				oauth2.setAuthenticationFailureHandler(authenticationFailureHandler());
 				http.addFilterAt(oauth2, SecurityWebFiltersOrder.AUTHENTICATION);
 			}
 			else if (this.jwt != null) {
@@ -3752,9 +5128,9 @@ public class ServerHttpSecurity {
 		private void registerDefaultAccessDeniedHandler(ServerHttpSecurity http) {
 			if (http.exceptionHandling != null) {
 				http.defaultAccessDeniedHandlers
-						.add(new ServerWebExchangeDelegatingServerAccessDeniedHandler.DelegateEntry(
-								this.authenticationConverterServerWebExchangeMatcher,
-								OAuth2ResourceServerSpec.this.accessDeniedHandler));
+					.add(new ServerWebExchangeDelegatingServerAccessDeniedHandler.DelegateEntry(
+							this.authenticationConverterServerWebExchangeMatcher,
+							OAuth2ResourceServerSpec.this.accessDeniedHandler));
 			}
 		}
 
@@ -3774,6 +5150,18 @@ public class ServerHttpSecurity {
 			}
 		}
 
+		private ServerAuthenticationFailureHandler authenticationFailureHandler() {
+			if (this.authenticationFailureHandler != null) {
+				return this.authenticationFailureHandler;
+			}
+			return new ServerAuthenticationEntryPointFailureHandler(this.entryPoint);
+		}
+
+		/**
+		 * @deprecated For removal in 7.0. Use {@link #oauth2ResourceServer(Customizer)}
+		 * instead
+		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}
@@ -3787,8 +5175,7 @@ public class ServerHttpSecurity {
 
 			private ReactiveJwtDecoder jwtDecoder;
 
-			private Converter<Jwt, ? extends Mono<? extends AbstractAuthenticationToken>> jwtAuthenticationConverter = new ReactiveJwtAuthenticationConverterAdapter(
-					new JwtAuthenticationConverter());
+			private Converter<Jwt, ? extends Mono<? extends AbstractAuthenticationToken>> jwtAuthenticationConverter;
 
 			/**
 			 * Configures the {@link ReactiveAuthenticationManager} to use
@@ -3848,6 +5235,14 @@ public class ServerHttpSecurity {
 				return this;
 			}
 
+			/**
+			 * @deprecated For removal in 7.0. Use {@link #jwt(Customizer)} or
+			 * {@code jwt(Customizer.withDefaults())} to stick with defaults. See the
+			 * <a href=
+			 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+			 * for more details.
+			 */
+			@Deprecated(since = "6.1", forRemoval = true)
 			public OAuth2ResourceServerSpec and() {
 				return OAuth2ResourceServerSpec.this;
 			}
@@ -3856,8 +5251,7 @@ public class ServerHttpSecurity {
 				ReactiveAuthenticationManager authenticationManager = getAuthenticationManager();
 				AuthenticationWebFilter oauth2 = new AuthenticationWebFilter(authenticationManager);
 				oauth2.setServerAuthenticationConverter(OAuth2ResourceServerSpec.this.bearerTokenConverter);
-				oauth2.setAuthenticationFailureHandler(
-						new ServerAuthenticationEntryPointFailureHandler(OAuth2ResourceServerSpec.this.entryPoint));
+				oauth2.setAuthenticationFailureHandler(authenticationFailureHandler());
 				http.addFilterAt(oauth2, SecurityWebFiltersOrder.AUTHENTICATION);
 			}
 
@@ -3866,7 +5260,16 @@ public class ServerHttpSecurity {
 			}
 
 			protected Converter<Jwt, ? extends Mono<? extends AbstractAuthenticationToken>> getJwtAuthenticationConverter() {
-				return this.jwtAuthenticationConverter;
+				if (this.jwtAuthenticationConverter != null) {
+					return this.jwtAuthenticationConverter;
+				}
+
+				if (getBeanNamesForTypeOrEmpty(ReactiveJwtAuthenticationConverter.class).length > 0) {
+					return getBean(ReactiveJwtAuthenticationConverter.class);
+				}
+				else {
+					return new ReactiveJwtAuthenticationConverter();
+				}
 			}
 
 			private ReactiveAuthenticationManager getAuthenticationManager() {
@@ -3898,6 +5301,8 @@ public class ServerHttpSecurity {
 			private String clientSecret;
 
 			private Supplier<ReactiveOpaqueTokenIntrospector> introspector;
+
+			private ReactiveOpaqueTokenAuthenticationConverter authenticationConverter;
 
 			private OpaqueTokenSpec() {
 			}
@@ -3937,17 +5342,33 @@ public class ServerHttpSecurity {
 				return this;
 			}
 
+			public OpaqueTokenSpec authenticationConverter(
+					ReactiveOpaqueTokenAuthenticationConverter authenticationConverter) {
+				Assert.notNull(authenticationConverter, "authenticationConverter cannot be null");
+				this.authenticationConverter = authenticationConverter;
+				return this;
+			}
+
 			/**
 			 * Allows method chaining to continue configuring the
 			 * {@link ServerHttpSecurity}
 			 * @return the {@link ServerHttpSecurity} to continue configuring
+			 * @deprecated For removal in 7.0. Use {@link #opaqueToken(Customizer)}
+			 * instead
 			 */
+			@Deprecated(since = "6.1", forRemoval = true)
 			public OAuth2ResourceServerSpec and() {
 				return OAuth2ResourceServerSpec.this;
 			}
 
 			protected ReactiveAuthenticationManager getAuthenticationManager() {
-				return new OpaqueTokenReactiveAuthenticationManager(getIntrospector());
+				OpaqueTokenReactiveAuthenticationManager authenticationManager = new OpaqueTokenReactiveAuthenticationManager(
+						getIntrospector());
+				ReactiveOpaqueTokenAuthenticationConverter authenticationConverter = getAuthenticationConverter();
+				if (authenticationConverter != null) {
+					authenticationManager.setAuthenticationConverter(authenticationConverter);
+				}
+				return authenticationManager;
 			}
 
 			protected ReactiveOpaqueTokenIntrospector getIntrospector() {
@@ -3957,13 +5378,180 @@ public class ServerHttpSecurity {
 				return getBean(ReactiveOpaqueTokenIntrospector.class);
 			}
 
+			protected ReactiveOpaqueTokenAuthenticationConverter getAuthenticationConverter() {
+				if (this.authenticationConverter != null) {
+					return this.authenticationConverter;
+				}
+				return getBeanOrNull(ReactiveOpaqueTokenAuthenticationConverter.class);
+			}
+
 			protected void configure(ServerHttpSecurity http) {
 				ReactiveAuthenticationManager authenticationManager = getAuthenticationManager();
 				AuthenticationWebFilter oauth2 = new AuthenticationWebFilter(authenticationManager);
 				oauth2.setServerAuthenticationConverter(OAuth2ResourceServerSpec.this.bearerTokenConverter);
-				oauth2.setAuthenticationFailureHandler(
-						new ServerAuthenticationEntryPointFailureHandler(OAuth2ResourceServerSpec.this.entryPoint));
+				oauth2.setAuthenticationFailureHandler(authenticationFailureHandler());
 				http.addFilterAt(oauth2, SecurityWebFiltersOrder.AUTHENTICATION);
+			}
+
+		}
+
+	}
+
+	/**
+	 * Configures OIDC 1.0 Logout support
+	 *
+	 * @author Josh Cummings
+	 * @since 6.2
+	 */
+	public final class OidcLogoutSpec {
+
+		private ReactiveClientRegistrationRepository clientRegistrationRepository;
+
+		private ReactiveOidcSessionRegistry sessionRegistry;
+
+		private BackChannelLogoutConfigurer backChannel;
+
+		/**
+		 * Configures the {@link ReactiveClientRegistrationRepository}. Default is to look
+		 * the value up as a Bean.
+		 * @param clientRegistrationRepository the repository to use
+		 * @return the {@link OidcLogoutSpec} to customize
+		 */
+		public OidcLogoutSpec clientRegistrationRepository(
+				ReactiveClientRegistrationRepository clientRegistrationRepository) {
+			Assert.notNull(clientRegistrationRepository, "clientRegistrationRepository cannot be null");
+			this.clientRegistrationRepository = clientRegistrationRepository;
+			return this;
+		}
+
+		/**
+		 * Configures the {@link ReactiveOidcSessionRegistry}. Default is to use the value
+		 * from {@link OAuth2LoginSpec#oidcSessionRegistry}, then look the value up as a
+		 * Bean, or else use an {@link InMemoryReactiveOidcSessionRegistry}.
+		 * @param sessionRegistry the registry to use
+		 * @return the {@link OidcLogoutSpec} to customize
+		 */
+		public OidcLogoutSpec oidcSessionRegistry(ReactiveOidcSessionRegistry sessionRegistry) {
+			Assert.notNull(sessionRegistry, "sessionRegistry cannot be null");
+			this.sessionRegistry = sessionRegistry;
+			return this;
+		}
+
+		/**
+		 * Configure OIDC Back-Channel Logout using the provided {@link Consumer}
+		 * @return the {@link OidcLogoutSpec} for further configuration
+		 */
+		public OidcLogoutSpec backChannel(Customizer<BackChannelLogoutConfigurer> backChannelLogoutConfigurer) {
+			if (this.backChannel == null) {
+				this.backChannel = new OidcLogoutSpec.BackChannelLogoutConfigurer();
+			}
+			backChannelLogoutConfigurer.customize(this.backChannel);
+			return this;
+		}
+
+		@Deprecated(forRemoval = true, since = "6.2")
+		public ServerHttpSecurity and() {
+			return ServerHttpSecurity.this;
+		}
+
+		void configure(ServerHttpSecurity http) {
+			if (this.backChannel != null) {
+				this.backChannel.configure(http);
+			}
+		}
+
+		private ReactiveClientRegistrationRepository getClientRegistrationRepository() {
+			if (this.clientRegistrationRepository == null) {
+				this.clientRegistrationRepository = getBeanOrNull(ReactiveClientRegistrationRepository.class);
+			}
+			return this.clientRegistrationRepository;
+		}
+
+		private ReactiveOidcSessionRegistry getSessionRegistry() {
+			if (this.sessionRegistry == null && ServerHttpSecurity.this.oauth2Login == null) {
+				return new InMemoryReactiveOidcSessionRegistry();
+			}
+			if (this.sessionRegistry == null) {
+				return ServerHttpSecurity.this.oauth2Login.oidcSessionRegistry;
+			}
+			return this.sessionRegistry;
+		}
+
+		/**
+		 * A configurer for configuring OIDC Back-Channel Logout
+		 */
+		public final class BackChannelLogoutConfigurer {
+
+			private ServerAuthenticationConverter authenticationConverter;
+
+			private final ReactiveAuthenticationManager authenticationManager = new OidcBackChannelLogoutReactiveAuthenticationManager();
+
+			private Supplier<ServerLogoutHandler> logoutHandler = this::logoutHandler;
+
+			private ServerAuthenticationConverter authenticationConverter() {
+				if (this.authenticationConverter == null) {
+					this.authenticationConverter = new OidcLogoutServerAuthenticationConverter(
+							OidcLogoutSpec.this.getClientRegistrationRepository());
+				}
+				return this.authenticationConverter;
+			}
+
+			private ReactiveAuthenticationManager authenticationManager() {
+				return this.authenticationManager;
+			}
+
+			private ServerLogoutHandler logoutHandler() {
+				OidcBackChannelServerLogoutHandler logoutHandler = new OidcBackChannelServerLogoutHandler();
+				logoutHandler.setSessionRegistry(OidcLogoutSpec.this.getSessionRegistry());
+				return logoutHandler;
+			}
+
+			/**
+			 * Use this endpoint when invoking a back-channel logout.
+			 *
+			 * <p>
+			 * The resulting {@link LogoutHandler} will {@code POST} the session cookie
+			 * and CSRF token to this endpoint to invalidate the corresponding end-user
+			 * session.
+			 *
+			 * <p>
+			 * Supports URI templates like {@code {baseUrl}}, {@code {baseScheme}}, and
+			 * {@code {basePort}}.
+			 *
+			 * <p>
+			 * By default, the URI is set to
+			 * {@code {baseScheme}://localhost{basePort}/logout}, meaning that the scheme
+			 * and port of the original back-channel request is preserved, while the host
+			 * and endpoint are changed.
+			 *
+			 * <p>
+			 * If you are using Spring Security for the logout endpoint, the path part of
+			 * this URI should match the value configured there.
+			 *
+			 * <p>
+			 * Otherwise, this is handy in the event that your server configuration means
+			 * that the scheme, server name, or port in the {@code Host} header are
+			 * different from how you would address the same server internally.
+			 * @param logoutUri the URI to request logout on the back-channel
+			 * @return the {@link OidcLogoutConfigurer.BackChannelLogoutConfigurer} for
+			 * further customizations
+			 * @since 6.2.4
+			 */
+			public BackChannelLogoutConfigurer logoutUri(String logoutUri) {
+				this.logoutHandler = () -> {
+					OidcBackChannelServerLogoutHandler logoutHandler = new OidcBackChannelServerLogoutHandler();
+					logoutHandler.setSessionRegistry(OidcLogoutSpec.this.getSessionRegistry());
+					logoutHandler.setLogoutUri(logoutUri);
+					return logoutHandler;
+				};
+				return this;
+			}
+
+			void configure(ServerHttpSecurity http) {
+				OidcBackChannelLogoutWebFilter filter = new OidcBackChannelLogoutWebFilter(authenticationConverter(),
+						authenticationManager());
+				filter.setLogoutHandler(this.logoutHandler.get());
+				http.addFilterBefore(filter, SecurityWebFiltersOrder.CSRF);
 			}
 
 		}
@@ -3973,7 +5561,6 @@ public class ServerHttpSecurity {
 	/**
 	 * Configures anonymous authentication
 	 *
-	 * @author Ankur Pathak
 	 * @since 5.2.0
 	 */
 	public final class AnonymousSpec {
@@ -4056,7 +5643,13 @@ public class ServerHttpSecurity {
 		/**
 		 * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
 		 * @return the {@link ServerHttpSecurity} to continue configuring
+		 * @deprecated For removal in 7.0. Use {@link #anonymous(Customizer)} or
+		 * {@code anonymous(Customizer.withDefaults())} to stick with defaults. See the
+		 * <a href=
+		 * "https://docs.spring.io/spring-security/reference/migration-7/configuration.html#_use_the_lambda_dsl">documentation</a>
+		 * for more details.
 		 */
+		@Deprecated(since = "6.1", forRemoval = true)
 		public ServerHttpSecurity and() {
 			return ServerHttpSecurity.this;
 		}

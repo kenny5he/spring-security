@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 
 package org.springframework.security;
 
-import org.junit.After;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
@@ -31,7 +31,7 @@ public class LdapServerBeanDefinitionParserTests {
 
 	private ClassPathXmlApplicationContext context;
 
-	@After
+	@AfterEach
 	public void closeAppContext() {
 		if (this.context != null) {
 			this.context.close();
@@ -42,8 +42,9 @@ public class LdapServerBeanDefinitionParserTests {
 	@Test
 	public void apacheDirectoryServerIsStartedByDefault() {
 		assertThatExceptionOfType(BeanDefinitionStoreException.class)
-				.isThrownBy(() -> this.context = new ClassPathXmlApplicationContext("applicationContext-security.xml"))
-				.withMessageContaining("Embedded LDAP server is not provided");
+			.isThrownBy(() -> this.context = new ClassPathXmlApplicationContext("applicationContext-security.xml"))
+			.havingRootCause()
+			.withMessageContaining("Embedded LDAP server is not provided");
 	}
 
 }

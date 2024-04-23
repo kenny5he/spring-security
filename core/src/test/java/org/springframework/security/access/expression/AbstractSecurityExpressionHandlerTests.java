@@ -16,8 +16,8 @@
 
 package org.springframework.security.access.expression;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -37,7 +37,7 @@ public class AbstractSecurityExpressionHandlerTests {
 
 	private AbstractSecurityExpressionHandler<Object> handler;
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		this.handler = new AbstractSecurityExpressionHandler<Object>() {
 			@Override
@@ -53,9 +53,9 @@ public class AbstractSecurityExpressionHandlerTests {
 	public void beanNamesAreCorrectlyResolved() {
 		this.handler.setApplicationContext(new AnnotationConfigApplicationContext(TestConfiguration.class));
 		Expression expression = this.handler.getExpressionParser()
-				.parseExpression("@number10.compareTo(@number20) < 0");
+			.parseExpression("@number10.compareTo(@number20) < 0");
 		assertThat(expression.getValue(this.handler.createEvaluationContext(mock(Authentication.class), new Object())))
-				.isEqualTo(true);
+			.isEqualTo(true);
 	}
 
 	@Test

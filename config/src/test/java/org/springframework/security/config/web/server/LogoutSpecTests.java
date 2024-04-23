@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package org.springframework.security.config.web.server;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.openqa.selenium.WebDriver;
 
 import org.springframework.security.config.annotation.web.reactive.ServerHttpSecurityConfigurationBuilder;
@@ -26,7 +26,10 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.context.WebSessionServerSecurityContextRepository;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.config.Customizer.withDefaults;
 
 /**
@@ -55,7 +58,8 @@ public class LogoutSpecTests {
 				.build();
 		// @formatter:on
 		FormLoginTests.DefaultLoginPage loginPage = FormLoginTests.HomePage
-				.to(driver, FormLoginTests.DefaultLoginPage.class).assertAt();
+			.to(driver, FormLoginTests.DefaultLoginPage.class)
+			.assertAt();
 		// @formatter:off
 		loginPage = loginPage.loginForm()
 				.username("user")
@@ -92,7 +96,8 @@ public class LogoutSpecTests {
 				.build();
 		// @formatter:on
 		FormLoginTests.DefaultLoginPage loginPage = FormLoginTests.HomePage
-				.to(driver, FormLoginTests.DefaultLoginPage.class).assertAt();
+			.to(driver, FormLoginTests.DefaultLoginPage.class)
+			.assertAt();
 		// @formatter:off
 		loginPage = loginPage.loginForm()
 					.username("user")
@@ -129,7 +134,8 @@ public class LogoutSpecTests {
 				.build();
 		// @formatter:on
 		FormLoginTests.DefaultLoginPage loginPage = FormLoginTests.HomePage
-				.to(driver, FormLoginTests.DefaultLoginPage.class).assertAt();
+			.to(driver, FormLoginTests.DefaultLoginPage.class)
+			.assertAt();
 		// @formatter:off
 		loginPage = loginPage.loginForm()
 				.username("user")
@@ -146,7 +152,7 @@ public class LogoutSpecTests {
 	}
 
 	@Test
-	public void logoutWhenDisabledThenPostToLogoutDoesNothing() {
+	public void logoutWhenDisabledThenDefaultLogoutPageDoesNotExist() {
 		// @formatter:off
 		SecurityWebFilterChain securityWebFilter = this.http
 				.authorizeExchange()
@@ -156,14 +162,15 @@ public class LogoutSpecTests {
 				.logout().disable()
 				.build();
 		WebTestClient webTestClient = WebTestClientBuilder
-				.bindToWebFilters(securityWebFilter)
+				.bindToControllerAndWebFilters(HomeController.class, securityWebFilter)
 				.build();
 		WebDriver driver = WebTestClientHtmlUnitDriverBuilder
 				.webTestClientSetup(webTestClient)
 				.build();
 		// @formatter:on
 		FormLoginTests.DefaultLoginPage loginPage = FormLoginTests.HomePage
-				.to(driver, FormLoginTests.DefaultLoginPage.class).assertAt();
+			.to(driver, FormLoginTests.DefaultLoginPage.class)
+			.assertAt();
 		// @formatter:off
 		FormLoginTests.HomePage homePage = loginPage.loginForm()
 				.username("user")
@@ -171,8 +178,8 @@ public class LogoutSpecTests {
 				.submit(FormLoginTests.HomePage.class);
 		// @formatter:on
 		homePage.assertAt();
-		FormLoginTests.DefaultLogoutPage.to(driver).assertAt().logout();
-		homePage.assertAt();
+		FormLoginTests.DefaultLogoutPage.to(driver);
+		assertThat(driver.getPageSource()).isEmpty();
 	}
 
 	@Test
@@ -196,7 +203,8 @@ public class LogoutSpecTests {
 				.build();
 		// @formatter:on
 		FormLoginTests.DefaultLoginPage loginPage = FormLoginTests.HomePage
-				.to(driver, FormLoginTests.DefaultLoginPage.class).assertAt();
+			.to(driver, FormLoginTests.DefaultLoginPage.class)
+			.assertAt();
 		// @formatter:off
 		FormLoginTests.HomePage homePage = loginPage.loginForm()
 				.username("user")
@@ -206,6 +214,16 @@ public class LogoutSpecTests {
 		homePage.assertAt();
 		FormLoginTests.DefaultLogoutPage.to(driver).assertAt().logout();
 		FormLoginTests.HomePage.to(driver, FormLoginTests.DefaultLoginPage.class).assertAt();
+	}
+
+	@RestController
+	public static class HomeController {
+
+		@GetMapping("/")
+		public String ok() {
+			return "ok";
+		}
+
 	}
 
 }

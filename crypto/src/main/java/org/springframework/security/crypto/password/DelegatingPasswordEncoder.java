@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import java.util.Map;
  *
  * <pre>
  * String idForEncode = "bcrypt";
- * Map&lt;String,PasswordEncoder&gt; encoders = new HashMap<>();
+ * Map&lt;String,PasswordEncoder&gt; encoders = new HashMap&lt;&gt;();
  * encoders.put(idForEncode, new BCryptPasswordEncoder());
  * encoders.put("noop", NoOpPasswordEncoder.getInstance());
  * encoders.put("pbkdf2", new Pbkdf2PasswordEncoder());
@@ -53,7 +53,9 @@ import java.util.Map;
  * Such that "id" is an identifier used to look up which {@link PasswordEncoder} should be
  * used and "encodedPassword" is the original encoded password for the selected
  * {@link PasswordEncoder}. The "id" must be at the beginning of the password, start with
- * "{" and end with "}". If the "id" cannot be found, the "id" will be null.
+ * "{" (id prefix) and end with "}" (id suffix). Both id prefix and id suffix can be
+ * customized via {@link #DelegatingPasswordEncoder(String, Map, String, String)}. If the
+ * "id" cannot be found, the "id" will be null.
  *
  * For example, the following might be a list of passwords encoded using different "id".
  * All of the original passwords are "password".
@@ -116,14 +118,20 @@ import java.util.Map;
  *
  * @author Rob Winch
  * @author Michael Simons
+ * @author heowc
+ * @author Jihoon Cha
  * @since 5.0
  * @see org.springframework.security.crypto.factory.PasswordEncoderFactories
  */
 public class DelegatingPasswordEncoder implements PasswordEncoder {
 
-	private static final String PREFIX = "{";
+	private static final String DEFAULT_ID_PREFIX = "{";
 
-	private static final String SUFFIX = "}";
+	private static final String DEFAULT_ID_SUFFIX = "}";
+
+	private final String idPrefix;
+
+	private final String idSuffix;
 
 	private final String idForEncode;
 
@@ -142,9 +150,34 @@ public class DelegatingPasswordEncoder implements PasswordEncoder {
 	 * {@link #matches(CharSequence, String)}
 	 */
 	public DelegatingPasswordEncoder(String idForEncode, Map<String, PasswordEncoder> idToPasswordEncoder) {
+		this(idForEncode, idToPasswordEncoder, DEFAULT_ID_PREFIX, DEFAULT_ID_SUFFIX);
+	}
+
+	/**
+	 * Creates a new instance
+	 * @param idForEncode the id used to lookup which {@link PasswordEncoder} should be
+	 * used for {@link #encode(CharSequence)}
+	 * @param idToPasswordEncoder a Map of id to {@link PasswordEncoder} used to determine
+	 * which {@link PasswordEncoder} should be used for
+	 * @param idPrefix the prefix that denotes the start of the id in the encoded results
+	 * @param idSuffix the suffix that denotes the end of an id in the encoded results
+	 * {@link #matches(CharSequence, String)}
+	 */
+	public DelegatingPasswordEncoder(String idForEncode, Map<String, PasswordEncoder> idToPasswordEncoder,
+			String idPrefix, String idSuffix) {
 		if (idForEncode == null) {
 			throw new IllegalArgumentException("idForEncode cannot be null");
 		}
+		if (idPrefix == null) {
+			throw new IllegalArgumentException("prefix cannot be null");
+		}
+		if (idSuffix == null || idSuffix.isEmpty()) {
+			throw new IllegalArgumentException("suffix cannot be empty");
+		}
+		if (idPrefix.contains(idSuffix)) {
+			throw new IllegalArgumentException("idPrefix " + idPrefix + " cannot contain idSuffix " + idSuffix);
+		}
+
 		if (!idToPasswordEncoder.containsKey(idForEncode)) {
 			throw new IllegalArgumentException(
 					"idForEncode " + idForEncode + "is not found in idToPasswordEncoder " + idToPasswordEncoder);
@@ -153,16 +186,18 @@ public class DelegatingPasswordEncoder implements PasswordEncoder {
 			if (id == null) {
 				continue;
 			}
-			if (id.contains(PREFIX)) {
-				throw new IllegalArgumentException("id " + id + " cannot contain " + PREFIX);
+			if (!idPrefix.isEmpty() && id.contains(idPrefix)) {
+				throw new IllegalArgumentException("id " + id + " cannot contain " + idPrefix);
 			}
-			if (id.contains(SUFFIX)) {
-				throw new IllegalArgumentException("id " + id + " cannot contain " + SUFFIX);
+			if (id.contains(idSuffix)) {
+				throw new IllegalArgumentException("id " + id + " cannot contain " + idSuffix);
 			}
 		}
 		this.idForEncode = idForEncode;
 		this.passwordEncoderForEncode = idToPasswordEncoder.get(idForEncode);
 		this.idToPasswordEncoder = new HashMap<>(idToPasswordEncoder);
+		this.idPrefix = idPrefix;
+		this.idSuffix = idSuffix;
 	}
 
 	/**
@@ -188,7 +223,7 @@ public class DelegatingPasswordEncoder implements PasswordEncoder {
 
 	@Override
 	public String encode(CharSequence rawPassword) {
-		return PREFIX + this.idForEncode + SUFFIX + this.passwordEncoderForEncode.encode(rawPassword);
+		return this.idPrefix + this.idForEncode + this.idSuffix + this.passwordEncoderForEncode.encode(rawPassword);
 	}
 
 	@Override
@@ -209,15 +244,15 @@ public class DelegatingPasswordEncoder implements PasswordEncoder {
 		if (prefixEncodedPassword == null) {
 			return null;
 		}
-		int start = prefixEncodedPassword.indexOf(PREFIX);
+		int start = prefixEncodedPassword.indexOf(this.idPrefix);
 		if (start != 0) {
 			return null;
 		}
-		int end = prefixEncodedPassword.indexOf(SUFFIX, start);
+		int end = prefixEncodedPassword.indexOf(this.idSuffix, start);
 		if (end < 0) {
 			return null;
 		}
-		return prefixEncodedPassword.substring(start + 1, end);
+		return prefixEncodedPassword.substring(start + this.idPrefix.length(), end);
 	}
 
 	@Override
@@ -233,8 +268,8 @@ public class DelegatingPasswordEncoder implements PasswordEncoder {
 	}
 
 	private String extractEncodedPassword(String prefixEncodedPassword) {
-		int start = prefixEncodedPassword.indexOf(SUFFIX);
-		return prefixEncodedPassword.substring(start + 1);
+		int start = prefixEncodedPassword.indexOf(this.idSuffix);
+		return prefixEncodedPassword.substring(start + this.idSuffix.length());
 	}
 
 	/**

@@ -18,13 +18,12 @@ package org.springframework.security.test.web.servlet.request;
 
 import java.io.IOException;
 
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -51,7 +50,7 @@ public class SecurityMockMvcRequestPostProcessorsDigestTests {
 
 	private DigestAuthenticationEntryPoint entryPoint;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.password = "password";
 		this.request = new MockHttpServletRequest();
@@ -65,7 +64,7 @@ public class SecurityMockMvcRequestPostProcessorsDigestTests {
 		this.filter.afterPropertiesSet();
 	}
 
-	@After
+	@AfterEach
 	public void cleanup() {
 		SecurityContextHolder.clearContext();
 	}
@@ -88,7 +87,7 @@ public class SecurityMockMvcRequestPostProcessorsDigestTests {
 		String username = "custom";
 		this.password = "secret";
 		MockHttpServletRequest postProcessedRequest = digest(username).password(this.password)
-				.postProcessRequest(this.request);
+			.postProcessRequest(this.request);
 		assertThat(extractUser()).isEqualTo(username);
 	}
 
@@ -97,7 +96,7 @@ public class SecurityMockMvcRequestPostProcessorsDigestTests {
 		String username = "admin";
 		this.entryPoint.setRealmName("Custom");
 		MockHttpServletRequest postProcessedRequest = digest(username).realm(this.entryPoint.getRealmName())
-				.postProcessRequest(this.request);
+			.postProcessRequest(this.request);
 		assertThat(extractUser()).isEqualTo(username);
 	}
 
@@ -105,7 +104,7 @@ public class SecurityMockMvcRequestPostProcessorsDigestTests {
 	public void digestWithFilterFails() throws Exception {
 		String username = "admin";
 		MockHttpServletRequest postProcessedRequest = digest(username).realm("Invalid")
-				.postProcessRequest(this.request);
+			.postProcessRequest(this.request);
 		assertThat(extractUser()).isNull();
 	}
 

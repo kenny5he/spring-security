@@ -16,7 +16,7 @@
 
 package org.springframework.security.web.server.context;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -40,7 +40,7 @@ public class NoOpServerSecurityContextRepositoryTests {
 	public void saveAndLoad() {
 		SecurityContext context = new SecurityContextImpl();
 		Mono<SecurityContext> result = this.repository.save(this.exchange, context)
-				.then(this.repository.load(this.exchange));
+			.then(this.repository.load(this.exchange));
 		StepVerifier.create(result).verifyComplete();
 	}
 

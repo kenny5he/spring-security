@@ -19,7 +19,7 @@ package org.springframework.security.web.access.expression;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.access.ConfigAttribute;
 import org.springframework.security.access.SecurityConfig;
@@ -56,8 +56,8 @@ public class ExpressionBasedFilterInvocationSecurityMetadataSourceTests {
 		LinkedHashMap<RequestMatcher, Collection<ConfigAttribute>> requestMap = new LinkedHashMap<>();
 		requestMap.put(AnyRequestMatcher.INSTANCE, SecurityConfig.createList("hasRole('X'"));
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new ExpressionBasedFilterInvocationSecurityMetadataSource(requestMap,
-						new DefaultWebSecurityExpressionHandler()));
+			.isThrownBy(() -> new ExpressionBasedFilterInvocationSecurityMetadataSource(requestMap,
+					new DefaultWebSecurityExpressionHandler()));
 	}
 
 }

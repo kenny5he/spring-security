@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.security.core.annotation.CurrentSecurityContext;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
@@ -75,24 +76,57 @@ import org.springframework.web.method.support.ModelAndViewContainer;
  */
 public final class CurrentSecurityContextArgumentResolver implements HandlerMethodArgumentResolver {
 
+	private SecurityContextHolderStrategy securityContextHolderStrategy = SecurityContextHolder
+		.getContextHolderStrategy();
+
 	private ExpressionParser parser = new SpelExpressionParser();
 
 	private BeanResolver beanResolver;
 
 	@Override
 	public boolean supportsParameter(MethodParameter parameter) {
-		return findMethodAnnotation(CurrentSecurityContext.class, parameter) != null;
+		return SecurityContext.class.isAssignableFrom(parameter.getParameterType())
+				|| findMethodAnnotation(CurrentSecurityContext.class, parameter) != null;
 	}
 
 	@Override
 	public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
 			NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
-		SecurityContext securityContext = SecurityContextHolder.getContext();
+		SecurityContext securityContext = this.securityContextHolderStrategy.getContext();
 		if (securityContext == null) {
 			return null;
 		}
-		Object securityContextResult = securityContext;
 		CurrentSecurityContext annotation = findMethodAnnotation(CurrentSecurityContext.class, parameter);
+		if (annotation != null) {
+			return resolveSecurityContextFromAnnotation(parameter, annotation, securityContext);
+		}
+
+		return securityContext;
+	}
+
+	/**
+	 * Sets the {@link SecurityContextHolderStrategy} to use. The default action is to use
+	 * the {@link SecurityContextHolderStrategy} stored in {@link SecurityContextHolder}.
+	 *
+	 * @since 5.8
+	 */
+	public void setSecurityContextHolderStrategy(SecurityContextHolderStrategy securityContextHolderStrategy) {
+		Assert.notNull(securityContextHolderStrategy, "securityContextHolderStrategy cannot be null");
+		this.securityContextHolderStrategy = securityContextHolderStrategy;
+	}
+
+	/**
+	 * Set the {@link BeanResolver} to be used on the expressions
+	 * @param beanResolver the {@link BeanResolver} to use
+	 */
+	public void setBeanResolver(BeanResolver beanResolver) {
+		Assert.notNull(beanResolver, "beanResolver cannot be null");
+		this.beanResolver = beanResolver;
+	}
+
+	private Object resolveSecurityContextFromAnnotation(MethodParameter parameter, CurrentSecurityContext annotation,
+			SecurityContext securityContext) {
+		Object securityContextResult = securityContext;
 		String expressionToParse = annotation.expression();
 		if (StringUtils.hasLength(expressionToParse)) {
 			StandardEvaluationContext context = new StandardEvaluationContext();
@@ -111,15 +145,6 @@ public final class CurrentSecurityContextArgumentResolver implements HandlerMeth
 			return null;
 		}
 		return securityContextResult;
-	}
-
-	/**
-	 * Set the {@link BeanResolver} to be used on the expressions
-	 * @param beanResolver the {@link BeanResolver} to use
-	 */
-	public void setBeanResolver(BeanResolver beanResolver) {
-		Assert.notNull(beanResolver, "beanResolver cannot be null");
-		this.beanResolver = beanResolver;
 	}
 
 	/**

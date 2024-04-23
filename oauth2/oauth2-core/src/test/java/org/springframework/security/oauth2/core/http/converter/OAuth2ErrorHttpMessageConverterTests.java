@@ -16,8 +16,8 @@
 
 package org.springframework.security.oauth2.core.http.converter;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpStatus;
@@ -43,7 +43,7 @@ public class OAuth2ErrorHttpMessageConverterTests {
 
 	private OAuth2ErrorHttpMessageConverter messageConverter;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.messageConverter = new OAuth2ErrorHttpMessageConverter();
 	}
@@ -105,8 +105,8 @@ public class OAuth2ErrorHttpMessageConverterTests {
 		String errorResponse = "{}";
 		MockClientHttpResponse response = new MockClientHttpResponse(errorResponse.getBytes(), HttpStatus.BAD_REQUEST);
 		assertThatExceptionOfType(HttpMessageNotReadableException.class)
-				.isThrownBy(() -> this.messageConverter.readInternal(OAuth2Error.class, response))
-				.withMessageContaining("An error occurred reading the OAuth 2.0 Error");
+			.isThrownBy(() -> this.messageConverter.readInternal(OAuth2Error.class, response))
+			.withMessageContaining("An error occurred reading the OAuth 2.0 Error");
 	}
 
 	@Test
@@ -130,8 +130,8 @@ public class OAuth2ErrorHttpMessageConverterTests {
 				"https://tools.ietf.org/html/rfc6749#section-5.2");
 		MockHttpOutputMessage outputMessage = new MockHttpOutputMessage();
 		assertThatExceptionOfType(HttpMessageNotWritableException.class)
-				.isThrownBy(() -> this.messageConverter.writeInternal(oauth2Error, outputMessage))
-				.withMessageContaining("An error occurred writing the OAuth 2.0 Error");
+			.isThrownBy(() -> this.messageConverter.writeInternal(oauth2Error, outputMessage))
+			.withMessageContaining("An error occurred writing the OAuth 2.0 Error");
 	}
 
 }

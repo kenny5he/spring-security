@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,17 +18,19 @@ package org.springframework.security.saml2.provider.service.web;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.function.Function;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterOutputStream;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
-import org.apache.commons.codec.binary.Base64;
-
-import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.saml2.core.Saml2Error;
 import org.springframework.security.saml2.core.Saml2ErrorCodes;
+import org.springframework.security.saml2.core.Saml2ParameterNames;
+import org.springframework.security.saml2.provider.service.authentication.AbstractSaml2AuthenticationRequest;
 import org.springframework.security.saml2.provider.service.authentication.Saml2AuthenticationException;
 import org.springframework.security.saml2.provider.service.authentication.Saml2AuthenticationToken;
 import org.springframework.security.saml2.provider.service.registration.RelyingPartyRegistration;
@@ -45,9 +47,15 @@ import org.springframework.util.Assert;
  */
 public final class Saml2AuthenticationTokenConverter implements AuthenticationConverter {
 
-	private static Base64 BASE64 = new Base64(0, new byte[] { '\n' });
+	// MimeDecoder allows extra line-breaks as well as other non-alphabet values.
+	// This matches the behaviour of the commons-codec decoder.
+	private static final Base64.Decoder BASE64 = Base64.getMimeDecoder();
 
-	private final Converter<HttpServletRequest, RelyingPartyRegistration> relyingPartyRegistrationResolver;
+	private static final Base64Checker BASE_64_CHECKER = new Base64Checker();
+
+	private final RelyingPartyRegistrationResolver relyingPartyRegistrationResolver;
+
+	private Function<HttpServletRequest, AbstractSaml2AuthenticationRequest> loader;
 
 	/**
 	 * Constructs a {@link Saml2AuthenticationTokenConverter} given a strategy for
@@ -55,25 +63,46 @@ public final class Saml2AuthenticationTokenConverter implements AuthenticationCo
 	 * @param relyingPartyRegistrationResolver the strategy for resolving
 	 * {@link RelyingPartyRegistration}s
 	 */
-	public Saml2AuthenticationTokenConverter(
-			Converter<HttpServletRequest, RelyingPartyRegistration> relyingPartyRegistrationResolver) {
+	public Saml2AuthenticationTokenConverter(RelyingPartyRegistrationResolver relyingPartyRegistrationResolver) {
 		Assert.notNull(relyingPartyRegistrationResolver, "relyingPartyRegistrationResolver cannot be null");
 		this.relyingPartyRegistrationResolver = relyingPartyRegistrationResolver;
+		this.loader = new HttpSessionSaml2AuthenticationRequestRepository()::loadAuthenticationRequest;
 	}
 
 	@Override
 	public Saml2AuthenticationToken convert(HttpServletRequest request) {
-		RelyingPartyRegistration relyingPartyRegistration = this.relyingPartyRegistrationResolver.convert(request);
+		AbstractSaml2AuthenticationRequest authenticationRequest = loadAuthenticationRequest(request);
+		String relyingPartyRegistrationId = (authenticationRequest != null)
+				? authenticationRequest.getRelyingPartyRegistrationId() : null;
+		RelyingPartyRegistration relyingPartyRegistration = this.relyingPartyRegistrationResolver.resolve(request,
+				relyingPartyRegistrationId);
 		if (relyingPartyRegistration == null) {
 			return null;
 		}
-		String saml2Response = request.getParameter("SAMLResponse");
+		String saml2Response = request.getParameter(Saml2ParameterNames.SAML_RESPONSE);
 		if (saml2Response == null) {
 			return null;
 		}
 		byte[] b = samlDecode(saml2Response);
 		saml2Response = inflateIfRequired(request, b);
-		return new Saml2AuthenticationToken(relyingPartyRegistration, saml2Response);
+		return new Saml2AuthenticationToken(relyingPartyRegistration, saml2Response, authenticationRequest);
+	}
+
+	/**
+	 * Use the given {@link Saml2AuthenticationRequestRepository} to load authentication
+	 * request.
+	 * @param authenticationRequestRepository the
+	 * {@link Saml2AuthenticationRequestRepository} to use
+	 * @since 5.6
+	 */
+	public void setAuthenticationRequestRepository(
+			Saml2AuthenticationRequestRepository<AbstractSaml2AuthenticationRequest> authenticationRequestRepository) {
+		Assert.notNull(authenticationRequestRepository, "authenticationRequestRepository cannot be null");
+		this.loader = authenticationRequestRepository::loadAuthenticationRequest;
+	}
+
+	private AbstractSaml2AuthenticationRequest loadAuthenticationRequest(HttpServletRequest request) {
+		return this.loader.apply(request);
 	}
 
 	private String inflateIfRequired(HttpServletRequest request, byte[] b) {
@@ -85,6 +114,7 @@ public final class Saml2AuthenticationTokenConverter implements AuthenticationCo
 
 	private byte[] samlDecode(String base64EncodedPayload) {
 		try {
+			BASE_64_CHECKER.checkAcceptable(base64EncodedPayload);
 			return BASE64.decode(base64EncodedPayload);
 		}
 		catch (Exception ex) {
@@ -105,6 +135,60 @@ public final class Saml2AuthenticationTokenConverter implements AuthenticationCo
 			throw new Saml2AuthenticationException(
 					new Saml2Error(Saml2ErrorCodes.INVALID_RESPONSE, "Unable to inflate string"), ex);
 		}
+	}
+
+	static class Base64Checker {
+
+		private static final int[] values = genValueMapping();
+
+		Base64Checker() {
+
+		}
+
+		private static int[] genValueMapping() {
+			byte[] alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+				.getBytes(StandardCharsets.ISO_8859_1);
+
+			int[] values = new int[256];
+			Arrays.fill(values, -1);
+			for (int i = 0; i < alphabet.length; i++) {
+				values[alphabet[i] & 0xff] = i;
+			}
+			return values;
+		}
+
+		boolean isAcceptable(String s) {
+			int goodChars = 0;
+			int lastGoodCharVal = -1;
+
+			// count number of characters from Base64 alphabet
+			for (int i = 0; i < s.length(); i++) {
+				int val = values[0xff & s.charAt(i)];
+				if (val != -1) {
+					lastGoodCharVal = val;
+					goodChars++;
+				}
+			}
+
+			// in cases of an incomplete final chunk, ensure the unused bits are zero
+			switch (goodChars % 4) {
+				case 0:
+					return true;
+				case 2:
+					return (lastGoodCharVal & 0b1111) == 0;
+				case 3:
+					return (lastGoodCharVal & 0b11) == 0;
+				default:
+					return false;
+			}
+		}
+
+		void checkAcceptable(String ins) {
+			if (!isAcceptable(ins)) {
+				throw new IllegalArgumentException("Unaccepted Encoding");
+			}
+		}
+
 	}
 
 }

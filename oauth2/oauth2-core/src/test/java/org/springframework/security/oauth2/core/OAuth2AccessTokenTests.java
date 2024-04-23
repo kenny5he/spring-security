@@ -21,7 +21,7 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.util.SerializationUtils;
 
@@ -53,13 +53,13 @@ public class OAuth2AccessTokenTests {
 	@Test
 	public void constructorWhenTokenTypeIsNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new OAuth2AccessToken(null, TOKEN_VALUE, ISSUED_AT, EXPIRES_AT));
+			.isThrownBy(() -> new OAuth2AccessToken(null, TOKEN_VALUE, ISSUED_AT, EXPIRES_AT));
 	}
 
 	@Test
 	public void constructorWhenTokenValueIsNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new OAuth2AccessToken(TOKEN_TYPE, null, ISSUED_AT, EXPIRES_AT));
+			.isThrownBy(() -> new OAuth2AccessToken(TOKEN_TYPE, null, ISSUED_AT, EXPIRES_AT));
 	}
 
 	@Test

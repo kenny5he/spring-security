@@ -19,7 +19,7 @@ package org.springframework.security.oauth2.client.userinfo;
 import java.util.Arrays;
 import java.util.Collections;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.oauth2.core.user.OAuth2User;
 
@@ -44,7 +44,7 @@ public class DelegatingOAuth2UserServiceTests {
 	@Test
 	public void constructorWhenUserServicesIsEmptyThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new DelegatingOAuth2UserService<>(Collections.emptyList()));
+			.isThrownBy(() -> new DelegatingOAuth2UserService<>(Collections.emptyList()));
 	}
 
 	@Test

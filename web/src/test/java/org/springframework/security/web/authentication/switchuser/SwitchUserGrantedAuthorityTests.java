@@ -16,7 +16,7 @@
 
 package org.springframework.security.web.authentication.switchuser;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
@@ -29,13 +29,13 @@ public class SwitchUserGrantedAuthorityTests {
 	@Test
 	public void authorityWithNullRoleFailsAssertion() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new SwitchUserGrantedAuthority(null, null))
-				.withMessage("role cannot be null");
+			.withMessage("role cannot be null");
 	}
 
 	@Test
 	public void authorityWithNullSourceFailsAssertion() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new SwitchUserGrantedAuthority("role", null))
-				.withMessage("source cannot be null");
+			.withMessage("source cannot be null");
 	}
 
 }

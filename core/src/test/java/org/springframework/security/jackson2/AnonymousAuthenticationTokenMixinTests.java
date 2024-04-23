@@ -21,7 +21,7 @@ import java.io.IOException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import org.json.JSONException;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.skyscreamer.jsonassert.JSONAssert;
 
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -71,7 +71,7 @@ public class AnonymousAuthenticationTokenMixinTests extends AbstractMixinTests {
 				+ "\"principal\": \"user\", \"authenticated\": true, \"keyHash\": " + HASH_KEY.hashCode() + ","
 				+ "\"authorities\": [\"java.util.ArrayList\", []]}";
 		assertThatExceptionOfType(JsonMappingException.class)
-				.isThrownBy(() -> this.mapper.readValue(jsonString, AnonymousAuthenticationToken.class));
+			.isThrownBy(() -> this.mapper.readValue(jsonString, AnonymousAuthenticationToken.class));
 	}
 
 	@Test

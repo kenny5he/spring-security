@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +16,17 @@
 
 package org.springframework.security.integration.python;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 @ContextConfiguration(locations = { "/python-method-access-app-context.xml" })
-@RunWith(SpringJUnit4ClassRunner.class)
+@ExtendWith(SpringExtension.class)
 public class PythonInterpreterBasedSecurityTests {
 
 	@Autowired
@@ -35,7 +35,7 @@ public class PythonInterpreterBasedSecurityTests {
 	@Test
 	public void serviceMethod() {
 		SecurityContextHolder.getContext()
-				.setAuthentication(new UsernamePasswordAuthenticationToken("bob", "bobspassword"));
+			.setAuthentication(UsernamePasswordAuthenticationToken.unauthenticated("bob", "bobspassword"));
 
 		// for (int i=0; i < 1000; i++) {
 		this.service.someMethod();

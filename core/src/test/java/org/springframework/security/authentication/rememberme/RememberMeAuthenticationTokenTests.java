@@ -19,7 +19,7 @@ package org.springframework.security.authentication.rememberme;
 import java.util.Arrays;
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.authentication.RememberMeAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -41,10 +41,10 @@ public class RememberMeAuthenticationTokenTests {
 	@Test
 	public void testConstructorRejectsNulls() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new RememberMeAuthenticationToken(null, "Test", ROLES_12));
+			.isThrownBy(() -> new RememberMeAuthenticationToken(null, "Test", ROLES_12));
 		assertThatIllegalArgumentException().isThrownBy(() -> new RememberMeAuthenticationToken("key", null, ROLES_12));
-		assertThatIllegalArgumentException().isThrownBy(
-				() -> new RememberMeAuthenticationToken("key", "Test", Arrays.asList((GrantedAuthority) null)));
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> new RememberMeAuthenticationToken("key", "Test", Arrays.asList((GrantedAuthority) null)));
 	}
 
 	@Test
@@ -76,8 +76,8 @@ public class RememberMeAuthenticationTokenTests {
 	@Test
 	public void testNotEqualsDueToDifferentAuthenticationClass() {
 		RememberMeAuthenticationToken token1 = new RememberMeAuthenticationToken("key", "Test", ROLES_12);
-		UsernamePasswordAuthenticationToken token2 = new UsernamePasswordAuthenticationToken("Test", "Password",
-				ROLES_12);
+		UsernamePasswordAuthenticationToken token2 = UsernamePasswordAuthenticationToken.authenticated("Test",
+				"Password", ROLES_12);
 		assertThat(token1.equals(token2)).isFalse();
 	}
 

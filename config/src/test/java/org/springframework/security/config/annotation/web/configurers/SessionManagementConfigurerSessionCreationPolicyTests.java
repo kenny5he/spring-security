@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,18 @@
 
 package org.springframework.security.config.annotation.web.configurers;
 
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,13 +40,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * @author Josh Cummings
  */
+@ExtendWith(SpringTestContextExtension.class)
 public class SessionManagementConfigurerSessionCreationPolicyTests {
 
 	@Autowired
 	MockMvc mvc;
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Test
 	public void getWhenSharedObjectSessionCreationPolicyConfigurationThenOverrides() throws Exception {
@@ -70,34 +73,37 @@ public class SessionManagementConfigurerSessionCreationPolicyTests {
 		assertThat(result.getRequest().getSession(false)).isNotNull();
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class StatelessCreateSessionSharedObjectConfig extends WebSecurityConfigurerAdapter {
+	static class StatelessCreateSessionSharedObjectConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
-			super.configure(http);
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			http.setSharedObject(SessionCreationPolicy.class, SessionCreationPolicy.STATELESS);
+			return http.build();
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class StatelessCreateSessionUserConfig extends WebSecurityConfigurerAdapter {
+	static class StatelessCreateSessionUserConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
-			super.configure(http);
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 					.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
 			// @formatter:on
 			http.setSharedObject(SessionCreationPolicy.class, SessionCreationPolicy.ALWAYS);
+			return http.build();
 		}
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class DefaultConfig extends WebSecurityConfigurerAdapter {
+	static class DefaultConfig {
 
 	}
 

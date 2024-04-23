@@ -16,11 +16,11 @@
 
 package org.springframework.security.oauth2.client.authentication;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 
 import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
@@ -46,7 +46,7 @@ import static org.mockito.BDDMockito.given;
  * @author Rob Winch
  * @since 5.1
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class OAuth2AuthorizationCodeReactiveAuthenticationManagerTests {
 
 	@Mock
@@ -62,7 +62,7 @@ public class OAuth2AuthorizationCodeReactiveAuthenticationManagerTests {
 
 	private OAuth2AccessTokenResponse.Builder tokenResponse = TestOAuth2AccessTokenResponses.accessTokenResponse();
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.manager = new OAuth2AuthorizationCodeReactiveAuthenticationManager(this.accessTokenResponseClient);
 	}
@@ -70,13 +70,13 @@ public class OAuth2AuthorizationCodeReactiveAuthenticationManagerTests {
 	@Test
 	public void authenticateWhenErrorThenOAuth2AuthorizationException() {
 		this.authorizationResponse = TestOAuth2AuthorizationResponses.error();
-		assertThatExceptionOfType(OAuth2AuthorizationException.class).isThrownBy(() -> authenticate());
+		assertThatExceptionOfType(OAuth2AuthorizationException.class).isThrownBy(this::authenticate);
 	}
 
 	@Test
 	public void authenticateWhenStateNotEqualThenOAuth2AuthorizationException() {
 		this.authorizationRequest.state("notequal");
-		assertThatExceptionOfType(OAuth2AuthorizationException.class).isThrownBy(() -> authenticate());
+		assertThatExceptionOfType(OAuth2AuthorizationException.class).isThrownBy(this::authenticate);
 	}
 
 	@Test
@@ -96,7 +96,7 @@ public class OAuth2AuthorizationCodeReactiveAuthenticationManagerTests {
 	@Test
 	public void authenticateWhenOAuth2AuthorizationExceptionThenOAuth2AuthorizationException() {
 		given(this.accessTokenResponseClient.getTokenResponse(any()))
-				.willReturn(Mono.error(() -> new OAuth2AuthorizationException(new OAuth2Error("error"))));
+			.willReturn(Mono.error(() -> new OAuth2AuthorizationException(new OAuth2Error("error"))));
 		assertThatExceptionOfType(OAuth2AuthorizationException.class).isThrownBy(() -> authenticate());
 	}
 

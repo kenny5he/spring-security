@@ -16,8 +16,8 @@
 
 package org.springframework.security.config.method;
 
-import org.junit.After;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.security.access.AccessDeniedException;
@@ -41,7 +41,7 @@ public class Sec2196Tests {
 		loadContext("<global-method-security secured-annotations=\"enabled\" pre-post-annotations=\"enabled\"/>"
 				+ "<b:bean class='" + Service.class.getName() + "'/>");
 		SecurityContextHolder.getContext()
-				.setAuthentication(new TestingAuthenticationToken("test", "pass", "ROLE_USER"));
+			.setAuthentication(new TestingAuthenticationToken("test", "pass", "ROLE_USER"));
 		Service service = this.context.getBean(Service.class);
 		assertThatExceptionOfType(AccessDeniedException.class).isThrownBy(() -> service.save(new User()));
 	}
@@ -51,7 +51,7 @@ public class Sec2196Tests {
 		loadContext("<global-method-security secured-annotations=\"enabled\" pre-post-annotations=\"enabled\"/>"
 				+ "<b:bean class='" + Service.class.getName() + "'/>");
 		SecurityContextHolder.getContext()
-				.setAuthentication(new TestingAuthenticationToken("test", "pass", "saveUsers"));
+			.setAuthentication(new TestingAuthenticationToken("test", "pass", "saveUsers"));
 		Service service = this.context.getBean(Service.class);
 		service.save(new User());
 	}
@@ -60,7 +60,7 @@ public class Sec2196Tests {
 		this.context = new InMemoryXmlApplicationContext(context);
 	}
 
-	@After
+	@AfterEach
 	public void closeAppContext() {
 		if (this.context != null) {
 			this.context.close();

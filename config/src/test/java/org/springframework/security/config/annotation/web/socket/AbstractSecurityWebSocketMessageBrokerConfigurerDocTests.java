@@ -18,9 +18,9 @@ package org.springframework.security.config.annotation.web.socket;
 
 import java.util.HashMap;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -41,9 +41,9 @@ import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.DefaultCsrfToken;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
-import org.springframework.web.socket.config.annotation.AbstractWebSocketMessageBrokerConfigurer;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
+import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
@@ -57,14 +57,14 @@ public class AbstractSecurityWebSocketMessageBrokerConfigurerDocTests {
 
 	String sessionAttr;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.token = new DefaultCsrfToken("header", "param", "token");
 		this.sessionAttr = "sessionAttr";
 		this.messageUser = new TestingAuthenticationToken("user", "pass", "ROLE_USER");
 	}
 
-	@After
+	@AfterEach
 	public void cleanup() {
 		if (this.context != null) {
 			this.context.close();
@@ -76,8 +76,8 @@ public class AbstractSecurityWebSocketMessageBrokerConfigurerDocTests {
 		loadConfig(WebSocketSecurityConfig.class);
 		clientInboundChannel().send(message("/user/queue/errors", SimpMessageType.SUBSCRIBE));
 		assertThatExceptionOfType(MessageDeliveryException.class)
-				.isThrownBy(() -> clientInboundChannel().send(message("/denyAll", SimpMessageType.MESSAGE)))
-				.withCauseInstanceOf(AccessDeniedException.class);
+			.isThrownBy(() -> clientInboundChannel().send(message("/denyAll", SimpMessageType.MESSAGE)))
+			.withCauseInstanceOf(AccessDeniedException.class);
 	}
 
 	private void loadConfig(Class<?>... configs) {
@@ -124,22 +124,28 @@ public class AbstractSecurityWebSocketMessageBrokerConfigurerDocTests {
 
 		@Override
 		protected void configureInbound(MessageSecurityMetadataSourceRegistry messages) {
-			messages.nullDestMatcher().authenticated()
-					// <1>
-					.simpSubscribeDestMatchers("/user/queue/errors").permitAll()
-					// <2>
-					.simpDestMatchers("/app/**").hasRole("USER")
-					// <3>
-					.simpSubscribeDestMatchers("/user/**", "/topic/friends/*").hasRole("USER") // <4>
-					.simpTypeMatchers(SimpMessageType.MESSAGE, SimpMessageType.SUBSCRIBE).denyAll() // <5>
-					.anyMessage().denyAll(); // <6>
+			messages.nullDestMatcher()
+				.authenticated()
+				// <1>
+				.simpSubscribeDestMatchers("/user/queue/errors")
+				.permitAll()
+				// <2>
+				.simpDestMatchers("/app/**")
+				.hasRole("USER")
+				// <3>
+				.simpSubscribeDestMatchers("/user/**", "/topic/friends/*")
+				.hasRole("USER") // <4>
+				.simpTypeMatchers(SimpMessageType.MESSAGE, SimpMessageType.SUBSCRIBE)
+				.denyAll() // <5>
+				.anyMessage()
+				.denyAll(); // <6>
 		}
 
 	}
 
 	@Configuration
 	@EnableWebSocketMessageBroker
-	static class WebSocketConfig extends AbstractWebSocketMessageBrokerConfigurer {
+	static class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
 		@Override
 		public void registerStompEndpoints(StompEndpointRegistry registry) {

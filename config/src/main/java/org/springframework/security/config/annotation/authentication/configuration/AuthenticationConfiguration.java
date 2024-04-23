@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.log.LogMessage;
 import org.springframework.security.authentication.AuthenticationEventPublisher;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DefaultAuthenticationEventPublisher;
 import org.springframework.security.config.annotation.ObjectPostProcessor;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.authentication.configurers.provisioning.InMemoryUserDetailsManagerConfigurer;
@@ -79,8 +80,7 @@ public class AuthenticationConfiguration {
 	public AuthenticationManagerBuilder authenticationManagerBuilder(ObjectPostProcessor<Object> objectPostProcessor,
 			ApplicationContext context) {
 		LazyPasswordEncoder defaultPasswordEncoder = new LazyPasswordEncoder(context);
-		AuthenticationEventPublisher authenticationEventPublisher = getBeanOrNull(context,
-				AuthenticationEventPublisher.class);
+		AuthenticationEventPublisher authenticationEventPublisher = getAuthenticationEventPublisher(context);
 		DefaultPasswordEncoderAuthenticationManagerBuilder result = new DefaultPasswordEncoderAuthenticationManagerBuilder(
 				objectPostProcessor, defaultPasswordEncoder);
 		if (authenticationEventPublisher != null) {
@@ -142,6 +142,13 @@ public class AuthenticationConfiguration {
 		this.objectPostProcessor = objectPostProcessor;
 	}
 
+	private AuthenticationEventPublisher getAuthenticationEventPublisher(ApplicationContext context) {
+		if (context.getBeanNamesForType(AuthenticationEventPublisher.class).length > 0) {
+			return context.getBean(AuthenticationEventPublisher.class);
+		}
+		return this.objectPostProcessor.postProcess(new DefaultAuthenticationEventPublisher());
+	}
+
 	@SuppressWarnings("unchecked")
 	private <T> T lazyBean(Class<T> interfaceName) {
 		LazyInitTargetSource lazyTargetSource = new LazyInitTargetSource();
@@ -177,8 +184,9 @@ public class AuthenticationConfiguration {
 			return Collections.emptyList();
 		}
 		for (String beanName : beanNamesForType) {
-			if (((ConfigurableApplicationContext) this.applicationContext).getBeanFactory().getBeanDefinition(beanName)
-					.isPrimary()) {
+			if (((ConfigurableApplicationContext) this.applicationContext).getBeanFactory()
+				.getBeanDefinition(beanName)
+				.isPrimary()) {
 				list.add(beanName);
 			}
 		}
@@ -211,7 +219,7 @@ public class AuthenticationConfiguration {
 		@Override
 		public void init(AuthenticationManagerBuilder auth) {
 			Map<String, Object> beansWithAnnotation = this.context
-					.getBeansWithAnnotation(EnableGlobalAuthentication.class);
+				.getBeansWithAnnotation(EnableGlobalAuthentication.class);
 			if (logger.isTraceEnabled()) {
 				logger.trace(LogMessage.format("Eagerly initializing %s", beansWithAnnotation));
 			}

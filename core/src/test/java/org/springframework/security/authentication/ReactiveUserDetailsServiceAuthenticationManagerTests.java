@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,11 @@
 
 package org.springframework.security.authentication;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -41,7 +41,7 @@ import static org.mockito.BDDMockito.given;
  * @author Rob Winch
  * @since 5.0
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class ReactiveUserDetailsServiceAuthenticationManagerTests {
 
 	@Mock
@@ -56,7 +56,7 @@ public class ReactiveUserDetailsServiceAuthenticationManagerTests {
 
 	String password;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.manager = new UserDetailsRepositoryReactiveAuthenticationManager(this.repository);
 		this.username = "user";
@@ -66,13 +66,13 @@ public class ReactiveUserDetailsServiceAuthenticationManagerTests {
 	@Test
 	public void constructorNullUserDetailsService() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new UserDetailsRepositoryReactiveAuthenticationManager(null));
+			.isThrownBy(() -> new UserDetailsRepositoryReactiveAuthenticationManager(null));
 	}
 
 	@Test
 	public void authenticateWhenUserNotFoundThenBadCredentials() {
 		given(this.repository.findByUsername(this.username)).willReturn(Mono.empty());
-		UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(this.username,
+		UsernamePasswordAuthenticationToken token = UsernamePasswordAuthenticationToken.unauthenticated(this.username,
 				this.password);
 		Mono<Authentication> authentication = this.manager.authenticate(token);
 		// @formatter:off
@@ -91,7 +91,7 @@ public class ReactiveUserDetailsServiceAuthenticationManagerTests {
 			.build();
 		// @formatter:on
 		given(this.repository.findByUsername(user.getUsername())).willReturn(Mono.just(user));
-		UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(this.username,
+		UsernamePasswordAuthenticationToken token = UsernamePasswordAuthenticationToken.unauthenticated(this.username,
 				this.password + "INVALID");
 		Mono<Authentication> authentication = this.manager.authenticate(token);
 		// @formatter:off
@@ -110,7 +110,7 @@ public class ReactiveUserDetailsServiceAuthenticationManagerTests {
 			.build();
 		// @formatter:on
 		given(this.repository.findByUsername(user.getUsername())).willReturn(Mono.just(user));
-		UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(this.username,
+		UsernamePasswordAuthenticationToken token = UsernamePasswordAuthenticationToken.unauthenticated(this.username,
 				this.password);
 		Authentication authentication = this.manager.authenticate(token).block();
 		assertThat(authentication).isEqualTo(authentication);
@@ -122,7 +122,7 @@ public class ReactiveUserDetailsServiceAuthenticationManagerTests {
 		given(this.passwordEncoder.matches(any(), any())).willReturn(true);
 		User user = new User(this.username, this.password, AuthorityUtils.createAuthorityList("ROLE_USER"));
 		given(this.repository.findByUsername(user.getUsername())).willReturn(Mono.just(user));
-		UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(this.username,
+		UsernamePasswordAuthenticationToken token = UsernamePasswordAuthenticationToken.unauthenticated(this.username,
 				this.password);
 		Authentication authentication = this.manager.authenticate(token).block();
 		assertThat(authentication).isEqualTo(authentication);
@@ -134,7 +134,7 @@ public class ReactiveUserDetailsServiceAuthenticationManagerTests {
 		given(this.passwordEncoder.matches(any(), any())).willReturn(false);
 		User user = new User(this.username, this.password, AuthorityUtils.createAuthorityList("ROLE_USER"));
 		given(this.repository.findByUsername(user.getUsername())).willReturn(Mono.just(user));
-		UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(this.username,
+		UsernamePasswordAuthenticationToken token = UsernamePasswordAuthenticationToken.unauthenticated(this.username,
 				this.password);
 		Mono<Authentication> authentication = this.manager.authenticate(token);
 		// @formatter:off

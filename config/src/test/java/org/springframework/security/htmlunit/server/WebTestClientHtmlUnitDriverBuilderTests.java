@@ -19,7 +19,7 @@ package org.springframework.security.htmlunit.server;
 import java.net.URI;
 import java.time.Duration;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.openqa.selenium.WebDriver;
 import reactor.core.publisher.Mono;
 
@@ -74,7 +74,7 @@ public class WebTestClientHtmlUnitDriverBuilderTests {
 	class HelloWorldController {
 
 		@ResponseBody
-		@GetMapping(produces = MediaType.TEXT_HTML_VALUE)
+		@GetMapping(path = "/", produces = MediaType.TEXT_HTML_VALUE)
 		String index() {
 			// @formatter:off
 			return "<html>\n"

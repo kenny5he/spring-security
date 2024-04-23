@@ -21,7 +21,7 @@ import java.io.IOException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import org.json.JSONException;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.skyscreamer.jsonassert.JSONAssert;
 
 import org.springframework.security.web.jackson2.AbstractMixinTests;
@@ -64,14 +64,14 @@ public class DefaultCsrfServerTokenMixinTests extends AbstractMixinTests {
 	public void defaultCsrfTokenDeserializeWithoutClassTest() throws IOException {
 		String tokenJson = "{\"headerName\": \"csrf-header\", \"parameterName\": \"_csrf\", \"token\": \"1\"}";
 		assertThatExceptionOfType(JsonMappingException.class)
-				.isThrownBy(() -> this.mapper.readValue(tokenJson, DefaultCsrfToken.class));
+			.isThrownBy(() -> this.mapper.readValue(tokenJson, DefaultCsrfToken.class));
 	}
 
 	@Test
 	public void defaultCsrfTokenDeserializeNullValuesTest() throws IOException {
 		String tokenJson = "{\"@class\": \"org.springframework.security.web.server.csrf.DefaultCsrfToken\", \"headerName\": \"\", \"parameterName\": null, \"token\": \"1\"}";
 		assertThatExceptionOfType(JsonMappingException.class)
-				.isThrownBy(() -> this.mapper.readValue(tokenJson, DefaultCsrfToken.class));
+			.isThrownBy(() -> this.mapper.readValue(tokenJson, DefaultCsrfToken.class));
 	}
 
 }

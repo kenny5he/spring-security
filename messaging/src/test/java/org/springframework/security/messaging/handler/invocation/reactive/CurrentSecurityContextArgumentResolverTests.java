@@ -19,7 +19,7 @@ package org.springframework.security.messaging.handler.invocation.reactive;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
 import org.springframework.core.MethodParameter;
@@ -47,9 +47,27 @@ public class CurrentSecurityContextArgumentResolverTests {
 	}
 
 	@Test
+	public void supportsParameterWhenMonoSecurityContextNoAnnotationThenTrue() {
+		assertThat(this.resolver.supportsParameter(arg0("currentSecurityContextOnMonoSecurityContextNoAnnotation")))
+			.isTrue();
+	}
+
+	@Test
+	public void supportsParameterWhenMonoCustomSecurityContextNoAnnotationThenTrue() {
+		assertThat(
+				this.resolver.supportsParameter(arg0("currentCustomSecurityContextOnMonoSecurityContextNoAnnotation")))
+			.isTrue();
+	}
+
+	@Test
+	public void supportsParameterWhenNoSecurityContextNoAnnotationThenFalse() {
+		assertThat(this.resolver.supportsParameter(arg0("currentSecurityContextOnMonoStringNoAnnotation"))).isFalse();
+	}
+
+	@Test
 	public void resolveArgumentWhenAuthenticationPrincipalAndEmptyContextThenNull() {
 		Object result = this.resolver.resolveArgument(arg0("currentSecurityContextOnMonoSecurityContext"), null)
-				.block();
+			.block();
 		assertThat(result).isNull();
 	}
 
@@ -57,13 +75,26 @@ public class CurrentSecurityContextArgumentResolverTests {
 	public void resolveArgumentWhenAuthenticationPrincipalThenFound() {
 		Authentication authentication = TestAuthentication.authenticatedUser();
 		Mono<SecurityContext> result = (Mono<SecurityContext>) this.resolver
-				.resolveArgument(arg0("currentSecurityContextOnMonoSecurityContext"), null)
-				.subscriberContext(ReactiveSecurityContextHolder.withAuthentication(authentication)).block();
+			.resolveArgument(arg0("currentSecurityContextOnMonoSecurityContext"), null)
+			.contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication))
+			.block();
 		assertThat(result.block().getAuthentication()).isEqualTo(authentication);
 	}
 
 	@SuppressWarnings("unused")
 	private void currentSecurityContextOnMonoSecurityContext(@CurrentSecurityContext Mono<SecurityContext> context) {
+	}
+
+	@SuppressWarnings("unused")
+	private void currentSecurityContextOnMonoSecurityContextNoAnnotation(Mono<SecurityContext> context) {
+	}
+
+	@SuppressWarnings("unused")
+	private void currentCustomSecurityContextOnMonoSecurityContextNoAnnotation(Mono<CustomSecurityContext> context) {
+	}
+
+	@SuppressWarnings("unused")
+	private void currentSecurityContextOnMonoStringNoAnnotation(Mono<String> context) {
 	}
 
 	@Test
@@ -75,8 +106,9 @@ public class CurrentSecurityContextArgumentResolverTests {
 	public void resolveArgumentWhenMonoAndAuthenticationPrincipalThenFound() {
 		Authentication authentication = TestAuthentication.authenticatedUser();
 		Mono<UserDetails> result = (Mono<UserDetails>) this.resolver
-				.resolveArgument(arg0("currentUserOnMonoUserDetails"), null)
-				.subscriberContext(ReactiveSecurityContextHolder.withAuthentication(authentication)).block();
+			.resolveArgument(arg0("currentUserOnMonoUserDetails"), null)
+			.contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication))
+			.block();
 		assertThat(result.block()).isEqualTo(authentication.getPrincipal());
 	}
 
@@ -88,8 +120,9 @@ public class CurrentSecurityContextArgumentResolverTests {
 	public void resolveArgumentWhenExpressionThenFound() {
 		Authentication authentication = TestAuthentication.authenticatedUser();
 		Mono<String> result = (Mono<String>) this.resolver
-				.resolveArgument(arg0("authenticationPrincipalExpression"), null)
-				.subscriberContext(ReactiveSecurityContextHolder.withAuthentication(authentication)).block();
+			.resolveArgument(arg0("authenticationPrincipalExpression"), null)
+			.contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication))
+			.block();
 		assertThat(result.block()).isEqualTo(authentication.getName());
 	}
 
@@ -107,6 +140,41 @@ public class CurrentSecurityContextArgumentResolverTests {
 	private void monoUserDetails(Mono<UserDetails> user) {
 	}
 
+	@Test
+	public void supportsParameterWhenSecurityContextNotAnnotatedThenTrue() {
+		assertThat(this.resolver.supportsParameter(arg0("monoSecurityContext"))).isTrue();
+	}
+
+	@Test
+	public void resolveArgumentWhenMonoSecurityContextNoAnnotationThenFound() {
+		Authentication authentication = TestAuthentication.authenticatedUser();
+		Mono<SecurityContext> result = (Mono<SecurityContext>) this.resolver
+			.resolveArgument(arg0("monoSecurityContext"), null)
+			.contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication))
+			.block();
+		assertThat(result.block().getAuthentication().getPrincipal()).isEqualTo(authentication.getPrincipal());
+	}
+
+	@SuppressWarnings("unused")
+	private void monoSecurityContext(Mono<SecurityContext> securityContext) {
+	}
+
+	@Test
+	public void resolveArgumentWhenMonoCustomSecurityContextNoAnnotationThenFound() {
+		Authentication authentication = TestAuthentication.authenticatedUser();
+		CustomSecurityContext securityContext = new CustomSecurityContext();
+		securityContext.setAuthentication(authentication);
+		Mono<CustomSecurityContext> result = (Mono<CustomSecurityContext>) this.resolver
+			.resolveArgument(arg0("monoCustomSecurityContext"), null)
+			.contextWrite(ReactiveSecurityContextHolder.withSecurityContext(Mono.just(securityContext)))
+			.block();
+		assertThat(result.block().getAuthentication().getPrincipal()).isEqualTo(authentication.getPrincipal());
+	}
+
+	@SuppressWarnings("unused")
+	private void monoCustomSecurityContext(Mono<CustomSecurityContext> securityContext) {
+	}
+
 	private MethodParameter arg0(String methodName) {
 		ResolvableMethod method = ResolvableMethod.on(getClass()).named(methodName).method();
 		return new SynthesizingMethodParameter(method.method(), 0);
@@ -115,6 +183,22 @@ public class CurrentSecurityContextArgumentResolverTests {
 	@CurrentSecurityContext(expression = "authentication?.principal")
 	@Retention(RetentionPolicy.RUNTIME)
 	@interface CurrentUser {
+
+	}
+
+	static class CustomSecurityContext implements SecurityContext {
+
+		private Authentication authentication;
+
+		@Override
+		public Authentication getAuthentication() {
+			return this.authentication;
+		}
+
+		@Override
+		public void setAuthentication(Authentication authentication) {
+			this.authentication = authentication;
+		}
 
 	}
 

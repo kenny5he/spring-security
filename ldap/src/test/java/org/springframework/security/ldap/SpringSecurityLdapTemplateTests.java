@@ -21,12 +21,12 @@ import javax.naming.directory.DirContext;
 import javax.naming.directory.SearchControls;
 import javax.naming.directory.SearchResult;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.ldap.core.DirContextAdapter;
 import org.springframework.ldap.core.DistinguishedName;
@@ -37,7 +37,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class SpringSecurityLdapTemplateTests {
 
 	@Mock
@@ -61,7 +61,7 @@ public class SpringSecurityLdapTemplateTests {
 		Object[] params = new Object[] {};
 		DirContextAdapter searchResultObject = mock(DirContextAdapter.class);
 		given(this.ctx.search(any(DistinguishedName.class), eq(filter), eq(params), this.searchControls.capture()))
-				.willReturn(this.resultsEnum);
+			.willReturn(this.resultsEnum);
 		given(this.resultsEnum.hasMore()).willReturn(true, false);
 		given(this.resultsEnum.next()).willReturn(this.searchResult);
 		given(this.searchResult.getObject()).willReturn(searchResultObject);

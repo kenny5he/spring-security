@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,10 +21,10 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.function.Function;
 
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.core.log.LogMessage;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -73,7 +73,7 @@ public class DefaultLogoutPageGeneratingFilter extends OncePerRequestFilter {
 				+ "rel=\"stylesheet\" integrity=\"sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M\" "
 				+ "crossorigin=\"anonymous\">\n");
 		sb.append("    <link href=\"https://getbootstrap.com/docs/4.0/examples/signin/signin.css\" "
-				+ "rel=\"stylesheet\" crossorigin=\"anonymous\"/>\n");
+				+ "rel=\"stylesheet\" integrity=\"sha384-oOE/3m0LUMPub4kaC09mrdEhIc+e3exm4xOGxAmuFXhBNF4hcg/6MiAXAf5p0P56\" crossorigin=\"anonymous\"/>\n");
 		sb.append("  </head>\n");
 		sb.append("  <body>\n");
 		sb.append("     <div class=\"container\">\n");

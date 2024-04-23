@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 the original author or authors.
+ * Copyright 2019-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,12 +55,13 @@ import org.springframework.security.rsocket.util.matcher.RoutePayloadExchangeMat
  * A minimal example can be found below:
  *
  * <pre class="code">
+ * &#064;Configuration
  * &#064;EnableRSocketSecurity
  * public class SecurityConfig {
  *     &#064;Bean
  *     PayloadSocketAcceptorInterceptor rsocketInterceptor(RSocketSecurity rsocket) {
  *         rsocket
- *             .authorizePayload((authorize) ->
+ *             .authorizePayload((authorize) -&gt;
  *                 authorize
  *                     .anyRequest().authenticated()
  *             );
@@ -82,12 +83,13 @@ import org.springframework.security.rsocket.util.matcher.RoutePayloadExchangeMat
  * A more advanced configuration can be seen below:
  *
  * <pre class="code">
+ * &#064;Configuration
  * &#064;EnableRSocketSecurity
  * public class SecurityConfig {
  *     &#064;Bean
  *     PayloadSocketAcceptorInterceptor rsocketInterceptor(RSocketSecurity rsocket) {
  *         rsocket
- *             .authorizePayload((authorize) ->
+ *             .authorizePayload((authorize) -&gt;
  *                 authorize
  *                     // must have ROLE_SETUP to make connection
  *                     .setup().hasRole("SETUP")
@@ -351,7 +353,7 @@ public class RSocketSecurity {
 	public class AuthorizePayloadsSpec {
 
 		private PayloadExchangeMatcherReactiveAuthorizationManager.Builder authzBuilder = PayloadExchangeMatcherReactiveAuthorizationManager
-				.builder();
+			.builder();
 
 		public Access setup() {
 			return matcher(PayloadExchangeMatchers.setup());
@@ -427,7 +429,7 @@ public class RSocketSecurity {
 			public AuthorizePayloadsSpec access(
 					ReactiveAuthorizationManager<PayloadExchangeAuthorizationContext> authorization) {
 				AuthorizePayloadsSpec.this.authzBuilder
-						.add(new PayloadExchangeMatcherEntry<>(this.matcher, authorization));
+					.add(new PayloadExchangeMatcherEntry<>(this.matcher, authorization));
 				return AuthorizePayloadsSpec.this;
 			}
 

@@ -20,13 +20,13 @@ import java.security.SecureRandom;
 import java.util.UUID;
 
 import org.bouncycastle.util.Arrays;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.crypto.codec.Hex;
 import org.springframework.security.crypto.keygen.KeyGenerators;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 public class BouncyCastleAesBytesEncryptorTests {
@@ -37,7 +37,7 @@ public class BouncyCastleAesBytesEncryptorTests {
 
 	private String salt;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		// generate random password, salt, and test data
 		SecureRandom secureRandom = new SecureRandom();
@@ -64,11 +64,11 @@ public class BouncyCastleAesBytesEncryptorTests {
 	private void generatesDifferentCipherTexts(BytesEncryptor bcEncryptor) {
 		byte[] encrypted1 = bcEncryptor.encrypt(this.testData);
 		byte[] encrypted2 = bcEncryptor.encrypt(this.testData);
-		Assert.assertFalse(Arrays.areEqual(encrypted1, encrypted2));
+		assertThat(Arrays.areEqual(encrypted1, encrypted2)).isFalse();
 		byte[] decrypted1 = bcEncryptor.decrypt(encrypted1);
 		byte[] decrypted2 = bcEncryptor.decrypt(encrypted2);
-		Assert.assertArrayEquals(this.testData, decrypted1);
-		Assert.assertArrayEquals(this.testData, decrypted2);
+		assertThat(decrypted1).containsExactly(this.testData);
+		assertThat(decrypted2).containsExactly(this.testData);
 	}
 
 	@Test

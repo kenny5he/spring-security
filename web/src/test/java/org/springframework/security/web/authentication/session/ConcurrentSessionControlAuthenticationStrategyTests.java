@@ -20,11 +20,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -46,7 +46,7 @@ import static org.mockito.BDDMockito.given;
  * @author Rob Winch
  *
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class ConcurrentSessionControlAuthenticationStrategyTests {
 
 	@Mock
@@ -62,7 +62,7 @@ public class ConcurrentSessionControlAuthenticationStrategyTests {
 
 	private ConcurrentSessionControlAuthenticationStrategy strategy;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.authentication = new TestingAuthenticationToken("user", "password", "ROLE_USER");
 		this.request = new MockHttpServletRequest();
@@ -80,7 +80,7 @@ public class ConcurrentSessionControlAuthenticationStrategyTests {
 	@Test
 	public void noRegisteredSession() {
 		given(this.sessionRegistry.getAllSessions(any(), anyBoolean()))
-				.willReturn(Collections.<SessionInformation>emptyList());
+			.willReturn(Collections.<SessionInformation>emptyList());
 		this.strategy.setMaximumSessions(1);
 		this.strategy.setExceptionIfMaximumExceeded(true);
 		this.strategy.onAuthentication(this.authentication, this.request, this.response);
@@ -92,7 +92,7 @@ public class ConcurrentSessionControlAuthenticationStrategyTests {
 		MockHttpSession session = new MockHttpSession(new MockServletContext(), this.sessionInformation.getSessionId());
 		this.request.setSession(session);
 		given(this.sessionRegistry.getAllSessions(any(), anyBoolean()))
-				.willReturn(Collections.<SessionInformation>singletonList(this.sessionInformation));
+			.willReturn(Collections.<SessionInformation>singletonList(this.sessionInformation));
 		this.strategy.setMaximumSessions(1);
 		this.strategy.setExceptionIfMaximumExceeded(true);
 		this.strategy.onAuthentication(this.authentication, this.request, this.response);
@@ -102,17 +102,17 @@ public class ConcurrentSessionControlAuthenticationStrategyTests {
 	@Test
 	public void maxSessionsWithException() {
 		given(this.sessionRegistry.getAllSessions(any(), anyBoolean()))
-				.willReturn(Collections.<SessionInformation>singletonList(this.sessionInformation));
+			.willReturn(Collections.<SessionInformation>singletonList(this.sessionInformation));
 		this.strategy.setMaximumSessions(1);
 		this.strategy.setExceptionIfMaximumExceeded(true);
 		assertThatExceptionOfType(SessionAuthenticationException.class)
-				.isThrownBy(() -> this.strategy.onAuthentication(this.authentication, this.request, this.response));
+			.isThrownBy(() -> this.strategy.onAuthentication(this.authentication, this.request, this.response));
 	}
 
 	@Test
 	public void maxSessionsExpireExistingUser() {
 		given(this.sessionRegistry.getAllSessions(any(), anyBoolean()))
-				.willReturn(Collections.<SessionInformation>singletonList(this.sessionInformation));
+			.willReturn(Collections.<SessionInformation>singletonList(this.sessionInformation));
 		this.strategy.setMaximumSessions(1);
 		this.strategy.onAuthentication(this.authentication, this.request, this.response);
 		assertThat(this.sessionInformation.isExpired()).isTrue();
@@ -123,7 +123,7 @@ public class ConcurrentSessionControlAuthenticationStrategyTests {
 		SessionInformation moreRecentSessionInfo = new SessionInformation(this.authentication.getPrincipal(), "unique",
 				new Date(1374766999999L));
 		given(this.sessionRegistry.getAllSessions(any(), anyBoolean()))
-				.willReturn(Arrays.<SessionInformation>asList(moreRecentSessionInfo, this.sessionInformation));
+			.willReturn(Arrays.<SessionInformation>asList(moreRecentSessionInfo, this.sessionInformation));
 		this.strategy.setMaximumSessions(2);
 		this.strategy.onAuthentication(this.authentication, this.request, this.response);
 		assertThat(this.sessionInformation.isExpired()).isTrue();

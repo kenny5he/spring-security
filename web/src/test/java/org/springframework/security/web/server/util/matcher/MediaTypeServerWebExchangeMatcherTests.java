@@ -19,7 +19,7 @@ package org.springframework.security.web.server.util.matcher;
 import java.util.Collections;
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.http.MediaType;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
@@ -41,6 +41,11 @@ public class MediaTypeServerWebExchangeMatcherTests {
 	public void constructorMediaTypeArrayWhenNullThenThrowsIllegalArgumentException() {
 		MediaType[] types = null;
 		assertThatIllegalArgumentException().isThrownBy(() -> new MediaTypeServerWebExchangeMatcher(types));
+	}
+
+	@Test
+	public void constructorListOfDoesNotThrowNullPointerException() {
+		new MediaTypeServerWebExchangeMatcher(List.of(MediaType.ALL));
 	}
 
 	@Test

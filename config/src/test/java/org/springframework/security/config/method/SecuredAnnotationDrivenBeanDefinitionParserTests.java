@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +22,9 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.annotation.BusinessService;
@@ -47,7 +47,7 @@ public class SecuredAnnotationDrivenBeanDefinitionParserTests {
 
 	private BusinessService target;
 
-	@Before
+	@BeforeEach
 	public void loadContext() {
 		SecurityContextHolder.clearContext();
 		this.appContext = new InMemoryXmlApplicationContext(
@@ -57,7 +57,7 @@ public class SecuredAnnotationDrivenBeanDefinitionParserTests {
 		this.target = (BusinessService) this.appContext.getBean("target");
 	}
 
-	@After
+	@AfterEach
 	public void closeAppContext() {
 		if (this.appContext != null) {
 			this.appContext.close();
@@ -68,21 +68,21 @@ public class SecuredAnnotationDrivenBeanDefinitionParserTests {
 	@Test
 	public void targetShouldPreventProtectedMethodInvocationWithNoContext() {
 		assertThatExceptionOfType(AuthenticationCredentialsNotFoundException.class)
-				.isThrownBy(this.target::someUserMethod1);
+			.isThrownBy(this.target::someUserMethod1);
 	}
 
 	@Test
 	public void targetShouldAllowProtectedMethodInvocationWithCorrectRole() {
-		UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken("Test", "Password",
-				AuthorityUtils.createAuthorityList("ROLE_USER"));
+		UsernamePasswordAuthenticationToken token = UsernamePasswordAuthenticationToken.authenticated("Test",
+				"Password", AuthorityUtils.createAuthorityList("ROLE_USER"));
 		SecurityContextHolder.getContext().setAuthentication(token);
 		this.target.someUserMethod1();
 	}
 
 	@Test
 	public void targetShouldPreventProtectedMethodInvocationWithIncorrectRole() {
-		UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken("Test", "Password",
-				AuthorityUtils.createAuthorityList("ROLE_SOMEOTHER"));
+		UsernamePasswordAuthenticationToken token = UsernamePasswordAuthenticationToken.authenticated("Test",
+				"Password", AuthorityUtils.createAuthorityList("ROLE_SOMEOTHER"));
 		SecurityContextHolder.getContext().setAuthentication(token);
 		assertThatExceptionOfType(AccessDeniedException.class).isThrownBy(this.target::someAdminMethod);
 	}
@@ -92,13 +92,13 @@ public class SecuredAnnotationDrivenBeanDefinitionParserTests {
 	public void targetIsSerializableBeforeUse() throws Exception {
 		BusinessService chompedTarget = (BusinessService) serializeAndDeserialize(this.target);
 		assertThatExceptionOfType(AuthenticationCredentialsNotFoundException.class)
-				.isThrownBy(chompedTarget::someAdminMethod);
+			.isThrownBy(chompedTarget::someAdminMethod);
 	}
 
 	@Test
 	public void targetIsSerializableAfterUse() throws Exception {
 		assertThatExceptionOfType(AuthenticationCredentialsNotFoundException.class)
-				.isThrownBy(this.target::someAdminMethod);
+			.isThrownBy(this.target::someAdminMethod);
 		SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("u", "p", "ROLE_A"));
 		BusinessService chompedTarget = (BusinessService) serializeAndDeserialize(this.target);
 		assertThatExceptionOfType(AccessDeniedException.class).isThrownBy(chompedTarget::someAdminMethod);

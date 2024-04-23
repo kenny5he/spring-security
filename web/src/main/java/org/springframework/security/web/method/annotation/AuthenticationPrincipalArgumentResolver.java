@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2013 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,10 @@ import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 import org.springframework.stereotype.Controller;
+import org.springframework.util.Assert;
+import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
@@ -87,6 +90,9 @@ import org.springframework.web.method.support.ModelAndViewContainer;
  */
 public final class AuthenticationPrincipalArgumentResolver implements HandlerMethodArgumentResolver {
 
+	private SecurityContextHolderStrategy securityContextHolderStrategy = SecurityContextHolder
+		.getContextHolderStrategy();
+
 	private ExpressionParser parser = new SpelExpressionParser();
 
 	private BeanResolver beanResolver;
@@ -99,7 +105,7 @@ public final class AuthenticationPrincipalArgumentResolver implements HandlerMet
 	@Override
 	public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
 			NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
-		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+		Authentication authentication = this.securityContextHolderStrategy.getContext().getAuthentication();
 		if (authentication == null) {
 			return null;
 		}
@@ -114,7 +120,7 @@ public final class AuthenticationPrincipalArgumentResolver implements HandlerMet
 			Expression expression = this.parser.parseExpression(expressionToParse);
 			principal = expression.getValue(context);
 		}
-		if (principal != null && !parameter.getParameterType().isAssignableFrom(principal.getClass())) {
+		if (principal != null && !ClassUtils.isAssignable(parameter.getParameterType(), principal.getClass())) {
 			if (annotation.errorOnInvalidType()) {
 				throw new ClassCastException(principal + " is not assignable to " + parameter.getParameterType());
 			}
@@ -129,6 +135,17 @@ public final class AuthenticationPrincipalArgumentResolver implements HandlerMet
 	 */
 	public void setBeanResolver(BeanResolver beanResolver) {
 		this.beanResolver = beanResolver;
+	}
+
+	/**
+	 * Sets the {@link SecurityContextHolderStrategy} to use. The default action is to use
+	 * the {@link SecurityContextHolderStrategy} stored in {@link SecurityContextHolder}.
+	 *
+	 * @since 5.8
+	 */
+	public void setSecurityContextHolderStrategy(SecurityContextHolderStrategy securityContextHolderStrategy) {
+		Assert.notNull(securityContextHolderStrategy, "securityContextHolderStrategy cannot be null");
+		this.securityContextHolderStrategy = securityContextHolderStrategy;
 	}
 
 	/**

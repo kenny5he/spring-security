@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,10 +30,13 @@ import org.springframework.util.Assert;
  * @see <a target="_blank" href=
  * "https://tools.ietf.org/html/rfc6749#section-1.3.3">Section 1.3.3 Resource Owner
  * Password Credentials</a>
+ * @deprecated The latest OAuth 2.0 Security Best Current Practice disallows the use of
+ * the Resource Owner Password Credentials grant. See reference <a target="_blank" href=
+ * "https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics-19#section-2.4">OAuth
+ * 2.0 Security Best Current Practice.</a>
  */
+@Deprecated
 public class OAuth2PasswordGrantRequest extends AbstractOAuth2AuthorizationGrantRequest {
-
-	private final ClientRegistration clientRegistration;
 
 	private final String username;
 
@@ -46,23 +49,13 @@ public class OAuth2PasswordGrantRequest extends AbstractOAuth2AuthorizationGrant
 	 * @param password the resource owner's password
 	 */
 	public OAuth2PasswordGrantRequest(ClientRegistration clientRegistration, String username, String password) {
-		super(AuthorizationGrantType.PASSWORD);
-		Assert.notNull(clientRegistration, "clientRegistration cannot be null");
+		super(AuthorizationGrantType.PASSWORD, clientRegistration);
 		Assert.isTrue(AuthorizationGrantType.PASSWORD.equals(clientRegistration.getAuthorizationGrantType()),
 				"clientRegistration.authorizationGrantType must be AuthorizationGrantType.PASSWORD");
 		Assert.hasText(username, "username cannot be empty");
 		Assert.hasText(password, "password cannot be empty");
-		this.clientRegistration = clientRegistration;
 		this.username = username;
 		this.password = password;
-	}
-
-	/**
-	 * Returns the {@link ClientRegistration client registration}.
-	 * @return the {@link ClientRegistration}
-	 */
-	public ClientRegistration getClientRegistration() {
-		return this.clientRegistration;
 	}
 
 	/**

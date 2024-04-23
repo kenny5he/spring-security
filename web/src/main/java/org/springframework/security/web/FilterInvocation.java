@@ -1,5 +1,5 @@
 /*
- * Copyright 2004, 2005, 2006 Acegi Technology Pty Limited
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,14 +26,16 @@ import java.lang.reflect.Proxy;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
-import javax.servlet.FilterChain;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletRequestWrapper;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.web.util.UrlUtils;
@@ -78,10 +80,19 @@ public class FilterInvocation {
 	}
 
 	public FilterInvocation(String contextPath, String servletPath, String method) {
-		this(contextPath, servletPath, null, null, method);
+		this(contextPath, servletPath, method, null);
+	}
+
+	public FilterInvocation(String contextPath, String servletPath, String method, ServletContext servletContext) {
+		this(contextPath, servletPath, null, null, method, servletContext);
 	}
 
 	public FilterInvocation(String contextPath, String servletPath, String pathInfo, String query, String method) {
+		this(contextPath, servletPath, pathInfo, query, method, null);
+	}
+
+	public FilterInvocation(String contextPath, String servletPath, String pathInfo, String query, String method,
+			ServletContext servletContext) {
 		DummyRequest request = new DummyRequest();
 		contextPath = (contextPath != null) ? contextPath : "/cp";
 		request.setContextPath(contextPath);
@@ -90,6 +101,7 @@ public class FilterInvocation {
 		request.setPathInfo(pathInfo);
 		request.setQueryString(query);
 		request.setMethod(method);
+		request.setServletContext(servletContext);
 		this.request = request;
 	}
 
@@ -134,7 +146,7 @@ public class FilterInvocation {
 
 	@Override
 	public String toString() {
-		if (StringUtils.isEmpty(this.request.getMethod())) {
+		if (!StringUtils.hasLength(this.request.getMethod())) {
 			return "filter invocation [" + getRequestUrl() + "]";
 		}
 		else {
@@ -159,6 +171,8 @@ public class FilterInvocation {
 		private String queryString;
 
 		private String method;
+
+		private ServletContext servletContext;
 
 		private final HttpHeaders headers = new HttpHeaders();
 
@@ -244,7 +258,11 @@ public class FilterInvocation {
 
 		@Override
 		public Enumeration<String> getHeaders(String name) {
-			return Collections.enumeration(this.headers.get(name));
+			List<String> headerList = this.headers.get(name);
+			if (headerList == null) {
+				return Collections.emptyEnumeration();
+			}
+			return Collections.enumeration(headerList);
 		}
 
 		@Override
@@ -290,6 +308,15 @@ public class FilterInvocation {
 			this.parameters.put(name, values);
 		}
 
+		@Override
+		public ServletContext getServletContext() {
+			return this.servletContext;
+		}
+
+		void setServletContext(ServletContext servletContext) {
+			this.servletContext = servletContext;
+		}
+
 	}
 
 	static final class UnsupportedOperationExceptionInvocationHandler implements InvocationHandler {
@@ -309,17 +336,21 @@ public class FilterInvocation {
 				return invokeDefaultMethodForJdk8(proxy, method, args);
 			}
 			return MethodHandles.lookup()
-					.findSpecial(method.getDeclaringClass(), method.getName(),
-							MethodType.methodType(method.getReturnType(), new Class[0]), method.getDeclaringClass())
-					.bindTo(proxy).invokeWithArguments(args);
+				.findSpecial(method.getDeclaringClass(), method.getName(),
+						MethodType.methodType(method.getReturnType(), new Class[0]), method.getDeclaringClass())
+				.bindTo(proxy)
+				.invokeWithArguments(args);
 		}
 
 		private Object invokeDefaultMethodForJdk8(Object proxy, Method method, Object[] args) throws Throwable {
 			Constructor<Lookup> constructor = Lookup.class.getDeclaredConstructor(Class.class);
 			constructor.setAccessible(true);
 			Class<?> clazz = method.getDeclaringClass();
-			return constructor.newInstance(clazz).in(clazz).unreflectSpecial(method, clazz).bindTo(proxy)
-					.invokeWithArguments(args);
+			return constructor.newInstance(clazz)
+				.in(clazz)
+				.unreflectSpecial(method, clazz)
+				.bindTo(proxy)
+				.invokeWithArguments(args);
 		}
 
 		private boolean isJdk8OrEarlier() {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,24 @@
 
 package org.springframework.security.config.web.server
 
+import io.mockk.every
+import io.mockk.mockkObject
+import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.Rule
-import org.junit.Test
-import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.*
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpStatus
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity
-import org.springframework.security.config.test.SpringTestRule
+import org.springframework.security.config.test.SpringTestContext
+import org.springframework.security.config.test.SpringTestContextExtension
 import org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.csrf
 import org.springframework.security.web.server.SecurityWebFilterChain
+import org.springframework.security.web.server.authentication.logout.HttpStatusReturningServerLogoutSuccessHandler
+import org.springframework.security.web.server.authentication.logout.SecurityContextServerLogoutHandler
 import org.springframework.security.web.server.authentication.logout.ServerLogoutHandler
 import org.springframework.security.web.server.authentication.logout.ServerLogoutSuccessHandler
 import org.springframework.security.web.server.util.matcher.PathPatternParserServerWebExchangeMatcher
@@ -40,10 +46,10 @@ import reactor.core.publisher.Mono
  *
  * @author Eleftheria Stein
  */
+@ExtendWith(SpringTestContextExtension::class)
 class ServerLogoutDslTests {
-    @Rule
     @JvmField
-    val spring = SpringTestRule()
+    val spring = SpringTestContext(this)
 
     private lateinit var client: WebTestClient
 
@@ -74,6 +80,7 @@ class ServerLogoutDslTests {
         }
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class LogoutConfig {
@@ -104,6 +111,7 @@ class ServerLogoutDslTests {
         }
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class CustomUrlConfig {
@@ -136,6 +144,7 @@ class ServerLogoutDslTests {
         }
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class RequiresLogoutConfig {
@@ -152,9 +161,8 @@ class ServerLogoutDslTests {
     @Test
     fun `logout when custom logout handler then custom handler invoked`() {
         this.spring.register(CustomLogoutHandlerConfig::class.java).autowire()
-
-        `when`(CustomLogoutHandlerConfig.LOGOUT_HANDLER.logout(any(), any()))
-                .thenReturn(Mono.empty())
+        mockkObject(CustomLogoutHandlerConfig.LOGOUT_HANDLER)
+        every { CustomLogoutHandlerConfig.LOGOUT_HANDLER.logout(any(), any()) } returns Mono.empty()
 
         this.client
                 .mutateWith(csrf())
@@ -162,15 +170,16 @@ class ServerLogoutDslTests {
                 .uri("/logout")
                 .exchange()
 
-        verify<ServerLogoutHandler>(CustomLogoutHandlerConfig.LOGOUT_HANDLER)
-                .logout(any(), any())
+        verify(exactly = 1) { CustomLogoutHandlerConfig.LOGOUT_HANDLER.logout(any(), any()) }
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class CustomLogoutHandlerConfig {
+
         companion object {
-            var LOGOUT_HANDLER: ServerLogoutHandler = mock(ServerLogoutHandler::class.java)
+            val LOGOUT_HANDLER: ServerLogoutHandler = SecurityContextServerLogoutHandler()
         }
 
         @Bean
@@ -186,6 +195,10 @@ class ServerLogoutDslTests {
     @Test
     fun `logout when custom logout success handler then custom handler invoked`() {
         this.spring.register(CustomLogoutSuccessHandlerConfig::class.java).autowire()
+        mockkObject(CustomLogoutSuccessHandlerConfig.LOGOUT_HANDLER)
+        every {
+            CustomLogoutSuccessHandlerConfig.LOGOUT_HANDLER.onLogoutSuccess(any(), any())
+        } returns Mono.empty()
 
         this.client
                 .mutateWith(csrf())
@@ -193,15 +206,16 @@ class ServerLogoutDslTests {
                 .uri("/logout")
                 .exchange()
 
-        verify<ServerLogoutSuccessHandler>(CustomLogoutSuccessHandlerConfig.LOGOUT_HANDLER)
-                .onLogoutSuccess(any(), any())
+        verify(exactly = 1) { CustomLogoutSuccessHandlerConfig.LOGOUT_HANDLER.onLogoutSuccess(any(), any()) }
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class CustomLogoutSuccessHandlerConfig {
+
         companion object {
-            var LOGOUT_HANDLER: ServerLogoutSuccessHandler = mock(ServerLogoutSuccessHandler::class.java)
+            val LOGOUT_HANDLER: ServerLogoutSuccessHandler = HttpStatusReturningServerLogoutSuccessHandler(HttpStatus.OK)
         }
 
         @Bean
@@ -226,6 +240,7 @@ class ServerLogoutDslTests {
                 .expectStatus().isNotFound
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class LogoutDisabledConfig {

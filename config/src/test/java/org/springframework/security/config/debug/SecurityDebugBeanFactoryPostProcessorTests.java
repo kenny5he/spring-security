@@ -16,11 +16,12 @@
 
 package org.springframework.security.config.debug;
 
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.security.config.BeanIds;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.security.web.debug.DebugFilter;
 
@@ -30,19 +31,19 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Rob Winch
  * @author Josh Cummings
  */
+@ExtendWith(SpringTestContextExtension.class)
 public class SecurityDebugBeanFactoryPostProcessorTests {
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Test
 	public void contextRefreshWhenInDebugModeAndDependencyHasAutowiredConstructorThenDebugModeStillWorks() {
 		// SEC-1885
 		this.spring.configLocations(
 				"classpath:org/springframework/security/config/debug/SecurityDebugBeanFactoryPostProcessorTests-context.xml")
-				.autowire();
+			.autowire();
 		assertThat(this.spring.getContext().getBean(BeanIds.SPRING_SECURITY_FILTER_CHAIN))
-				.isInstanceOf(DebugFilter.class);
+			.isInstanceOf(DebugFilter.class);
 		assertThat(this.spring.getContext().getBean(BeanIds.FILTER_CHAIN_PROXY)).isInstanceOf(FilterChainProxy.class);
 	}
 

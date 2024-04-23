@@ -16,8 +16,8 @@
 
 package org.springframework.security.web.header.writers;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -42,7 +42,7 @@ public class PermissionsPolicyHeaderWriterTests {
 
 	private static final String PERMISSIONS_POLICY_HEADER = "Permissions-Policy";
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		this.request = new MockHttpServletRequest();
 		this.response = new MockHttpServletResponse();
@@ -59,13 +59,13 @@ public class PermissionsPolicyHeaderWriterTests {
 	@Test
 	public void createWriterWithNullPolicyShouldThrowException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new PermissionsPolicyHeaderWriter(null))
-				.withMessage("policy can not be null or empty");
+			.withMessage("policy can not be null or empty");
 	}
 
 	@Test
 	public void createWriterWithEmptyPolicyShouldThrowException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new PermissionsPolicyHeaderWriter(""))
-				.withMessage("policy can not be null or empty");
+			.withMessage("policy can not be null or empty");
 	}
 
 	@Test

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,21 +16,23 @@
 
 package org.springframework.security.config.annotation.web.configurers;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.test.context.annotation.SecurityTestExecutionListeners;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.HeaderWriterLogoutHandler;
 import org.springframework.security.web.header.writers.ClearSiteDataHeaderWriter;
 import org.springframework.security.web.header.writers.ClearSiteDataHeaderWriter.Directive;
-import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -47,7 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Rafiullah Hamedy
  *
  */
-@RunWith(SpringRunner.class)
+@ExtendWith({ SpringExtension.class, SpringTestContextExtension.class })
 @SecurityTestExecutionListeners
 public class LogoutConfigurerClearSiteDataTests {
 
@@ -58,8 +60,7 @@ public class LogoutConfigurerClearSiteDataTests {
 
 	private static final String HEADER_VALUE = "\"cache\", \"cookies\", \"storage\", \"executionContexts\"";
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired
 	MockMvc mvc;
@@ -88,15 +89,17 @@ public class LogoutConfigurerClearSiteDataTests {
 		this.mvc.perform(logoutRequest).andExpect(header().stringValues(CLEAR_SITE_DATA_HEADER, HEADER_VALUE));
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class HttpLogoutConfig extends WebSecurityConfigurerAdapter {
+	static class HttpLogoutConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.logout()
 					.addLogoutHandler(new HeaderWriterLogoutHandler(new ClearSiteDataHeaderWriter(SOURCE)));
+			return http.build();
 			// @formatter:on
 		}
 

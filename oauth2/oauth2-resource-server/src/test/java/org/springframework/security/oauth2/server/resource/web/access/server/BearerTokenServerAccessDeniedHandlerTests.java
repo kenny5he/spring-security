@@ -20,8 +20,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
 import org.springframework.http.HttpStatus;
@@ -40,7 +40,7 @@ public class BearerTokenServerAccessDeniedHandlerTests {
 
 	private BearerTokenServerAccessDeniedHandler accessDeniedHandler;
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		this.accessDeniedHandler = new BearerTokenServerAccessDeniedHandler();
 	}
@@ -66,7 +66,7 @@ public class BearerTokenServerAccessDeniedHandlerTests {
 		this.accessDeniedHandler.handle(exchange, null).block();
 		assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
 		assertThat(exchange.getResponse().getHeaders().get("WWW-Authenticate"))
-				.isEqualTo(Arrays.asList("Bearer realm=\"test\""));
+			.isEqualTo(Arrays.asList("Bearer realm=\"test\""));
 	}
 
 	@Test

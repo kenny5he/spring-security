@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,11 +21,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.PopulatedDatabase;
@@ -39,6 +39,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
+import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserCache;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -48,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /**
  * Tests for {@link JdbcUserDetailsManager}
@@ -71,18 +74,18 @@ public class JdbcUserDetailsManagerTests {
 
 	private JdbcTemplate template;
 
-	@BeforeClass
+	@BeforeAll
 	public static void createDataSource() {
 		dataSource = new TestDataSource("jdbcusermgrtest");
 	}
 
-	@AfterClass
+	@AfterAll
 	public static void clearDataSource() throws Exception {
 		dataSource.destroy();
 		dataSource = null;
 	}
 
-	@Before
+	@BeforeEach
 	public void initializeManagerAndCreateTables() {
 		this.manager = new JdbcUserDetailsManager();
 		this.cache = new MockUserCache();
@@ -100,13 +103,13 @@ public class JdbcUserDetailsManagerTests {
 		this.template.execute("create table users(username varchar(20) not null primary key,"
 				+ "password varchar(20) not null, enabled boolean not null)");
 		this.template
-				.execute("create table authorities (username varchar(20) not null, authority varchar(20) not null, "
-						+ "constraint fk_authorities_users foreign key(username) references users(username))");
+			.execute("create table authorities (username varchar(20) not null, authority varchar(20) not null, "
+					+ "constraint fk_authorities_users foreign key(username) references users(username))");
 		PopulatedDatabase.createGroupTables(this.template);
 		PopulatedDatabase.insertGroupData(this.template);
 	}
 
-	@After
+	@AfterEach
 	public void dropTablesAndClearContext() {
 		this.template.execute("drop table authorities");
 		this.template.execute("drop table users");
@@ -142,7 +145,7 @@ public class JdbcUserDetailsManagerTests {
 				AuthorityUtils.createAuthorityList("A", "B"));
 		this.manager.createUser(user);
 		UserDetails user2 = this.manager.loadUserByUsername(user.getUsername());
-		assertThat(user2).isEqualToComparingFieldByField(user);
+		assertThat(user2).usingRecursiveComparison().isEqualTo(user);
 	}
 
 	@Test
@@ -173,7 +176,7 @@ public class JdbcUserDetailsManagerTests {
 				AuthorityUtils.createAuthorityList("D", "F", "E"));
 		this.manager.updateUser(newJoe);
 		UserDetails joe = this.manager.loadUserByUsername(newJoe.getUsername());
-		assertThat(joe).isEqualToComparingFieldByField(newJoe);
+		assertThat(joe).usingRecursiveComparison().isEqualTo(newJoe);
 		assertThat(this.cache.getUserMap().containsKey(newJoe.getUsername())).isFalse();
 	}
 
@@ -186,13 +189,13 @@ public class JdbcUserDetailsManagerTests {
 	public void userExistsReturnsTrueForExistingUsername() {
 		insertJoe();
 		assertThat(this.manager.userExists("joe")).isTrue();
-		assertThat(this.cache.getUserMap().containsKey("joe")).isTrue();
+		assertThat(this.cache.getUserMap()).containsKey("joe");
 	}
 
 	@Test
 	public void changePasswordFailsForUnauthenticatedUser() {
 		assertThatExceptionOfType(AccessDeniedException.class)
-				.isThrownBy(() -> this.manager.changePassword("password", "newPassword"));
+			.isThrownBy(() -> this.manager.changePassword("password", "newPassword"));
 	}
 
 	@Test
@@ -203,6 +206,18 @@ public class JdbcUserDetailsManagerTests {
 		UserDetails newJoe = this.manager.loadUserByUsername("joe");
 		assertThat(newJoe.getPassword()).isEqualTo("newPassword");
 		assertThat(this.cache.getUserMap().containsKey("joe")).isFalse();
+	}
+
+	@Test
+	public void changePasswordWhenCustomSecurityContextHolderStrategyThenUses() {
+		insertJoe();
+		Authentication authentication = authenticateJoe();
+		SecurityContextHolderStrategy strategy = mock(SecurityContextHolderStrategy.class);
+		given(strategy.getContext()).willReturn(new SecurityContextImpl(authentication));
+		given(strategy.createEmptyContext()).willReturn(new SecurityContextImpl());
+		this.manager.setSecurityContextHolderStrategy(strategy);
+		this.manager.changePassword("wrongpassword", "newPassword");
+		verify(strategy).getContext();
 	}
 
 	@Test
@@ -231,12 +246,12 @@ public class JdbcUserDetailsManagerTests {
 		given(am.authenticate(any(Authentication.class))).willThrow(new BadCredentialsException(""));
 		this.manager.setAuthenticationManager(am);
 		assertThatExceptionOfType(BadCredentialsException.class)
-				.isThrownBy(() -> this.manager.changePassword("password", "newPassword"));
+			.isThrownBy(() -> this.manager.changePassword("password", "newPassword"));
 		// Check password hasn't changed.
 		UserDetails newJoe = this.manager.loadUserByUsername("joe");
 		assertThat(newJoe.getPassword()).isEqualTo("password");
 		assertThat(SecurityContextHolder.getContext().getAuthentication().getCredentials()).isEqualTo("password");
-		assertThat(this.cache.getUserMap().containsKey("joe")).isTrue();
+		assertThat(this.cache.getUserMap()).containsKey("joe");
 	}
 
 	@Test
@@ -283,7 +298,7 @@ public class JdbcUserDetailsManagerTests {
 	public void renameGroupIsSuccessful() {
 		this.manager.renameGroup("GROUP_0", "GROUP_X");
 		assertThat(this.template.queryForObject("select id from groups where group_name = 'GROUP_X'", Integer.class))
-				.isZero();
+			.isZero();
 	}
 
 	@Test
@@ -296,13 +311,13 @@ public class JdbcUserDetailsManagerTests {
 	public void removeUserFromGroupDeletesGroupMemberRow() {
 		this.manager.removeUserFromGroup("jerry", "GROUP_1");
 		assertThat(this.template.queryForList("select group_id from group_members where username = 'jerry'"))
-				.hasSize(1);
+			.hasSize(1);
 	}
 
 	@Test
 	public void findGroupAuthoritiesReturnsCorrectAuthorities() {
 		assertThat(AuthorityUtils.createAuthorityList("ROLE_A"))
-				.isEqualTo(this.manager.findGroupAuthorities("GROUP_0"));
+			.isEqualTo(this.manager.findGroupAuthorities("GROUP_0"));
 	}
 
 	@Test
@@ -344,14 +359,14 @@ public class JdbcUserDetailsManagerTests {
 	@Test
 	public void createNewAuthenticationUsesNullPasswordToKeepPassordsSave() {
 		insertJoe();
-		UsernamePasswordAuthenticationToken currentAuth = new UsernamePasswordAuthenticationToken("joe", null,
+		UsernamePasswordAuthenticationToken currentAuth = UsernamePasswordAuthenticationToken.authenticated("joe", null,
 				AuthorityUtils.createAuthorityList("ROLE_USER"));
 		Authentication updatedAuth = this.manager.createNewAuthentication(currentAuth, "new");
 		assertThat(updatedAuth.getCredentials()).isNull();
 	}
 
 	private Authentication authenticateJoe() {
-		UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken("joe", "password",
+		UsernamePasswordAuthenticationToken auth = UsernamePasswordAuthenticationToken.authenticated("joe", "password",
 				joe.getAuthorities());
 		SecurityContextHolder.getContext().setAuthentication(auth);
 		return auth;

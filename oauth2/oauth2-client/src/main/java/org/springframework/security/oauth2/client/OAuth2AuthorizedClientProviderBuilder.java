@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -104,8 +104,8 @@ public final class OAuth2AuthorizedClientProviderBuilder {
 	 * @return the {@link OAuth2AuthorizedClientProviderBuilder}
 	 */
 	public OAuth2AuthorizedClientProviderBuilder refreshToken(Consumer<RefreshTokenGrantBuilder> builderConsumer) {
-		RefreshTokenGrantBuilder builder = (RefreshTokenGrantBuilder) this.builders.computeIfAbsent(
-				RefreshTokenOAuth2AuthorizedClientProvider.class, (k) -> new RefreshTokenGrantBuilder());
+		RefreshTokenGrantBuilder builder = (RefreshTokenGrantBuilder) this.builders
+			.computeIfAbsent(RefreshTokenOAuth2AuthorizedClientProvider.class, (k) -> new RefreshTokenGrantBuilder());
 		builderConsumer.accept(builder);
 		return OAuth2AuthorizedClientProviderBuilder.this;
 	}
@@ -137,7 +137,13 @@ public final class OAuth2AuthorizedClientProviderBuilder {
 	/**
 	 * Configures support for the {@code password} grant.
 	 * @return the {@link OAuth2AuthorizedClientProviderBuilder}
+	 * @deprecated The latest OAuth 2.0 Security Best Current Practice disallows the use
+	 * of the Resource Owner Password Credentials grant. See reference
+	 * <a target="_blank" href=
+	 * "https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics-19#section-2.4">OAuth
+	 * 2.0 Security Best Current Practice.</a>
 	 */
+	@Deprecated
 	public OAuth2AuthorizedClientProviderBuilder password() {
 		this.builders.computeIfAbsent(PasswordOAuth2AuthorizedClientProvider.class, (k) -> new PasswordGrantBuilder());
 		return OAuth2AuthorizedClientProviderBuilder.this;
@@ -148,10 +154,16 @@ public final class OAuth2AuthorizedClientProviderBuilder {
 	 * @param builderConsumer a {@code Consumer} of {@link PasswordGrantBuilder} used for
 	 * further configuration
 	 * @return the {@link OAuth2AuthorizedClientProviderBuilder}
+	 * @deprecated The latest OAuth 2.0 Security Best Current Practice disallows the use
+	 * of the Resource Owner Password Credentials grant. See reference
+	 * <a target="_blank" href=
+	 * "https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics-19#section-2.4">OAuth
+	 * 2.0 Security Best Current Practice.</a>
 	 */
+	@Deprecated
 	public OAuth2AuthorizedClientProviderBuilder password(Consumer<PasswordGrantBuilder> builderConsumer) {
 		PasswordGrantBuilder builder = (PasswordGrantBuilder) this.builders
-				.computeIfAbsent(PasswordOAuth2AuthorizedClientProvider.class, (k) -> new PasswordGrantBuilder());
+			.computeIfAbsent(PasswordOAuth2AuthorizedClientProvider.class, (k) -> new PasswordGrantBuilder());
 		builderConsumer.accept(builder);
 		return OAuth2AuthorizedClientProviderBuilder.this;
 	}
@@ -204,10 +216,12 @@ public final class OAuth2AuthorizedClientProviderBuilder {
 
 		/**
 		 * Sets the maximum acceptable clock skew, which is used when checking the access
-		 * token expiry. An access token is considered expired if it's before
-		 * {@code Instant.now(this.clock) - clockSkew}.
+		 * token expiry. An access token is considered expired if
+		 * {@code OAuth2Token#getExpiresAt() - clockSkew} is before the current time
+		 * {@code clock#instant()}.
 		 * @param clockSkew the maximum acceptable clock skew
 		 * @return the {@link PasswordGrantBuilder}
+		 * @see PasswordOAuth2AuthorizedClientProvider#setClockSkew(Duration)
 		 */
 		public PasswordGrantBuilder clockSkew(Duration clockSkew) {
 			this.clockSkew = clockSkew;
@@ -275,10 +289,12 @@ public final class OAuth2AuthorizedClientProviderBuilder {
 
 		/**
 		 * Sets the maximum acceptable clock skew, which is used when checking the access
-		 * token expiry. An access token is considered expired if it's before
-		 * {@code Instant.now(this.clock) - clockSkew}.
+		 * token expiry. An access token is considered expired if
+		 * {@code OAuth2Token#getExpiresAt() - clockSkew} is before the current time
+		 * {@code clock#instant()}.
 		 * @param clockSkew the maximum acceptable clock skew
 		 * @return the {@link ClientCredentialsGrantBuilder}
+		 * @see ClientCredentialsOAuth2AuthorizedClientProvider#setClockSkew(Duration)
 		 */
 		public ClientCredentialsGrantBuilder clockSkew(Duration clockSkew) {
 			this.clockSkew = clockSkew;
@@ -365,10 +381,12 @@ public final class OAuth2AuthorizedClientProviderBuilder {
 
 		/**
 		 * Sets the maximum acceptable clock skew, which is used when checking the access
-		 * token expiry. An access token is considered expired if it's before
-		 * {@code Instant.now(this.clock) - clockSkew}.
+		 * token expiry. An access token is considered expired if
+		 * {@code OAuth2Token#getExpiresAt() - clockSkew} is before the current time
+		 * {@code clock#instant()}.
 		 * @param clockSkew the maximum acceptable clock skew
 		 * @return the {@link RefreshTokenGrantBuilder}
+		 * @see RefreshTokenOAuth2AuthorizedClientProvider#setClockSkew(Duration)
 		 */
 		public RefreshTokenGrantBuilder clockSkew(Duration clockSkew) {
 			this.clockSkew = clockSkew;

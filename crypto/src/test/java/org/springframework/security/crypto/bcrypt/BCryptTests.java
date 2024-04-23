@@ -17,8 +17,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -58,7 +58,7 @@ public class BCryptTests {
 
 	private static List<TestObject<byte[]>> testObjectsByteArray;
 
-	@BeforeClass
+	@BeforeAll
 	public static void setupTestObjects() {
 		testObjectsString = new ArrayList<>();
 		testObjectsString.add(new TestObject<>("", "$2a$06$DCq7YPn5Rq63x1Lad4cll.",
@@ -332,13 +332,13 @@ public class BCryptTests {
 	@Test
 	public void emptyByteArrayCannotBeEncoded() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> BCrypt.encode_base64(new byte[0], 0, new StringBuilder()));
+			.isThrownBy(() -> BCrypt.encode_base64(new byte[0], 0, new StringBuilder()));
 	}
 
 	@Test
 	public void moreBytesThanInTheArrayCannotBeEncoded() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> BCrypt.encode_base64(new byte[1], 2, new StringBuilder()));
+			.isThrownBy(() -> BCrypt.encode_base64(new byte[1], 2, new StringBuilder()));
 	}
 
 	@Test
@@ -390,7 +390,7 @@ public class BCryptTests {
 				Arrays.fill(ba, (byte) 0);
 				ba[i] = (byte) b;
 				String s = encode_base64(ba, 3);
-				assertThat(s.length()).isEqualTo(4);
+				assertThat(s).hasSize(4);
 				byte[] decoded = BCrypt.decode_base64(s, 3);
 				assertThat(decoded).isEqualTo(ba);
 			}
@@ -421,13 +421,13 @@ public class BCryptTests {
 	@Test
 	public void hashpwFailsWhenSaltSpecifiesTooFewRounds() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> BCrypt.hashpw("password", "$2a$03$......................"));
+			.isThrownBy(() -> BCrypt.hashpw("password", "$2a$03$......................"));
 	}
 
 	@Test
 	public void hashpwFailsWhenSaltSpecifiesTooManyRounds() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> BCrypt.hashpw("password", "$2a$32$......................"));
+			.isThrownBy(() -> BCrypt.hashpw("password", "$2a$32$......................"));
 	}
 
 	@Test
@@ -438,13 +438,13 @@ public class BCryptTests {
 	@Test
 	public void hashpwWorksWithOldRevision() {
 		assertThat(BCrypt.hashpw("password", "$2$05$......................"))
-				.isEqualTo("$2$05$......................bvpG2UfzdyW/S0ny/4YyEZrmczoJfVm");
+			.isEqualTo("$2$05$......................bvpG2UfzdyW/S0ny/4YyEZrmczoJfVm");
 	}
 
 	@Test
 	public void hashpwFailsWhenSaltIsTooShort() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> BCrypt.hashpw("password", "$2a$10$123456789012345678901"));
+			.isThrownBy(() -> BCrypt.hashpw("password", "$2a$10$123456789012345678901"));
 	}
 
 	@Test
@@ -454,6 +454,13 @@ public class BCryptTests {
 		assertThat(BCrypt.equalsNoEarlyReturn("test", "")).isFalse();
 		assertThat(BCrypt.equalsNoEarlyReturn("", "test")).isFalse();
 		assertThat(BCrypt.equalsNoEarlyReturn("test", "pass")).isFalse();
+	}
+
+	@Test
+	public void checkpwWhenZeroRoundsThenMatches() {
+		String password = "$2a$00$9N8N35BVs5TLqGL3pspAte5OWWA2a2aZIs.EGp7At7txYakFERMue";
+		assertThat(BCrypt.checkpw("password", password)).isTrue();
+		assertThat(BCrypt.checkpw("wrong", password)).isFalse();
 	}
 
 }

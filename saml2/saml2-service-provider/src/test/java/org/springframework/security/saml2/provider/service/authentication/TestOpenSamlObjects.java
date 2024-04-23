@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package org.springframework.security.saml2.provider.service.authentication;
 
 import java.security.cert.X509Certificate;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -28,21 +29,17 @@ import javax.crypto.spec.SecretKeySpec;
 import javax.xml.namespace.QName;
 
 import org.apache.xml.security.encryption.XMLCipherParameters;
-import org.joda.time.DateTime;
-import org.joda.time.Duration;
 import org.opensaml.core.xml.XMLObject;
 import org.opensaml.core.xml.config.XMLObjectProviderRegistrySupport;
 import org.opensaml.core.xml.io.MarshallingException;
 import org.opensaml.core.xml.schema.XSAny;
 import org.opensaml.core.xml.schema.XSBoolean;
 import org.opensaml.core.xml.schema.XSBooleanValue;
-import org.opensaml.core.xml.schema.XSDateTime;
 import org.opensaml.core.xml.schema.XSInteger;
 import org.opensaml.core.xml.schema.XSString;
 import org.opensaml.core.xml.schema.XSURI;
 import org.opensaml.core.xml.schema.impl.XSAnyBuilder;
 import org.opensaml.core.xml.schema.impl.XSBooleanBuilder;
-import org.opensaml.core.xml.schema.impl.XSDateTimeBuilder;
 import org.opensaml.core.xml.schema.impl.XSIntegerBuilder;
 import org.opensaml.core.xml.schema.impl.XSStringBuilder;
 import org.opensaml.core.xml.schema.impl.XSURIBuilder;
@@ -53,11 +50,14 @@ import org.opensaml.saml.saml2.core.Attribute;
 import org.opensaml.saml.saml2.core.AttributeStatement;
 import org.opensaml.saml.saml2.core.AttributeValue;
 import org.opensaml.saml.saml2.core.AuthnRequest;
+import org.opensaml.saml.saml2.core.AuthnStatement;
 import org.opensaml.saml.saml2.core.Conditions;
 import org.opensaml.saml.saml2.core.EncryptedAssertion;
 import org.opensaml.saml.saml2.core.EncryptedAttribute;
 import org.opensaml.saml.saml2.core.EncryptedID;
 import org.opensaml.saml.saml2.core.Issuer;
+import org.opensaml.saml.saml2.core.LogoutRequest;
+import org.opensaml.saml.saml2.core.LogoutResponse;
 import org.opensaml.saml.saml2.core.NameID;
 import org.opensaml.saml.saml2.core.Response;
 import org.opensaml.saml.saml2.core.Status;
@@ -67,6 +67,10 @@ import org.opensaml.saml.saml2.core.SubjectConfirmation;
 import org.opensaml.saml.saml2.core.SubjectConfirmationData;
 import org.opensaml.saml.saml2.core.impl.AttributeBuilder;
 import org.opensaml.saml.saml2.core.impl.AttributeStatementBuilder;
+import org.opensaml.saml.saml2.core.impl.IssuerBuilder;
+import org.opensaml.saml.saml2.core.impl.LogoutRequestBuilder;
+import org.opensaml.saml.saml2.core.impl.LogoutResponseBuilder;
+import org.opensaml.saml.saml2.core.impl.NameIDBuilder;
 import org.opensaml.saml.saml2.core.impl.StatusBuilder;
 import org.opensaml.saml.saml2.core.impl.StatusCodeBuilder;
 import org.opensaml.saml.saml2.encryption.Encrypter;
@@ -87,6 +91,7 @@ import org.springframework.security.saml2.Saml2Exception;
 import org.springframework.security.saml2.core.OpenSamlInitializationService;
 import org.springframework.security.saml2.core.Saml2X509Credential;
 import org.springframework.security.saml2.core.TestSaml2X509Credentials;
+import org.springframework.security.saml2.provider.service.registration.RelyingPartyRegistration;
 
 public final class TestOpenSamlObjects {
 
@@ -97,9 +102,11 @@ public final class TestOpenSamlObjects {
 
 	private static String DESTINATION = "https://localhost/login/saml2/sso/idp-alias";
 
-	private static String RELYING_PARTY_ENTITY_ID = "https://localhost/saml2/service-provider-metadata/idp-alias";
+	private static String LOGOUT_DESTINATION = "http://localhost/logout/saml2/slo";
 
-	private static String ASSERTING_PARTY_ENTITY_ID = "https://some.idp.test/saml2/idp";
+	public static String RELYING_PARTY_ENTITY_ID = "https://localhost/saml2/service-provider-metadata/idp-alias";
+
+	public static String ASSERTING_PARTY_ENTITY_ID = "https://some.idp.test/saml2/idp";
 
 	private static SecretKey SECRET_KEY = new SecretKeySpec(
 			Base64.getDecoder().decode("shOnwNMoCv88HKMEa91+FlYoD5RNvzMTAL5LGxZKIFk="), "AES");
@@ -107,14 +114,13 @@ public final class TestOpenSamlObjects {
 	private TestOpenSamlObjects() {
 	}
 
-	static Response response() {
+	public static Response response() {
 		return response(DESTINATION, ASSERTING_PARTY_ENTITY_ID);
 	}
 
-	static Response response(String destination, String issuerEntityId) {
+	public static Response response(String destination, String issuerEntityId) {
 		Response response = build(Response.DEFAULT_ELEMENT_NAME);
 		response.setID("R" + UUID.randomUUID().toString());
-		response.setIssueInstant(DateTime.now());
 		response.setVersion(SAMLVersion.VERSION_20);
 		response.setID("_" + UUID.randomUUID().toString());
 		response.setDestination(destination);
@@ -138,21 +144,24 @@ public final class TestOpenSamlObjects {
 		return assertion(USERNAME, ASSERTING_PARTY_ENTITY_ID, RELYING_PARTY_ENTITY_ID, DESTINATION);
 	}
 
-	static Assertion assertion(String username, String issuerEntityId, String recipientEntityId, String recipientUri) {
+	public static Assertion assertion(String username, String issuerEntityId, String recipientEntityId,
+			String recipientUri) {
 		Assertion assertion = build(Assertion.DEFAULT_ELEMENT_NAME);
 		assertion.setID("A" + UUID.randomUUID().toString());
-		assertion.setIssueInstant(DateTime.now());
 		assertion.setVersion(SAMLVersion.VERSION_20);
-		assertion.setIssueInstant(DateTime.now());
 		assertion.setIssuer(issuer(issuerEntityId));
 		assertion.setSubject(subject(username));
 		assertion.setConditions(conditions());
+		assertion.setIssueInstant(Instant.now());
 		SubjectConfirmation subjectConfirmation = subjectConfirmation();
 		subjectConfirmation.setMethod(SubjectConfirmation.METHOD_BEARER);
 		SubjectConfirmationData confirmationData = subjectConfirmationData(recipientEntityId);
 		confirmationData.setRecipient(recipientUri);
 		subjectConfirmation.setSubjectConfirmationData(confirmationData);
 		assertion.getSubject().getSubjectConfirmations().add(subjectConfirmation);
+		AuthnStatement statement = build(AuthnStatement.DEFAULT_ELEMENT_NAME);
+		statement.setSessionIndex("session-index");
+		assertion.getAuthnStatements().add(statement);
 		return assertion;
 	}
 
@@ -183,16 +192,11 @@ public final class TestOpenSamlObjects {
 	static SubjectConfirmationData subjectConfirmationData(String recipient) {
 		SubjectConfirmationData subject = build(SubjectConfirmationData.DEFAULT_ELEMENT_NAME);
 		subject.setRecipient(recipient);
-		subject.setNotBefore(DateTime.now().minus(Duration.millis(5 * 60 * 1000)));
-		subject.setNotOnOrAfter(DateTime.now().plus(Duration.millis(5 * 60 * 1000)));
 		return subject;
 	}
 
 	static Conditions conditions() {
-		Conditions conditions = build(Conditions.DEFAULT_ELEMENT_NAME);
-		conditions.setNotBefore(DateTime.now().minus(Duration.millis(5 * 60 * 1000)));
-		conditions.setNotOnOrAfter(DateTime.now().plus(Duration.millis(5 * 60 * 1000)));
-		return conditions;
+		return build(Conditions.DEFAULT_ELEMENT_NAME);
 	}
 
 	public static AuthnRequest authnRequest() {
@@ -203,6 +207,18 @@ public final class TestOpenSamlObjects {
 		authnRequest.setDestination(ASSERTING_PARTY_ENTITY_ID + "/SSO.saml2");
 		authnRequest.setAssertionConsumerServiceURL(DESTINATION);
 		return authnRequest;
+	}
+
+	public static LogoutRequest logoutRequest() {
+		Issuer issuer = build(Issuer.DEFAULT_ELEMENT_NAME);
+		issuer.setValue(ASSERTING_PARTY_ENTITY_ID);
+		NameID nameId = build(NameID.DEFAULT_ELEMENT_NAME);
+		nameId.setValue("user");
+		LogoutRequest logoutRequest = build(LogoutRequest.DEFAULT_ELEMENT_NAME);
+		logoutRequest.setIssuer(issuer);
+		logoutRequest.setDestination(LOGOUT_DESTINATION);
+		logoutRequest.setNameID(nameId);
+		return logoutRequest;
 	}
 
 	static Credential getSigningCredential(Saml2X509Credential credential, String entityId) {
@@ -233,7 +249,7 @@ public final class TestOpenSamlObjects {
 		return signable;
 	}
 
-	static <T extends SignableSAMLObject> T signed(T signable, Saml2X509Credential credential, String entityId) {
+	public static <T extends SignableSAMLObject> T signed(T signable, Saml2X509Credential credential, String entityId) {
 		return signed(signable, credential, entityId, SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
 	}
 
@@ -297,6 +313,17 @@ public final class TestOpenSamlObjects {
 		return attribute;
 	}
 
+	static AttributeStatement customAttributeStatement(String attributeName, XMLObject customAttributeValue) {
+		AttributeStatementBuilder attributeStatementBuilder = new AttributeStatementBuilder();
+		AttributeBuilder attributeBuilder = new AttributeBuilder();
+		Attribute attribute = attributeBuilder.buildObject();
+		attribute.setName(attributeName);
+		attribute.getAttributeValues().add(customAttributeValue);
+		AttributeStatement attributeStatement = attributeStatementBuilder.buildObject();
+		attributeStatement.getAttributes().add(attribute);
+		return attributeStatement;
+	}
+
 	static List<AttributeStatement> attributeStatements() {
 		List<AttributeStatement> attributeStatements = new ArrayList<>();
 		AttributeStatementBuilder attributeStatementBuilder = new AttributeStatementBuilder();
@@ -317,6 +344,18 @@ public final class TestOpenSamlObjects {
 		name.setValue("John Doe");
 		nameAttr.getAttributeValues().add(name);
 		attrStmt1.getAttributes().add(nameAttr);
+		Attribute roleOneAttr = attributeBuilder.buildObject(); // gh-11042
+		roleOneAttr.setName("role");
+		XSString roleOne = new XSStringBuilder().buildObject(AttributeValue.DEFAULT_ELEMENT_NAME, XSString.TYPE_NAME);
+		roleOne.setValue("RoleOne");
+		roleOneAttr.getAttributeValues().add(roleOne);
+		attrStmt1.getAttributes().add(roleOneAttr);
+		Attribute roleTwoAttr = attributeBuilder.buildObject(); // gh-11042
+		roleTwoAttr.setName("role");
+		XSString roleTwo = new XSStringBuilder().buildObject(AttributeValue.DEFAULT_ELEMENT_NAME, XSString.TYPE_NAME);
+		roleTwo.setValue("RoleTwo");
+		roleTwoAttr.getAttributeValues().add(roleTwo);
+		attrStmt1.getAttributes().add(roleTwoAttr);
 		Attribute ageAttr = attributeBuilder.buildObject();
 		ageAttr.setName("age");
 		XSInteger age = new XSIntegerBuilder().buildObject(AttributeValue.DEFAULT_ELEMENT_NAME, XSInteger.TYPE_NAME);
@@ -328,7 +367,7 @@ public final class TestOpenSamlObjects {
 		Attribute websiteAttr = attributeBuilder.buildObject();
 		websiteAttr.setName("website");
 		XSURI uri = new XSURIBuilder().buildObject(AttributeValue.DEFAULT_ELEMENT_NAME, XSURI.TYPE_NAME);
-		uri.setValue("https://johndoe.com/");
+		uri.setURI("https://johndoe.com/");
 		websiteAttr.getAttributeValues().add(uri);
 		attrStmt2.getAttributes().add(websiteAttr);
 		Attribute registeredAttr = attributeBuilder.buildObject();
@@ -338,13 +377,6 @@ public final class TestOpenSamlObjects {
 		registered.setValue(new XSBooleanValue(true, false));
 		registeredAttr.getAttributeValues().add(registered);
 		attrStmt2.getAttributes().add(registeredAttr);
-		Attribute registeredDateAttr = attributeBuilder.buildObject();
-		registeredDateAttr.setName("registeredDate");
-		XSDateTime registeredDate = new XSDateTimeBuilder().buildObject(AttributeValue.DEFAULT_ELEMENT_NAME,
-				XSDateTime.TYPE_NAME);
-		registeredDate.setValue(DateTime.parse("1970-01-01T00:00:00Z"));
-		registeredDateAttr.getAttributeValues().add(registeredDate);
-		attrStmt2.getAttributes().add(registeredDateAttr);
 		attributeStatements.add(attrStmt2);
 		return attributeStatements;
 	}
@@ -359,6 +391,79 @@ public final class TestOpenSamlObjects {
 		statusCode.setValue(code);
 		status.setStatusCode(statusCode);
 		return status;
+	}
+
+	public static LogoutRequest assertingPartyLogoutRequest(RelyingPartyRegistration registration) {
+		LogoutRequestBuilder logoutRequestBuilder = new LogoutRequestBuilder();
+		LogoutRequest logoutRequest = logoutRequestBuilder.buildObject();
+		logoutRequest.setID("id");
+		NameIDBuilder nameIdBuilder = new NameIDBuilder();
+		NameID nameId = nameIdBuilder.buildObject();
+		nameId.setValue("user");
+		logoutRequest.setNameID(nameId);
+		IssuerBuilder issuerBuilder = new IssuerBuilder();
+		Issuer issuer = issuerBuilder.buildObject();
+		issuer.setValue(registration.getAssertingPartyDetails().getEntityId());
+		logoutRequest.setIssuer(issuer);
+		logoutRequest.setDestination(registration.getSingleLogoutServiceLocation());
+		return logoutRequest;
+	}
+
+	public static LogoutRequest assertingPartyLogoutRequestNameIdInEncryptedId(RelyingPartyRegistration registration) {
+		LogoutRequestBuilder logoutRequestBuilder = new LogoutRequestBuilder();
+		LogoutRequest logoutRequest = logoutRequestBuilder.buildObject();
+		logoutRequest.setID("id");
+		NameIDBuilder nameIdBuilder = new NameIDBuilder();
+		NameID nameId = nameIdBuilder.buildObject();
+		nameId.setValue("user");
+		logoutRequest.setNameID(null);
+		Saml2X509Credential credential = registration.getAssertingPartyDetails()
+			.getEncryptionX509Credentials()
+			.iterator()
+			.next();
+		EncryptedID encrypted = encrypted(nameId, credential);
+		logoutRequest.setEncryptedID(encrypted);
+		IssuerBuilder issuerBuilder = new IssuerBuilder();
+		Issuer issuer = issuerBuilder.buildObject();
+		issuer.setValue(registration.getAssertingPartyDetails().getEntityId());
+		logoutRequest.setIssuer(issuer);
+		logoutRequest.setDestination(registration.getSingleLogoutServiceLocation());
+		return logoutRequest;
+	}
+
+	public static LogoutResponse assertingPartyLogoutResponse(RelyingPartyRegistration registration) {
+		LogoutResponseBuilder logoutResponseBuilder = new LogoutResponseBuilder();
+		LogoutResponse logoutResponse = logoutResponseBuilder.buildObject();
+		logoutResponse.setID("id");
+		StatusBuilder statusBuilder = new StatusBuilder();
+		StatusCodeBuilder statusCodeBuilder = new StatusCodeBuilder();
+		StatusCode code = statusCodeBuilder.buildObject();
+		code.setValue(StatusCode.SUCCESS);
+		Status status = statusBuilder.buildObject();
+		status.setStatusCode(code);
+		logoutResponse.setStatus(status);
+		IssuerBuilder issuerBuilder = new IssuerBuilder();
+		Issuer issuer = issuerBuilder.buildObject();
+		issuer.setValue(registration.getAssertingPartyDetails().getEntityId());
+		logoutResponse.setIssuer(issuer);
+		logoutResponse.setDestination(registration.getSingleLogoutServiceResponseLocation());
+		return logoutResponse;
+	}
+
+	public static LogoutRequest relyingPartyLogoutRequest(RelyingPartyRegistration registration) {
+		LogoutRequestBuilder logoutRequestBuilder = new LogoutRequestBuilder();
+		LogoutRequest logoutRequest = logoutRequestBuilder.buildObject();
+		logoutRequest.setID("id");
+		NameIDBuilder nameIdBuilder = new NameIDBuilder();
+		NameID nameId = nameIdBuilder.buildObject();
+		nameId.setValue("user");
+		logoutRequest.setNameID(nameId);
+		IssuerBuilder issuerBuilder = new IssuerBuilder();
+		Issuer issuer = issuerBuilder.buildObject();
+		issuer.setValue(registration.getAssertingPartyDetails().getEntityId());
+		logoutRequest.setIssuer(issuer);
+		logoutRequest.setDestination(registration.getAssertingPartyDetails().getSingleLogoutServiceLocation());
+		return logoutRequest;
 	}
 
 	static <T extends XMLObject> T build(QName qName) {

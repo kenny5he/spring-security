@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import javax.servlet.http.Cookie;
+import jakarta.servlet.http.Cookie;
 
 import org.springframework.util.Assert;
 
@@ -126,7 +126,7 @@ public class SimpleSavedRequest implements SavedRequest {
 	}
 
 	public void setLocales(List<Locale> locales) {
-		Assert.notNull("locales cannot be null");
+		Assert.notNull(locales, "locales cannot be null");
 		this.locales = locales;
 	}
 

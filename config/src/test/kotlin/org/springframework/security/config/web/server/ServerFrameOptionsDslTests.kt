@@ -16,13 +16,15 @@
 
 package org.springframework.security.config.web.server
 
-import org.junit.Rule
-import org.junit.Test
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity
-import org.springframework.security.config.test.SpringTestRule
+import org.springframework.security.config.test.SpringTestContext
+import org.springframework.security.config.test.SpringTestContextExtension
 import org.springframework.security.web.header.writers.frameoptions.XFrameOptionsHeaderWriter
 import org.springframework.security.web.server.SecurityWebFilterChain
 import org.springframework.security.web.server.header.XFrameOptionsServerHttpHeadersWriter
@@ -34,10 +36,10 @@ import org.springframework.web.reactive.config.EnableWebFlux
  *
  * @author Eleftheria Stein
  */
+@ExtendWith(SpringTestContextExtension::class)
 class ServerFrameOptionsDslTests {
-    @Rule
     @JvmField
-    val spring = SpringTestRule()
+    val spring = SpringTestContext(this)
 
     private lateinit var client: WebTestClient
 
@@ -59,6 +61,7 @@ class ServerFrameOptionsDslTests {
                 .expectHeader().valueEquals(XFrameOptionsServerHttpHeadersWriter.X_FRAME_OPTIONS, XFrameOptionsHeaderWriter.XFrameOptionsMode.DENY.name)
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class FrameOptionsConfig {
@@ -82,6 +85,7 @@ class ServerFrameOptionsDslTests {
                 .expectHeader().doesNotExist(XFrameOptionsServerHttpHeadersWriter.X_FRAME_OPTIONS)
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class FrameOptionsDisabledConfig {
@@ -107,6 +111,7 @@ class ServerFrameOptionsDslTests {
                 .expectHeader().valueEquals(XFrameOptionsServerHttpHeadersWriter.X_FRAME_OPTIONS, XFrameOptionsHeaderWriter.XFrameOptionsMode.SAMEORIGIN.name)
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class CustomModeConfig {

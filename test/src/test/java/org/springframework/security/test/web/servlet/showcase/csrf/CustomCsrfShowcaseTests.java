@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2014 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,20 +16,21 @@
 
 package org.springframework.security.test.web.servlet.showcase.csrf;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -43,7 +44,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@RunWith(SpringJUnit4ClassRunner.class)
+@ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = CustomCsrfShowcaseTests.Config.class)
 @WebAppConfiguration
 public class CustomCsrfShowcaseTests {
@@ -56,10 +57,12 @@ public class CustomCsrfShowcaseTests {
 
 	private MockMvc mvc;
 
-	@Before
+	@BeforeEach
 	public void setup() {
-		this.mvc = MockMvcBuilders.webAppContextSetup(this.context).defaultRequest(get("/").with(csrf()))
-				.apply(springSecurity()).build();
+		this.mvc = MockMvcBuilders.webAppContextSetup(this.context)
+			.defaultRequest(get("/").with(csrf()))
+			.apply(springSecurity())
+			.build();
 	}
 
 	@Test
@@ -72,16 +75,18 @@ public class CustomCsrfShowcaseTests {
 		this.mvc.perform(put("/").with(csrf())).andExpect(status().isNotFound());
 	}
 
+	@Configuration
 	@EnableWebSecurity
 	@EnableWebMvc
-	static class Config extends WebSecurityConfigurerAdapter {
+	static class Config {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.csrf()
 					.csrfTokenRepository(repo());
+			return http.build();
 			// @formatter:on
 		}
 

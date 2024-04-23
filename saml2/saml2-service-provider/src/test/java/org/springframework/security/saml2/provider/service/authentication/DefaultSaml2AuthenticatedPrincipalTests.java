@@ -22,8 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.joda.time.DateTime;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -44,13 +43,13 @@ public class DefaultSaml2AuthenticatedPrincipalTests {
 		Map<String, List<Object>> attributes = new LinkedHashMap<>();
 		attributes.put("email", Arrays.asList("john.doe@example.com", "doe.john@example.com"));
 		assertThatIllegalArgumentException().isThrownBy(() -> new DefaultSaml2AuthenticatedPrincipal(null, attributes))
-				.withMessageContaining("name cannot be null");
+			.withMessageContaining("name cannot be null");
 	}
 
 	@Test
 	public void createDefaultSaml2AuthenticatedPrincipalWhenAttributesNullThenException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new DefaultSaml2AuthenticatedPrincipal("user", null))
-				.withMessageContaining("attributes cannot be null");
+			.withMessageContaining("attributes cannot be null");
 	}
 
 	@Test
@@ -72,7 +71,7 @@ public class DefaultSaml2AuthenticatedPrincipalTests {
 	@Test
 	public void getAttributeWhenDistinctValuesThenReturnsValues() {
 		final Boolean registered = true;
-		final Instant registeredDate = Instant.ofEpochMilli(DateTime.parse("1970-01-01T00:00:00Z").getMillis());
+		final Instant registeredDate = Instant.parse("1970-01-01T00:00:00Z");
 		Map<String, List<Object>> attributes = new LinkedHashMap<>();
 		attributes.put("registration", Arrays.asList(registered, registeredDate));
 		DefaultSaml2AuthenticatedPrincipal principal = new DefaultSaml2AuthenticatedPrincipal("user", attributes);

@@ -25,10 +25,10 @@ import io.rsocket.exceptions.ApplicationErrorException;
 import io.rsocket.frame.decoder.PayloadDecoder;
 import io.rsocket.transport.netty.server.CloseableChannel;
 import io.rsocket.transport.netty.server.TcpServerTransport;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -49,7 +49,7 @@ import org.springframework.security.rsocket.metadata.BasicAuthenticationEncoder;
 import org.springframework.security.rsocket.metadata.UsernamePasswordMetadata;
 import org.springframework.stereotype.Controller;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -58,7 +58,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
  * @author Rob Winch
  */
 @ContextConfiguration
-@RunWith(SpringRunner.class)
+@ExtendWith(SpringExtension.class)
 public class RSocketMessageHandlerITests {
 
 	@Autowired
@@ -74,7 +74,7 @@ public class RSocketMessageHandlerITests {
 
 	private RSocketRequester requester;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		// @formatter:off
 		this.server = RSocketServer.create()
@@ -94,7 +94,7 @@ public class RSocketMessageHandlerITests {
 		// @formatter:on
 	}
 
-	@After
+	@AfterEach
 	public void dispose() {
 		this.requester.rsocket().dispose();
 		this.server.dispose();
@@ -195,7 +195,7 @@ public class RSocketMessageHandlerITests {
 		String data = "a";
 		assertThatExceptionOfType(ApplicationErrorException.class).isThrownBy(
 				() -> this.requester.route("secure.hello").data(data).retrieveFlux(String.class).collectList().block())
-				.withMessageContaining("Access Denied");
+			.withMessageContaining("Access Denied");
 		assertThat(this.controller.payloads).isEmpty();
 	}
 
@@ -294,7 +294,7 @@ public class RSocketMessageHandlerITests {
 
 		@MessageMapping({ "secure.send", "send" })
 		Mono<Void> send(Mono<String> payload) {
-			return payload.doOnNext(this::add).then(Mono.fromRunnable(() -> doNotifyAll()));
+			return payload.doOnNext(this::add).then(Mono.fromRunnable(this::doNotifyAll));
 		}
 
 		private synchronized void doNotifyAll() {

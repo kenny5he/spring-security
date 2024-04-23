@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,13 @@ import org.springframework.util.ClassUtils;
  * @author Luke Taylor
  * @since 3.0
  * @see PreInvocationAuthorizationAdviceVoter
+ * @deprecated Use
+ * {@link org.springframework.security.authorization.method.PreAuthorizeAuthorizationManager}
+ * and
+ * {@link org.springframework.security.authorization.method.PostAuthorizeAuthorizationManager}
+ * instead
  */
+@Deprecated
 public class PrePostAnnotationSecurityMetadataSource extends AbstractMethodSecurityMetadataSource {
 
 	private final PrePostInvocationAttributeFactory attributeFactory;
@@ -62,8 +68,6 @@ public class PrePostAnnotationSecurityMetadataSource extends AbstractMethodSecur
 		if (method.getDeclaringClass() == Object.class) {
 			return Collections.emptyList();
 		}
-		this.logger.trace(LogMessage.format("Looking for Pre/Post annotations for method '%s' on target class '%s'",
-				method.getName(), targetClass));
 		PreFilter preFilter = findAnnotation(method, targetClass, PreFilter.class);
 		PreAuthorize preAuthorize = findAnnotation(method, targetClass, PreAuthorize.class);
 		PostFilter postFilter = findAnnotation(method, targetClass, PostFilter.class);
@@ -71,7 +75,6 @@ public class PrePostAnnotationSecurityMetadataSource extends AbstractMethodSecur
 		PostAuthorize postAuthorize = findAnnotation(method, targetClass, PostAuthorize.class);
 		if (preFilter == null && preAuthorize == null && postFilter == null && postAuthorize == null) {
 			// There is no meta-data so return
-			this.logger.trace("No expression annotations found");
 			return Collections.emptyList();
 		}
 		String preFilterAttribute = (preFilter != null) ? preFilter.value() : null;
@@ -127,8 +130,8 @@ public class PrePostAnnotationSecurityMetadataSource extends AbstractMethodSecur
 		// actually implement the method)
 		annotation = AnnotationUtils.findAnnotation(specificMethod.getDeclaringClass(), annotationClass);
 		if (annotation != null) {
-			this.logger.debug(
-					LogMessage.format("%s found on: %s", annotation, specificMethod.getDeclaringClass().getName()));
+			this.logger
+				.debug(LogMessage.format("%s found on: %s", annotation, specificMethod.getDeclaringClass().getName()));
 			return annotation;
 		}
 		return null;

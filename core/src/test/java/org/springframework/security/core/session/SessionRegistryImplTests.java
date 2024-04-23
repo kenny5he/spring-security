@@ -19,8 +19,8 @@ package org.springframework.security.core.session;
 import java.util.Date;
 import java.util.List;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.core.context.SecurityContext;
 
@@ -35,7 +35,7 @@ public class SessionRegistryImplTests {
 
 	private SessionRegistryImpl sessionRegistry;
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		this.sessionRegistry = new SessionRegistryImpl();
 	}
@@ -97,8 +97,8 @@ public class SessionRegistryImplTests {
 		this.sessionRegistry.registerNewSession(sessionId2, principal1);
 		this.sessionRegistry.registerNewSession(sessionId3, principal2);
 		assertThat(this.sessionRegistry.getAllPrincipals()).hasSize(2);
-		assertThat(this.sessionRegistry.getAllPrincipals().contains(principal1)).isTrue();
-		assertThat(this.sessionRegistry.getAllPrincipals().contains(principal2)).isTrue();
+		assertThat(this.sessionRegistry.getAllPrincipals()).contains(principal1);
+		assertThat(this.sessionRegistry.getAllPrincipals()).contains(principal2);
 	}
 
 	@Test

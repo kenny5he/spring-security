@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package org.springframework.security.config.annotation.web.configurers;
 
 import java.util.List;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -95,9 +95,10 @@ public final class ServletApiConfigurer<H extends HttpSecurityBuilder<H>>
 			String[] grantedAuthorityDefaultsBeanNames = context.getBeanNamesForType(GrantedAuthorityDefaults.class);
 			if (grantedAuthorityDefaultsBeanNames.length == 1) {
 				GrantedAuthorityDefaults grantedAuthorityDefaults = context
-						.getBean(grantedAuthorityDefaultsBeanNames[0], GrantedAuthorityDefaults.class);
+					.getBean(grantedAuthorityDefaultsBeanNames[0], GrantedAuthorityDefaults.class);
 				this.securityContextRequestFilter.setRolePrefix(grantedAuthorityDefaults.getRolePrefix());
 			}
+			this.securityContextRequestFilter.setSecurityContextHolderStrategy(getSecurityContextHolderStrategy());
 		}
 		this.securityContextRequestFilter = postProcess(this.securityContextRequestFilter);
 		http.addFilter(this.securityContextRequestFilter);

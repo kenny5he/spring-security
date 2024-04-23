@@ -1,5 +1,5 @@
 /*
- * Copyright 2004, 2005, 2006 Acegi Technology Pty Limited
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,17 @@
 
 package org.springframework.security.web;
 
-import javax.servlet.FilterChain;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import java.util.Enumeration;
+import java.util.NoSuchElementException;
 
-import org.junit.Test;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.web.FilterInvocation.DummyRequest;
 import org.springframework.security.web.util.UrlUtils;
 
@@ -74,14 +77,14 @@ public class FilterInvocationTests {
 	public void testRejectsNullServletRequest() {
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new FilterInvocation(null, response, mock(FilterChain.class)));
+			.isThrownBy(() -> new FilterInvocation(null, response, mock(FilterChain.class)));
 	}
 
 	@Test
 	public void testRejectsNullServletResponse() {
 		MockHttpServletRequest request = new MockHttpServletRequest(null, null);
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new FilterInvocation(request, null, mock(FilterChain.class)));
+			.isThrownBy(() -> new FilterInvocation(request, null, mock(FilterChain.class)));
 	}
 
 	@Test
@@ -120,7 +123,7 @@ public class FilterInvocationTests {
 	@Test
 	public void dummyChainRejectsInvocation() throws Exception {
 		assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(() -> FilterInvocation.DUMMY_CHAIN
-				.doFilter(mock(HttpServletRequest.class), mock(HttpServletResponse.class)));
+			.doFilter(mock(HttpServletRequest.class), mock(HttpServletResponse.class)));
 	}
 
 	@Test
@@ -129,6 +132,35 @@ public class FilterInvocationTests {
 		request.setContextPath("");
 		request.setRequestURI("/something");
 		UrlUtils.buildRequestUrl(request);
+	}
+
+	@Test
+	public void constructorWhenServletContextProvidedThenSetServletContextInRequest() {
+		String contextPath = "";
+		String servletPath = "/path";
+		String method = "";
+		MockServletContext mockServletContext = new MockServletContext();
+		FilterInvocation filterInvocation = new FilterInvocation(contextPath, servletPath, method, mockServletContext);
+		assertThat(filterInvocation.getRequest().getServletContext()).isSameAs(mockServletContext);
+	}
+
+	@Test
+	public void testDummyRequestGetHeaders() {
+		DummyRequest request = new DummyRequest();
+		request.addHeader("known", "val");
+		Enumeration<String> headers = request.getHeaders("known");
+		assertThat(headers.hasMoreElements()).isTrue();
+		assertThat(headers.nextElement()).isEqualTo("val");
+		assertThat(headers.hasMoreElements()).isFalse();
+		assertThatExceptionOfType(NoSuchElementException.class).isThrownBy(headers::nextElement);
+	}
+
+	@Test
+	public void testDummyRequestGetHeadersNull() {
+		DummyRequest request = new DummyRequest();
+		Enumeration<String> headers = request.getHeaders("unknown");
+		assertThat(headers.hasMoreElements()).isFalse();
+		assertThatExceptionOfType(NoSuchElementException.class).isThrownBy(headers::nextElement);
 	}
 
 }

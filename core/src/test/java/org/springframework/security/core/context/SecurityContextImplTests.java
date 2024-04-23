@@ -16,7 +16,7 @@
 
 package org.springframework.security.core.context;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -40,7 +40,7 @@ public class SecurityContextImplTests {
 	@Test
 	public void testSecurityContextCorrectOperation() {
 		SecurityContext context = new SecurityContextImpl();
-		Authentication auth = new UsernamePasswordAuthenticationToken("rod", "koala");
+		Authentication auth = UsernamePasswordAuthenticationToken.unauthenticated("rod", "koala");
 		context.setAuthentication(auth);
 		assertThat(context.getAuthentication()).isEqualTo(auth);
 		assertThat(context.toString().lastIndexOf("rod") != -1).isTrue();

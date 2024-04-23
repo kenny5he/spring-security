@@ -18,7 +18,7 @@ package org.springframework.security.web.server.csrf;
 
 import java.util.Map;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -55,7 +55,7 @@ public class WebSessionServerCsrfTokenRepositoryTests {
 	@Test
 	public void saveTokenWhenDefaultThenAddsToSession() {
 		Mono<CsrfToken> result = this.repository.generateToken(this.exchange)
-				.delayUntil((t) -> this.repository.saveToken(this.exchange, t));
+			.delayUntil((t) -> this.repository.saveToken(this.exchange, t));
 		result.block();
 		WebSession session = this.exchange.getSession().block();
 		Map<String, Object> attributes = session.getAttributes();

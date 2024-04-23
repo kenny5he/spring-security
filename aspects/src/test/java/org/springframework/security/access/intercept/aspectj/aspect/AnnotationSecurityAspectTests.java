@@ -20,9 +20,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -74,7 +74,7 @@ public class AnnotationSecurityAspectTests {
 
 	private PrePostSecured prePostSecured = new PrePostSecured();
 
-	@Before
+	@BeforeEach
 	public final void setUp() {
 		MockitoAnnotations.initMocks(this);
 		this.interceptor = new AspectJMethodSecurityInterceptor();
@@ -88,7 +88,7 @@ public class AnnotationSecurityAspectTests {
 		secAspect.setSecurityInterceptor(this.interceptor);
 	}
 
-	@After
+	@AfterEach
 	public void clearContext() {
 		SecurityContextHolder.clearContext();
 	}
@@ -101,7 +101,7 @@ public class AnnotationSecurityAspectTests {
 	@Test
 	public void securedClassMethodDeniesUnauthenticatedAccess() {
 		assertThatExceptionOfType(AuthenticationCredentialsNotFoundException.class)
-				.isThrownBy(() -> this.secured.securedClassMethod());
+			.isThrownBy(() -> this.secured.securedClassMethod());
 	}
 
 	@Test
@@ -143,8 +143,8 @@ public class AnnotationSecurityAspectTests {
 		SecurityContextHolder.getContext().setAuthentication(this.anne);
 		List<String> objects = this.prePostSecured.postFilterMethod();
 		assertThat(objects).hasSize(2);
-		assertThat(objects.contains("apple")).isTrue();
-		assertThat(objects.contains("aubergine")).isTrue();
+		assertThat(objects).contains("apple");
+		assertThat(objects).contains("aubergine");
 	}
 
 	private void configureForElAnnotations() {

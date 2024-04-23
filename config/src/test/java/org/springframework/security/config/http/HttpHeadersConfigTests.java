@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,14 +24,15 @@ import java.util.Map;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableMap;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.parsing.BeanDefinitionParsingException;
 import org.springframework.beans.factory.xml.XmlBeanDefinitionStoreException;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,7 +48,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Tim Ysewyn
  * @author Josh Cummings
  * @author Rafiullah Hamedy
+ * @author Marcus Da Coregio
  */
+@ExtendWith(SpringTestContextExtension.class)
 public class HttpHeadersConfigTests {
 
 	private static final String CONFIG_LOCATION_PREFIX = "classpath:org/springframework/security/config/http/HttpHeadersConfigTests";
@@ -59,12 +62,11 @@ public class HttpHeadersConfigTests {
 			.put("Cache-Control", "no-cache, no-store, max-age=0, must-revalidate")
 			.put("Expires", "0")
 			.put("Pragma", "no-cache")
-			.put("X-XSS-Protection", "1; mode=block")
+			.put("X-XSS-Protection", "0")
 			.build();
 	// @formatter:on
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired
 	MockMvc mvc;
@@ -115,8 +117,8 @@ public class HttpHeadersConfigTests {
 	@Test
 	public void configureWhenHeadersDisabledHavingChildElementThenAutowireFails() {
 		assertThatExceptionOfType(BeanDefinitionParsingException.class)
-				.isThrownBy(() -> this.spring.configLocations(this.xml("HeadersDisabledHavingChildElement")).autowire())
-				.withMessageContaining("Cannot specify <headers disabled=\"true\"> with child elements");
+			.isThrownBy(() -> this.spring.configLocations(this.xml("HeadersDisabledHavingChildElement")).autowire())
+			.withMessageContaining("Cannot specify <headers disabled=\"true\"> with child elements");
 	}
 
 	@Test
@@ -252,18 +254,19 @@ public class HttpHeadersConfigTests {
 	@Test
 	public void configureWhenUsingFrameOptionsAllowFromNoOriginThenAutowireFails() {
 		assertThatExceptionOfType(BeanDefinitionParsingException.class)
-				.isThrownBy(() -> this.spring
-						.configLocations(this.xml("DefaultsDisabledWithFrameOptionsAllowFromNoOrigin")).autowire())
-				.withMessageContaining("Strategy requires a 'value' to be set.");
+			.isThrownBy(() -> this.spring.configLocations(this.xml("DefaultsDisabledWithFrameOptionsAllowFromNoOrigin"))
+				.autowire())
+			.withMessageContaining("Strategy requires a 'value' to be set.");
 		// FIXME better error message?
 	}
 
 	@Test
 	public void configureWhenUsingFrameOptionsAllowFromBlankOriginThenAutowireFails() {
 		assertThatExceptionOfType(BeanDefinitionParsingException.class)
-				.isThrownBy(() -> this.spring
-						.configLocations(this.xml("DefaultsDisabledWithFrameOptionsAllowFromBlankOrigin")).autowire())
-				.withMessageContaining("Strategy requires a 'value' to be set.");
+			.isThrownBy(
+					() -> this.spring.configLocations(this.xml("DefaultsDisabledWithFrameOptionsAllowFromBlankOrigin"))
+						.autowire())
+			.withMessageContaining("Strategy requires a 'value' to be set.");
 		// FIXME better error message?
 	}
 
@@ -322,14 +325,14 @@ public class HttpHeadersConfigTests {
 
 	@Test
 	public void configureWhenUsingCustomHeaderNameOnlyThenAutowireFails() {
-		assertThatExceptionOfType(BeanCreationException.class).isThrownBy(
-				() -> this.spring.configLocations(this.xml("DefaultsDisabledWithOnlyHeaderName")).autowire());
+		assertThatExceptionOfType(BeanCreationException.class)
+			.isThrownBy(() -> this.spring.configLocations(this.xml("DefaultsDisabledWithOnlyHeaderName")).autowire());
 	}
 
 	@Test
 	public void configureWhenUsingCustomHeaderValueOnlyThenAutowireFails() {
-		assertThatExceptionOfType(BeanCreationException.class).isThrownBy(
-				() -> this.spring.configLocations(this.xml("DefaultsDisabledWithOnlyHeaderValue")).autowire());
+		assertThatExceptionOfType(BeanCreationException.class)
+			.isThrownBy(() -> this.spring.configLocations(this.xml("DefaultsDisabledWithOnlyHeaderValue")).autowire());
 	}
 
 	@Test
@@ -351,29 +354,16 @@ public class HttpHeadersConfigTests {
 		// @formatter:off
 		this.mvc.perform(get("/"))
 				.andExpect(status().isOk())
-				.andExpect(header().string("X-XSS-Protection", "1; mode=block"))
+				.andExpect(header().string("X-XSS-Protection", "0"))
 				.andExpect(excludes(excludedHeaders));
 		// @formatter:on
 	}
 
 	@Test
-	public void requestWhenEnablingXssProtectionThenDefaultsToModeBlock() throws Exception {
+	public void requestWhenSettingXssProtectionHeaderValueToZeroThenDefaultsToZero() throws Exception {
 		Set<String> excludedHeaders = new HashSet<>(defaultHeaders.keySet());
 		excludedHeaders.remove("X-XSS-Protection");
-		this.spring.configLocations(this.xml("DefaultsDisabledWithXssProtectionEnabled")).autowire();
-		// @formatter:off
-		this.mvc.perform(get("/"))
-				.andExpect(status().isOk())
-				.andExpect(header().string("X-XSS-Protection", "1; mode=block"))
-				.andExpect(excludes(excludedHeaders));
-		// @formatter:on
-	}
-
-	@Test
-	public void requestWhenDisablingXssProtectionThenDefaultsToZero() throws Exception {
-		Set<String> excludedHeaders = new HashSet<>(defaultHeaders.keySet());
-		excludedHeaders.remove("X-XSS-Protection");
-		this.spring.configLocations(this.xml("DefaultsDisabledWithXssProtectionDisabled")).autowire();
+		this.spring.configLocations(this.xml("DefaultsDisabledWithXssProtectionHeaderValueZero")).autowire();
 		// @formatter:off
 		this.mvc.perform(get("/"))
 				.andExpect(status().isOk())
@@ -383,18 +373,38 @@ public class HttpHeadersConfigTests {
 	}
 
 	@Test
-	public void configureWhenXssProtectionDisabledAndBlockSetThenAutowireFails() {
-		assertThatExceptionOfType(BeanCreationException.class)
-				.isThrownBy(() -> this.spring
-						.configLocations(this.xml("DefaultsDisabledWithXssProtectionDisabledAndBlockSet")).autowire())
-				.withMessageContaining("Cannot set block to true with enabled false");
+	public void requestWhenSettingXssProtectionHeaderValueToOneThenDefaultsToOne() throws Exception {
+		Set<String> excludedHeaders = new HashSet<>(defaultHeaders.keySet());
+		excludedHeaders.remove("X-XSS-Protection");
+		this.spring.configLocations(this.xml("DefaultsDisabledWithXssProtectionHeaderValueOne")).autowire();
+		// @formatter:off
+		this.mvc.perform(get("/"))
+				.andExpect(status().isOk())
+				.andExpect(header().string("X-XSS-Protection", "1"))
+				.andExpect(excludes(excludedHeaders));
+		// @formatter:on
+	}
+
+	@Test
+	public void requestWhenSettingXssProtectionHeaderValueToOneModeBlockThenDefaultsToOneModeBlock() throws Exception {
+		Set<String> excludedHeaders = new HashSet<>(defaultHeaders.keySet());
+		excludedHeaders.remove("X-XSS-Protection");
+		this.spring.configLocations(this.xml("DefaultsDisabledWithXssProtectionHeaderValueOneModeBlock")).autowire();
+		// @formatter:off
+		this.mvc.perform(get("/"))
+				.andExpect(status().isOk())
+				.andExpect(header().string("X-XSS-Protection", "1; mode=block"))
+				.andExpect(excludes(excludedHeaders));
+		// @formatter:on
 	}
 
 	@Test
 	public void requestWhenUsingCacheControlThenRespondsWithCorrespondingHeaders() throws Exception {
 		Map<String, String> includedHeaders = ImmutableMap.<String, String>builder()
-				.put("Cache-Control", "no-cache, no-store, max-age=0, must-revalidate").put("Expires", "0")
-				.put("Pragma", "no-cache").build();
+			.put("Cache-Control", "no-cache, no-store, max-age=0, must-revalidate")
+			.put("Expires", "0")
+			.put("Pragma", "no-cache")
+			.build();
 		this.spring.configLocations(this.xml("DefaultsDisabledWithCacheControl")).autowire();
 		// @formatter:off
 		this.mvc.perform(get("/"))
@@ -442,15 +452,17 @@ public class HttpHeadersConfigTests {
 	@Test
 	public void configureWhenUsingHpkpWithoutPinsThenAutowireFails() {
 		assertThatExceptionOfType(XmlBeanDefinitionStoreException.class)
-				.isThrownBy(() -> this.spring.configLocations(this.xml("DefaultsDisabledWithEmptyHpkp")).autowire())
-				.withMessageContaining("The content of element 'hpkp' is not complete");
+			.isThrownBy(() -> this.spring.configLocations(this.xml("DefaultsDisabledWithEmptyHpkp")).autowire())
+			.havingRootCause()
+			.withMessageContaining("The content of element 'hpkp' is not complete");
 	}
 
 	@Test
 	public void configureWhenUsingHpkpWithEmptyPinsThenAutowireFails() {
 		assertThatExceptionOfType(XmlBeanDefinitionStoreException.class)
-				.isThrownBy(() -> this.spring.configLocations(this.xml("DefaultsDisabledWithEmptyPins")).autowire())
-				.withMessageContaining("The content of element 'pins' is not complete");
+			.isThrownBy(() -> this.spring.configLocations(this.xml("DefaultsDisabledWithEmptyPins")).autowire())
+			.havingRootCause()
+			.withMessageContaining("The content of element 'pins' is not complete");
 	}
 
 	@Test
@@ -613,47 +625,38 @@ public class HttpHeadersConfigTests {
 
 	@Test
 	public void configureWhenHstsDisabledAndIncludeSubdomainsSpecifiedThenAutowireFails() {
-		assertThatExceptionOfType(BeanDefinitionParsingException.class).isThrownBy(
-				() -> this.spring.configLocations(this.xml("HstsDisabledSpecifyingIncludeSubdomains")).autowire())
-				.withMessageContaining("include-subdomains");
+		assertThatExceptionOfType(BeanDefinitionParsingException.class)
+			.isThrownBy(
+					() -> this.spring.configLocations(this.xml("HstsDisabledSpecifyingIncludeSubdomains")).autowire())
+			.withMessageContaining("include-subdomains");
 	}
 
 	@Test
 	public void configureWhenHstsDisabledAndMaxAgeSpecifiedThenAutowireFails() {
 		assertThatExceptionOfType(BeanDefinitionParsingException.class)
-				.isThrownBy(() -> this.spring.configLocations(this.xml("HstsDisabledSpecifyingMaxAge")).autowire())
-				.withMessageContaining("max-age");
+			.isThrownBy(() -> this.spring.configLocations(this.xml("HstsDisabledSpecifyingMaxAge")).autowire())
+			.withMessageContaining("max-age");
 	}
 
 	@Test
 	public void configureWhenHstsDisabledAndRequestMatcherSpecifiedThenAutowireFails() {
 		assertThatExceptionOfType(BeanDefinitionParsingException.class)
-				.isThrownBy(
-						() -> this.spring.configLocations(this.xml("HstsDisabledSpecifyingRequestMatcher")).autowire())
-				.withMessageContaining("request-matcher-ref");
+			.isThrownBy(() -> this.spring.configLocations(this.xml("HstsDisabledSpecifyingRequestMatcher")).autowire())
+			.withMessageContaining("request-matcher-ref");
 	}
 
 	@Test
-	public void configureWhenXssProtectionDisabledAndEnabledThenAutowireFails() {
-		assertThatExceptionOfType(BeanDefinitionParsingException.class)
-				.isThrownBy(() -> this.spring.configLocations(this.xml("XssProtectionDisabledAndEnabled")).autowire())
-				.withMessageContaining("enabled");
-	}
-
-	@Test
-	public void configureWhenXssProtectionDisabledAndBlockSpecifiedThenAutowireFails() {
-		assertThatExceptionOfType(BeanDefinitionParsingException.class)
-				.isThrownBy(
-						() -> this.spring.configLocations(this.xml("XssProtectionDisabledSpecifyingBlock")).autowire())
-				.withMessageContaining("block");
+	public void configureWhenXssProtectionDisabledAndHeaderValueSpecifiedThenAutowireFails() {
+		assertThatExceptionOfType(BeanDefinitionParsingException.class).isThrownBy(
+				() -> this.spring.configLocations(this.xml("XssProtectionDisabledSpecifyingHeaderValue")).autowire())
+			.withMessageContaining("header-value");
 	}
 
 	@Test
 	public void configureWhenFrameOptionsDisabledAndPolicySpecifiedThenAutowireFails() {
 		assertThatExceptionOfType(BeanDefinitionParsingException.class)
-				.isThrownBy(
-						() -> this.spring.configLocations(this.xml("FrameOptionsDisabledSpecifyingPolicy")).autowire())
-				.withMessageContaining("policy");
+			.isThrownBy(() -> this.spring.configLocations(this.xml("FrameOptionsDisabledSpecifyingPolicy")).autowire())
+			.withMessageContaining("policy");
 	}
 
 	@Test
@@ -729,6 +732,53 @@ public class HttpHeadersConfigTests {
 				.andExpect(status().isOk())
 				.andExpect(excludesDefaults())
 				.andExpect(header().string("Referrer-Policy", "same-origin"));
+		// @formatter:on
+	}
+
+	@Test
+	public void requestWhenCrossOriginOpenerPolicyWithSameOriginAllowPopupsThenRespondsWithSameOriginAllowPopups()
+			throws Exception {
+		this.spring.configLocations(this.xml("DefaultsDisabledWithCrossOriginOpenerPolicy")).autowire();
+		// @formatter:off
+		this.mvc.perform(get("/"))
+				.andExpect(status().isOk())
+				.andExpect(excludesDefaults())
+				.andExpect(header().string("Cross-Origin-Opener-Policy", "same-origin-allow-popups"));
+		// @formatter:on
+	}
+
+	@Test
+	public void requestWhenCrossOriginEmbedderPolicyWithRequireCorpThenRespondsWithRequireCorp() throws Exception {
+		this.spring.configLocations(this.xml("DefaultsDisabledWithCrossOriginEmbedderPolicy")).autowire();
+		// @formatter:off
+		this.mvc.perform(get("/"))
+				.andExpect(status().isOk())
+				.andExpect(excludesDefaults())
+				.andExpect(header().string("Cross-Origin-Embedder-Policy", "require-corp"));
+		// @formatter:on
+	}
+
+	@Test
+	public void requestWhenCrossOriginResourcePolicyWithSameOriginThenRespondsWithSameOrigin() throws Exception {
+		this.spring.configLocations(this.xml("DefaultsDisabledWithCrossOriginResourcePolicy")).autowire();
+		// @formatter:off
+		this.mvc.perform(get("/"))
+				.andExpect(status().isOk())
+				.andExpect(excludesDefaults())
+				.andExpect(header().string("Cross-Origin-Resource-Policy", "same-origin"));
+		// @formatter:on
+	}
+
+	@Test
+	public void requestWhenCrossOriginPoliciesRespondsCrossOriginPolicies() throws Exception {
+		this.spring.configLocations(this.xml("DefaultsDisabledWithCrossOriginPolicies")).autowire();
+		// @formatter:off
+		this.mvc.perform(get("/"))
+				.andExpect(status().isOk())
+				.andExpect(excludesDefaults())
+				.andExpect(header().string("Cross-Origin-Opener-Policy", "same-origin"))
+				.andExpect(header().string("Cross-Origin-Embedder-Policy", "require-corp"))
+				.andExpect(header().string("Cross-Origin-Resource-Policy", "same-origin"));
 		// @formatter:on
 	}
 

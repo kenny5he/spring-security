@@ -24,7 +24,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.json.JSONException;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.skyscreamer.jsonassert.JSONAssert;
 
 import org.springframework.security.core.GrantedAuthority;
@@ -73,7 +73,7 @@ public class UserDeserializerTests extends AbstractMixinTests {
 		String userJsonWithoutPasswordString = USER_JSON.replace(SimpleGrantedAuthorityMixinTests.AUTHORITIES_SET_JSON,
 				"[]");
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> this.mapper.readValue(userJsonWithoutPasswordString, User.class));
+			.isThrownBy(() -> this.mapper.readValue(userJsonWithoutPasswordString, User.class));
 	}
 
 	@Test

@@ -18,7 +18,7 @@ package org.springframework.security.access.vote;
 
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.access.AccessDecisionVoter;
 import org.springframework.security.access.ConfigAttribute;
@@ -44,7 +44,7 @@ public class AuthenticatedVoterTests {
 	}
 
 	private Authentication createFullyAuthenticated() {
-		return new UsernamePasswordAuthenticationToken("ignored", "ignored",
+		return UsernamePasswordAuthenticationToken.authenticated("ignored", "ignored",
 				AuthorityUtils.createAuthorityList("ignored"));
 	}
 
@@ -59,6 +59,7 @@ public class AuthenticatedVoterTests {
 		assertThat(AccessDecisionVoter.ACCESS_GRANTED).isEqualTo(voter.vote(createAnonymous(), null, def));
 		assertThat(AccessDecisionVoter.ACCESS_GRANTED).isEqualTo(voter.vote(createRememberMe(), null, def));
 		assertThat(AccessDecisionVoter.ACCESS_GRANTED).isEqualTo(voter.vote(createFullyAuthenticated(), null, def));
+		assertThat(AccessDecisionVoter.ACCESS_DENIED).isEqualTo(voter.vote(null, null, def));
 	}
 
 	@Test
@@ -68,6 +69,7 @@ public class AuthenticatedVoterTests {
 		assertThat(AccessDecisionVoter.ACCESS_DENIED).isEqualTo(voter.vote(createAnonymous(), null, def));
 		assertThat(AccessDecisionVoter.ACCESS_DENIED).isEqualTo(voter.vote(createRememberMe(), null, def));
 		assertThat(AccessDecisionVoter.ACCESS_GRANTED).isEqualTo(voter.vote(createFullyAuthenticated(), null, def));
+		assertThat(AccessDecisionVoter.ACCESS_DENIED).isEqualTo(voter.vote(null, null, def));
 	}
 
 	@Test
@@ -77,6 +79,7 @@ public class AuthenticatedVoterTests {
 		assertThat(AccessDecisionVoter.ACCESS_DENIED).isEqualTo(voter.vote(createAnonymous(), null, def));
 		assertThat(AccessDecisionVoter.ACCESS_GRANTED).isEqualTo(voter.vote(createRememberMe(), null, def));
 		assertThat(AccessDecisionVoter.ACCESS_GRANTED).isEqualTo(voter.vote(createFullyAuthenticated(), null, def));
+		assertThat(AccessDecisionVoter.ACCESS_DENIED).isEqualTo(voter.vote(null, null, def));
 	}
 
 	@Test

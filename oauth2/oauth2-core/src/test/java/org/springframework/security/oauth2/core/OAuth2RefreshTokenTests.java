@@ -18,7 +18,7 @@ package org.springframework.security.oauth2.core;
 
 import java.time.Instant;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -39,23 +39,21 @@ public class OAuth2RefreshTokenTests {
 	@Test
 	public void constructorWhenTokenValueIsNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new OAuth2RefreshToken(null, ISSUED_AT, EXPIRES_AT))
-				.withMessage("tokenValue cannot be empty");
+			.withMessage("tokenValue cannot be empty");
 	}
 
 	@Test
 	public void constructorWhenIssuedAtAfterExpiresAtThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(
-						() -> new OAuth2RefreshToken(TOKEN_VALUE, Instant.from(EXPIRES_AT).plusSeconds(1), EXPIRES_AT))
-				.withMessage("expiresAt must be after issuedAt");
+			.isThrownBy(() -> new OAuth2RefreshToken(TOKEN_VALUE, Instant.from(EXPIRES_AT).plusSeconds(1), EXPIRES_AT))
+			.withMessage("expiresAt must be after issuedAt");
 	}
 
 	@Test
 	public void constructorWhenExpiresAtBeforeIssuedAtThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(
-						() -> new OAuth2RefreshToken(TOKEN_VALUE, ISSUED_AT, Instant.from(ISSUED_AT).minusSeconds(1)))
-				.withMessage("expiresAt must be after issuedAt");
+			.isThrownBy(() -> new OAuth2RefreshToken(TOKEN_VALUE, ISSUED_AT, Instant.from(ISSUED_AT).minusSeconds(1)))
+			.withMessage("expiresAt must be after issuedAt");
 	}
 
 	@Test

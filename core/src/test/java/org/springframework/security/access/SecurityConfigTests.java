@@ -16,7 +16,7 @@
 
 package org.springframework.security.access;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -48,7 +48,7 @@ public class SecurityConfigTests {
 	@Test
 	public void testNoArgConstructorDoesntExist() throws Exception {
 		assertThatExceptionOfType(NoSuchMethodException.class)
-				.isThrownBy(() -> SecurityConfig.class.getDeclaredConstructor((Class[]) null));
+			.isThrownBy(() -> SecurityConfig.class.getDeclaredConstructor((Class[]) null));
 	}
 
 	@Test

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,10 @@
 
 package org.springframework.security.web.firewall;
 
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletResponse;
-
-import org.junit.Before;
-import org.junit.Test;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.mockito.Mockito.mock;
@@ -39,7 +38,7 @@ public class FirewalledResponseTests {
 
 	private FirewalledResponse fwResponse;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.response = mock(HttpServletResponse.class);
 		this.fwResponse = new FirewalledResponse(this.response);
@@ -60,7 +59,7 @@ public class FirewalledResponseTests {
 	@Test
 	public void sendRedirectWhenHasCrlfThenThrowsException() throws Exception {
 		assertThatIllegalArgumentException().isThrownBy(() -> this.fwResponse.sendRedirect("/theURL\r\nsomething"))
-				.withMessageContaining(CRLF_MESSAGE);
+			.withMessageContaining(CRLF_MESSAGE);
 	}
 
 	@Test
@@ -78,15 +77,15 @@ public class FirewalledResponseTests {
 	@Test
 	public void addHeaderWhenHeaderValueHasCrlfThenException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> this.fwResponse.addHeader("foo", "abc\r\nContent-Length:100"))
-				.withMessageContaining(CRLF_MESSAGE);
+			.isThrownBy(() -> this.fwResponse.addHeader("foo", "abc\r\nContent-Length:100"))
+			.withMessageContaining(CRLF_MESSAGE);
 	}
 
 	@Test
 	public void addHeaderWhenHeaderNameHasCrlfThenException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> this.fwResponse.addHeader("abc\r\nContent-Length:100", "bar"))
-				.withMessageContaining(CRLF_MESSAGE);
+			.isThrownBy(() -> this.fwResponse.addHeader("abc\r\nContent-Length:100", "bar"))
+			.withMessageContaining(CRLF_MESSAGE);
 	}
 
 	@Test
@@ -115,14 +114,14 @@ public class FirewalledResponseTests {
 			}
 		};
 		assertThatIllegalArgumentException().isThrownBy(() -> this.fwResponse.addCookie(cookie))
-				.withMessageContaining(CRLF_MESSAGE);
+			.withMessageContaining(CRLF_MESSAGE);
 	}
 
 	@Test
 	public void addCookieWhenCookieValueContainsCrlfThenException() {
 		Cookie cookie = new Cookie("foo", "foo\r\nbar");
 		assertThatIllegalArgumentException().isThrownBy(() -> this.fwResponse.addCookie(cookie))
-				.withMessageContaining(CRLF_MESSAGE);
+			.withMessageContaining(CRLF_MESSAGE);
 	}
 
 	@Test
@@ -130,7 +129,7 @@ public class FirewalledResponseTests {
 		Cookie cookie = new Cookie("foo", "bar");
 		cookie.setPath("/foo\r\nbar");
 		assertThatIllegalArgumentException().isThrownBy(() -> this.fwResponse.addCookie(cookie))
-				.withMessageContaining(CRLF_MESSAGE);
+			.withMessageContaining(CRLF_MESSAGE);
 	}
 
 	@Test
@@ -138,15 +137,7 @@ public class FirewalledResponseTests {
 		Cookie cookie = new Cookie("foo", "bar");
 		cookie.setDomain("foo\r\nbar");
 		assertThatIllegalArgumentException().isThrownBy(() -> this.fwResponse.addCookie(cookie))
-				.withMessageContaining(CRLF_MESSAGE);
-	}
-
-	@Test
-	public void addCookieWhenCookieCommentContainsCrlfThenException() {
-		Cookie cookie = new Cookie("foo", "bar");
-		cookie.setComment("foo\r\nbar");
-		assertThatIllegalArgumentException().isThrownBy(() -> this.fwResponse.addCookie(cookie))
-				.withMessageContaining(CRLF_MESSAGE);
+			.withMessageContaining(CRLF_MESSAGE);
 	}
 
 	@Test

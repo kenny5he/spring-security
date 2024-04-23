@@ -16,10 +16,9 @@
 
 package org.springframework.security.web.util.matcher;
 
-import javax.servlet.DispatcherType;
-import javax.servlet.http.HttpServletRequest;
-
-import org.junit.Test;
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockHttpServletRequest;

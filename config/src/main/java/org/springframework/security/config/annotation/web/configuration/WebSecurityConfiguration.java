@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import javax.servlet.Filter;
+import jakarta.servlet.Filter;
 
 import org.springframework.beans.factory.BeanClassLoaderAware;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.context.annotation.Bean;
@@ -38,9 +37,11 @@ import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.type.AnnotationMetadata;
 import org.springframework.security.access.expression.SecurityExpressionHandler;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.ObjectPostProcessor;
 import org.springframework.security.config.annotation.SecurityConfigurer;
 import org.springframework.security.config.annotation.web.WebSecurityConfigurer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.crypto.RsaKeyConversionServicePostProcessor;
 import org.springframework.security.context.DelegatingApplicationListener;
@@ -48,23 +49,20 @@ import org.springframework.security.web.FilterChainProxy;
 import org.springframework.security.web.FilterInvocation;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.WebInvocationPrivilegeEvaluator;
-import org.springframework.security.web.access.intercept.FilterSecurityInterceptor;
 import org.springframework.security.web.context.AbstractSecurityWebApplicationInitializer;
-import org.springframework.util.Assert;
 
 /**
  * Uses a {@link WebSecurity} to create the {@link FilterChainProxy} that performs the web
  * based security for Spring Security. It then exports the necessary beans. Customizations
- * can be made to {@link WebSecurity} by extending {@link WebSecurityConfigurerAdapter}
- * and exposing it as a {@link Configuration} or implementing
- * {@link WebSecurityConfigurer} and exposing it as a {@link Configuration}. This
- * configuration is imported when using {@link EnableWebSecurity}.
+ * can be made to {@link WebSecurity} by implementing {@link WebSecurityConfigurer} and
+ * exposing it as a {@link Configuration} or exposing a {@link WebSecurityCustomizer}
+ * bean. This configuration is imported when using {@link EnableWebSecurity}.
  *
- * @see EnableWebSecurity
- * @see WebSecurity
  * @author Rob Winch
  * @author Keesun Baik
  * @since 3.2
+ * @see EnableWebSecurity
+ * @see WebSecurity
  */
 @Configuration(proxyBeanMethods = false)
 public class WebSecurityConfiguration implements ImportAware, BeanClassLoaderAware {
@@ -84,6 +82,9 @@ public class WebSecurityConfiguration implements ImportAware, BeanClassLoaderAwa
 	@Autowired(required = false)
 	private ObjectPostProcessor<Object> objectObjectPostProcessor;
 
+	@Autowired(required = false)
+	private HttpSecurity httpSecurity;
+
 	@Bean
 	public static DelegatingApplicationListener delegatingApplicationListener() {
 		return new DelegatingApplicationListener();
@@ -102,24 +103,17 @@ public class WebSecurityConfiguration implements ImportAware, BeanClassLoaderAwa
 	 */
 	@Bean(name = AbstractSecurityWebApplicationInitializer.DEFAULT_FILTER_NAME)
 	public Filter springSecurityFilterChain() throws Exception {
-		boolean hasConfigurers = this.webSecurityConfigurers != null && !this.webSecurityConfigurers.isEmpty();
 		boolean hasFilterChain = !this.securityFilterChains.isEmpty();
-		Assert.state(!(hasConfigurers && hasFilterChain),
-				"Found WebSecurityConfigurerAdapter as well as SecurityFilterChain. Please select just one.");
-		if (!hasConfigurers && !hasFilterChain) {
-			WebSecurityConfigurerAdapter adapter = this.objectObjectPostProcessor
-					.postProcess(new WebSecurityConfigurerAdapter() {
-					});
-			this.webSecurity.apply(adapter);
+		if (!hasFilterChain) {
+			this.webSecurity.addSecurityFilterChainBuilder(() -> {
+				this.httpSecurity.authorizeHttpRequests((authorize) -> authorize.anyRequest().authenticated());
+				this.httpSecurity.formLogin(Customizer.withDefaults());
+				this.httpSecurity.httpBasic(Customizer.withDefaults());
+				return this.httpSecurity.build();
+			});
 		}
 		for (SecurityFilterChain securityFilterChain : this.securityFilterChains) {
 			this.webSecurity.addSecurityFilterChainBuilder(() -> securityFilterChain);
-			for (Filter filter : securityFilterChain.getFilters()) {
-				if (filter instanceof FilterSecurityInterceptor) {
-					this.webSecurity.securityInterceptor((FilterSecurityInterceptor) filter);
-					break;
-				}
-			}
 		}
 		for (WebSecurityCustomizer customizer : this.webSecurityCustomizers) {
 			customizer.customize(this.webSecurity);
@@ -128,8 +122,8 @@ public class WebSecurityConfiguration implements ImportAware, BeanClassLoaderAwa
 	}
 
 	/**
-	 * Creates the {@link WebInvocationPrivilegeEvaluator} that is necessary for the JSP
-	 * tag support.
+	 * Creates the {@link WebInvocationPrivilegeEvaluator} that is necessary to evaluate
+	 * privileges for a given web URI
 	 * @return the {@link WebInvocationPrivilegeEvaluator}
 	 */
 	@Bean
@@ -143,19 +137,21 @@ public class WebSecurityConfiguration implements ImportAware, BeanClassLoaderAwa
 	 * instances used to create the web configuration.
 	 * @param objectPostProcessor the {@link ObjectPostProcessor} used to create a
 	 * {@link WebSecurity} instance
-	 * @param webSecurityConfigurers the
+	 * @param beanFactory the bean factory to use to retrieve the relevant
 	 * {@code <SecurityConfigurer<FilterChainProxy, WebSecurityBuilder>} instances used to
 	 * create the web configuration
 	 * @throws Exception
 	 */
 	@Autowired(required = false)
 	public void setFilterChainProxySecurityConfigurer(ObjectPostProcessor<Object> objectPostProcessor,
-			@Value("#{@autowiredWebSecurityConfigurersIgnoreParents.getWebSecurityConfigurers()}") List<SecurityConfigurer<Filter, WebSecurity>> webSecurityConfigurers)
-			throws Exception {
+			ConfigurableListableBeanFactory beanFactory) throws Exception {
 		this.webSecurity = objectPostProcessor.postProcess(new WebSecurity(objectPostProcessor));
 		if (this.debugEnabled != null) {
 			this.webSecurity.debug(this.debugEnabled);
 		}
+		List<SecurityConfigurer<Filter, WebSecurity>> webSecurityConfigurers = new AutowiredWebSecurityConfigurersIgnoreParents(
+				beanFactory)
+			.getWebSecurityConfigurers();
 		webSecurityConfigurers.sort(AnnotationAwareOrderComparator.INSTANCE);
 		Integer previousOrder = null;
 		Object previousConfig = null;
@@ -176,13 +172,11 @@ public class WebSecurityConfiguration implements ImportAware, BeanClassLoaderAwa
 
 	@Autowired(required = false)
 	void setFilterChains(List<SecurityFilterChain> securityFilterChains) {
-		securityFilterChains.sort(AnnotationAwareOrderComparator.INSTANCE);
 		this.securityFilterChains = securityFilterChains;
 	}
 
 	@Autowired(required = false)
 	void setWebSecurityCustomizers(List<WebSecurityCustomizer> webSecurityCustomizers) {
-		webSecurityCustomizers.sort(AnnotationAwareOrderComparator.INSTANCE);
 		this.webSecurityCustomizers = webSecurityCustomizers;
 	}
 
@@ -191,16 +185,10 @@ public class WebSecurityConfiguration implements ImportAware, BeanClassLoaderAwa
 		return new RsaKeyConversionServicePostProcessor();
 	}
 
-	@Bean
-	public static AutowiredWebSecurityConfigurersIgnoreParents autowiredWebSecurityConfigurersIgnoreParents(
-			ConfigurableListableBeanFactory beanFactory) {
-		return new AutowiredWebSecurityConfigurersIgnoreParents(beanFactory);
-	}
-
 	@Override
 	public void setImportMetadata(AnnotationMetadata importMetadata) {
 		Map<String, Object> enableWebSecurityAttrMap = importMetadata
-				.getAnnotationAttributes(EnableWebSecurity.class.getName());
+			.getAnnotationAttributes(EnableWebSecurity.class.getName());
 		AnnotationAttributes enableWebSecurityAttrs = AnnotationAttributes.fromMap(enableWebSecurityAttrMap);
 		this.debugEnabled = enableWebSecurityAttrs.getBoolean("debug");
 		if (this.webSecurity != null) {
@@ -214,7 +202,7 @@ public class WebSecurityConfiguration implements ImportAware, BeanClassLoaderAwa
 	}
 
 	/**
-	 * A custom verision of the Spring provided AnnotationAwareOrderComparator that uses
+	 * A custom version of the Spring provided AnnotationAwareOrderComparator that uses
 	 * {@link AnnotationUtils#findAnnotation(Class, Class)} to look on super class
 	 * instances for the {@link Order} annotation.
 	 *

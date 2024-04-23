@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2016 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,10 @@
 
 package org.springframework.security.ldap;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
@@ -24,6 +28,7 @@ import java.util.StringTokenizer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import org.springframework.core.log.LogMessage;
 import org.springframework.ldap.core.support.DirContextAuthenticationStrategy;
 import org.springframework.ldap.core.support.LdapContextSource;
 import org.springframework.ldap.core.support.SimpleDirContextAuthenticationStrategy;
@@ -68,13 +73,13 @@ public class DefaultSpringSecurityContextSource extends LdapContextSource {
 			String url = tokenizer.nextToken();
 			String urlRootDn = LdapUtils.parseRootDnFromUrl(url);
 			urls.add(url.substring(0, url.lastIndexOf(urlRootDn)));
-			this.logger.info(" URL '" + url + "', root DN is '" + urlRootDn + "'");
+			this.logger.info(LogMessage.format("Configure with URL %s and root DN %s", url, urlRootDn));
 			Assert.isTrue(rootDn == null || rootDn.equals(urlRootDn),
 					"Root DNs must be the same when using multiple URLs");
 			rootDn = (rootDn != null) ? rootDn : urlRootDn;
 		}
 		setUrls(urls.toArray(new String[0]));
-		setBase(rootDn);
+		setBase((rootDn != null) ? decodeUrl(rootDn) : null);
 		setPooled(true);
 		setAuthenticationStrategy(new SimpleDirContextAuthenticationStrategy() {
 
@@ -85,7 +90,7 @@ public class DefaultSpringSecurityContextSource extends LdapContextSource {
 				// Remove the pooling flag unless authenticating as the 'manager' user.
 				if (!DefaultSpringSecurityContextSource.this.userDn.equals(dn)
 						&& env.containsKey(SUN_LDAP_POOLING_FLAG)) {
-					DefaultSpringSecurityContextSource.this.logger.debug("Removing pooling flag for user " + dn);
+					DefaultSpringSecurityContextSource.this.logger.trace("Removing pooling flag for user " + dn);
 					env.remove(SUN_LDAP_POOLING_FLAG);
 				}
 			}
@@ -136,7 +141,7 @@ public class DefaultSpringSecurityContextSource extends LdapContextSource {
 	private static String buildProviderUrl(List<String> urls, String baseDn) {
 		Assert.notNull(baseDn, "The Base DN for the LDAP server must not be null.");
 		Assert.notEmpty(urls, "At least one LDAP server URL must be provided.");
-		String trimmedBaseDn = baseDn.trim();
+		String encodedBaseDn = encodeUrl(baseDn.trim());
 		StringBuilder providerUrl = new StringBuilder();
 		for (String serverUrl : urls) {
 			String trimmedUrl = serverUrl.trim();
@@ -147,11 +152,29 @@ public class DefaultSpringSecurityContextSource extends LdapContextSource {
 			if (!trimmedUrl.endsWith("/")) {
 				providerUrl.append("/");
 			}
-			providerUrl.append(trimmedBaseDn);
+			providerUrl.append(encodedBaseDn);
 			providerUrl.append(" ");
 		}
 		return providerUrl.toString();
 
+	}
+
+	private static String encodeUrl(String url) {
+		try {
+			return URLEncoder.encode(url, StandardCharsets.UTF_8.toString());
+		}
+		catch (UnsupportedEncodingException ex) {
+			throw new IllegalStateException(ex);
+		}
+	}
+
+	private String decodeUrl(String url) {
+		try {
+			return URLDecoder.decode(url, StandardCharsets.UTF_8.toString());
+		}
+		catch (UnsupportedEncodingException ex) {
+			throw new IllegalStateException(ex);
+		}
 	}
 
 }

@@ -18,9 +18,9 @@ package org.springframework.security.web.server.authentication;
 
 import java.util.UUID;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 
 import org.springframework.security.core.Authentication;
@@ -37,13 +37,15 @@ import org.springframework.web.server.ServerWebExchange;
  * @author Ankur Pathak
  * @since 5.2.0
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class AnonymousAuthenticationWebFilterTests {
 
 	@Test
 	public void anonymousAuthenticationFilterWorking() {
-		WebTestClient client = WebTestClientBuilder.bindToControllerAndWebFilters(HttpMeController.class,
-				new AnonymousAuthenticationWebFilter(UUID.randomUUID().toString())).build();
+		WebTestClient client = WebTestClientBuilder
+			.bindToControllerAndWebFilters(HttpMeController.class,
+					new AnonymousAuthenticationWebFilter(UUID.randomUUID().toString()))
+			.build();
 		client.get().uri("/me").exchange().expectStatus().isOk().expectBody(String.class).isEqualTo("anonymousUser");
 	}
 
@@ -53,8 +55,10 @@ public class AnonymousAuthenticationWebFilterTests {
 
 		@GetMapping
 		public Mono<String> me(ServerWebExchange exchange) {
-			return ReactiveSecurityContextHolder.getContext().map(SecurityContext::getAuthentication)
-					.map(Authentication::getPrincipal).ofType(String.class);
+			return ReactiveSecurityContextHolder.getContext()
+				.map(SecurityContext::getAuthentication)
+				.map(Authentication::getPrincipal)
+				.ofType(String.class);
 		}
 
 	}

@@ -18,19 +18,21 @@ package org.springframework.security.config.annotation.method.configuration;
 
 import java.io.Serializable;
 
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.PermissionEvaluator;
 import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
 import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -43,18 +45,18 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
  * @author Rob Winch
  *
  */
+@ExtendWith(SpringTestContextExtension.class)
 public class SampleEnableGlobalMethodSecurityTests {
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired
 	private MethodSecurityService methodSecurityService;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		SecurityContextHolder.getContext()
-				.setAuthentication(new TestingAuthenticationToken("user", "password", "ROLE_USER"));
+			.setAuthentication(new TestingAuthenticationToken("user", "password", "ROLE_USER"));
 	}
 
 	@Test
@@ -63,7 +65,7 @@ public class SampleEnableGlobalMethodSecurityTests {
 		assertThat(this.methodSecurityService.secured()).isNull();
 		assertThat(this.methodSecurityService.jsr250()).isNull();
 		assertThatExceptionOfType(AccessDeniedException.class)
-				.isThrownBy(() -> this.methodSecurityService.preAuthorize());
+			.isThrownBy(() -> this.methodSecurityService.preAuthorize());
 	}
 
 	@Test
@@ -71,9 +73,10 @@ public class SampleEnableGlobalMethodSecurityTests {
 		this.spring.register(CustomPermissionEvaluatorWebSecurityConfig.class).autowire();
 		assertThat(this.methodSecurityService.hasPermission("allowed")).isNull();
 		assertThatExceptionOfType(AccessDeniedException.class)
-				.isThrownBy(() -> this.methodSecurityService.hasPermission("denied"));
+			.isThrownBy(() -> this.methodSecurityService.hasPermission("denied"));
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(prePostEnabled = true)
 	static class SampleWebSecurityConfig {
 
@@ -94,6 +97,7 @@ public class SampleEnableGlobalMethodSecurityTests {
 
 	}
 
+	@Configuration
 	@EnableGlobalMethodSecurity(prePostEnabled = true)
 	public static class CustomPermissionEvaluatorWebSecurityConfig extends GlobalMethodSecurityConfiguration {
 

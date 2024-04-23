@@ -63,7 +63,7 @@ public final class Encryptors {
 	 * @param salt a hex-encoded, random, site-global salt value to use to generate the
 	 * key
 	 *
-	 * @see #stronger(CharSequence, CharSequence)
+	 * @see Encryptors#stronger(CharSequence, CharSequence)
 	 */
 	public static BytesEncryptor standard(CharSequence password, CharSequence salt) {
 		return new AesBytesEncryptor(password.toString(), salt, KeyGenerators.secureRandom(16));
@@ -89,23 +89,6 @@ public final class Encryptors {
 	 */
 	public static TextEncryptor text(CharSequence password, CharSequence salt) {
 		return new HexEncodingTextEncryptor(standard(password, salt));
-	}
-
-	/**
-	 * Creates an encryptor for queryable text strings that uses standard password-based
-	 * encryption. Uses a 16-byte all-zero initialization vector so encrypting the same
-	 * data results in the same encryption result. This is done to allow encrypted data to
-	 * be queried against. Encrypted text is hex-encoded.
-	 * @param password the password used to generate the encryptor's secret key; should
-	 * not be shared
-	 * @param salt a hex-encoded, random, site-global salt value to use to generate the
-	 * secret key
-	 * @deprecated This encryptor is not secure. Instead, look to your data store for a
-	 * mechanism to query encrypted data.
-	 */
-	@Deprecated
-	public static TextEncryptor queryableText(CharSequence password, CharSequence salt) {
-		return new HexEncodingTextEncryptor(new AesBytesEncryptor(password.toString(), salt));
 	}
 
 	/**

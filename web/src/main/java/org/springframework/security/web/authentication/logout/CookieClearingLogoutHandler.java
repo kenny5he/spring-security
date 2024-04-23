@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,12 +20,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 /**
  * A logout handler which clears either - A defined list of cookie names, using the
@@ -45,7 +46,8 @@ public final class CookieClearingLogoutHandler implements LogoutHandler {
 		for (String cookieName : cookiesToClear) {
 			cookieList.add((request) -> {
 				Cookie cookie = new Cookie(cookieName, null);
-				String cookiePath = request.getContextPath() + "/";
+				String contextPath = request.getContextPath();
+				String cookiePath = StringUtils.hasText(contextPath) ? contextPath : "/";
 				cookie.setPath(cookiePath);
 				cookie.setMaxAge(0);
 				cookie.setSecure(request.isSecure());

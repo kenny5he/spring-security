@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package org.springframework.security.oauth2.core;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -34,18 +34,8 @@ public class ClientAuthenticationMethodTests {
 	}
 
 	@Test
-	public void getValueWhenAuthenticationMethodBasicThenReturnBasic() {
-		assertThat(ClientAuthenticationMethod.BASIC.getValue()).isEqualTo("basic");
-	}
-
-	@Test
 	public void getValueWhenAuthenticationMethodClientSecretBasicThenReturnClientSecretBasic() {
 		assertThat(ClientAuthenticationMethod.CLIENT_SECRET_BASIC.getValue()).isEqualTo("client_secret_basic");
-	}
-
-	@Test
-	public void getValueWhenAuthenticationMethodPostThenReturnPost() {
-		assertThat(ClientAuthenticationMethod.POST.getValue()).isEqualTo("post");
 	}
 
 	@Test
@@ -54,8 +44,29 @@ public class ClientAuthenticationMethodTests {
 	}
 
 	@Test
+	public void getValueWhenAuthenticationMethodClientSecretJwtThenReturnClientSecretJwt() {
+		assertThat(ClientAuthenticationMethod.CLIENT_SECRET_JWT.getValue()).isEqualTo("client_secret_jwt");
+	}
+
+	@Test
+	public void getValueWhenAuthenticationMethodPrivateKeyJwtThenReturnPrivateKeyJwt() {
+		assertThat(ClientAuthenticationMethod.PRIVATE_KEY_JWT.getValue()).isEqualTo("private_key_jwt");
+	}
+
+	@Test
 	public void getValueWhenAuthenticationMethodNoneThenReturnNone() {
 		assertThat(ClientAuthenticationMethod.NONE.getValue()).isEqualTo("none");
+	}
+
+	@Test
+	public void getValueWhenAuthenticationMethodTlsClientAuthThenReturnTlsClientAuth() {
+		assertThat(ClientAuthenticationMethod.TLS_CLIENT_AUTH.getValue()).isEqualTo("tls_client_auth");
+	}
+
+	@Test
+	public void getValueWhenAuthenticationMethodSelfSignedTlsClientAuthThenReturnSelfSignedTlsClientAuth() {
+		assertThat(ClientAuthenticationMethod.SELF_SIGNED_TLS_CLIENT_AUTH.getValue())
+			.isEqualTo("self_signed_tls_client_auth");
 	}
 
 }

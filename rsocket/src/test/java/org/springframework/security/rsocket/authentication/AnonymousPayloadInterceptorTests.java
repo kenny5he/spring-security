@@ -18,11 +18,11 @@ package org.springframework.security.rsocket.authentication;
 
 import java.util.List;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.TestingAuthenticationToken;
@@ -38,7 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 /**
  * @author Rob Winch
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class AnonymousPayloadInterceptorTests {
 
 	@Mock
@@ -46,7 +46,7 @@ public class AnonymousPayloadInterceptorTests {
 
 	private AnonymousPayloadInterceptor interceptor;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.interceptor = new AnonymousPayloadInterceptor("key");
 	}
@@ -75,7 +75,7 @@ public class AnonymousPayloadInterceptorTests {
 	public void constructorKeyPrincipalAuthoritiesWhenAuthoritiesNullThenException() {
 		List<GrantedAuthority> authorities = null;
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new AnonymousPayloadInterceptor("key", "principal", authorities));
+			.isThrownBy(() -> new AnonymousPayloadInterceptor("key", "principal", authorities));
 	}
 
 	@Test
@@ -91,7 +91,8 @@ public class AnonymousPayloadInterceptorTests {
 		AuthenticationPayloadInterceptorChain chain = new AuthenticationPayloadInterceptorChain();
 		TestingAuthenticationToken expected = new TestingAuthenticationToken("test", "password");
 		this.interceptor.intercept(this.exchange, chain)
-				.subscriberContext(ReactiveSecurityContextHolder.withAuthentication(expected)).block();
+			.contextWrite(ReactiveSecurityContextHolder.withAuthentication(expected))
+			.block();
 		Authentication authentication = chain.getAuthentication();
 		assertThat(authentication).isEqualTo(expected);
 	}

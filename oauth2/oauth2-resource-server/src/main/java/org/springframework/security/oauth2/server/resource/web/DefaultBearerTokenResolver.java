@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,11 @@ package org.springframework.security.oauth2.server.resource.web;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.server.resource.BearerTokenError;
 import org.springframework.security.oauth2.server.resource.BearerTokenErrors;
@@ -37,6 +39,8 @@ import org.springframework.util.StringUtils;
  */
 public final class DefaultBearerTokenResolver implements BearerTokenResolver {
 
+	private static final String ACCESS_TOKEN_PARAMETER_NAME = "access_token";
+
 	private static final Pattern authorizationPattern = Pattern.compile("^Bearer (?<token>[a-zA-Z0-9-._~+/]+=*)$",
 			Pattern.CASE_INSENSITIVE);
 
@@ -47,18 +51,19 @@ public final class DefaultBearerTokenResolver implements BearerTokenResolver {
 	private String bearerTokenHeaderName = HttpHeaders.AUTHORIZATION;
 
 	@Override
-	public String resolve(HttpServletRequest request) {
-		String authorizationHeaderToken = resolveFromAuthorizationHeader(request);
-		String parameterToken = resolveFromRequestParameters(request);
+	public String resolve(final HttpServletRequest request) {
+		final String authorizationHeaderToken = resolveFromAuthorizationHeader(request);
+		final String parameterToken = isParameterTokenSupportedForRequest(request)
+				? resolveFromRequestParameters(request) : null;
 		if (authorizationHeaderToken != null) {
 			if (parameterToken != null) {
-				BearerTokenError error = BearerTokenErrors
-						.invalidRequest("Found multiple bearer tokens in the request");
+				final BearerTokenError error = BearerTokenErrors
+					.invalidRequest("Found multiple bearer tokens in the request");
 				throw new OAuth2AuthenticationException(error);
 			}
 			return authorizationHeaderToken;
 		}
-		if (parameterToken != null && isParameterTokenSupportedForRequest(request)) {
+		if (parameterToken != null && isParameterTokenEnabledForRequest(request)) {
 			return parameterToken;
 		}
 		return null;
@@ -113,7 +118,7 @@ public final class DefaultBearerTokenResolver implements BearerTokenResolver {
 	}
 
 	private static String resolveFromRequestParameters(HttpServletRequest request) {
-		String[] values = request.getParameterValues("access_token");
+		String[] values = request.getParameterValues(ACCESS_TOKEN_PARAMETER_NAME);
 		if (values == null || values.length == 0) {
 			return null;
 		}
@@ -124,9 +129,25 @@ public final class DefaultBearerTokenResolver implements BearerTokenResolver {
 		throw new OAuth2AuthenticationException(error);
 	}
 
-	private boolean isParameterTokenSupportedForRequest(HttpServletRequest request) {
-		return ((this.allowFormEncodedBodyParameter && "POST".equals(request.getMethod()))
-				|| (this.allowUriQueryParameter && "GET".equals(request.getMethod())));
+	private boolean isParameterTokenSupportedForRequest(final HttpServletRequest request) {
+		return isFormEncodedRequest(request) || isGetRequest(request);
+	}
+
+	private static boolean isGetRequest(HttpServletRequest request) {
+		return HttpMethod.GET.name().equals(request.getMethod());
+	}
+
+	private static boolean isFormEncodedRequest(HttpServletRequest request) {
+		return MediaType.APPLICATION_FORM_URLENCODED_VALUE.equals(request.getContentType());
+	}
+
+	private static boolean hasAccessTokenInQueryString(HttpServletRequest request) {
+		return (request.getQueryString() != null) && request.getQueryString().contains(ACCESS_TOKEN_PARAMETER_NAME);
+	}
+
+	private boolean isParameterTokenEnabledForRequest(HttpServletRequest request) {
+		return ((this.allowFormEncodedBodyParameter && isFormEncodedRequest(request) && !isGetRequest(request)
+				&& !hasAccessTokenInQueryString(request)) || (this.allowUriQueryParameter && isGetRequest(request)));
 	}
 
 }

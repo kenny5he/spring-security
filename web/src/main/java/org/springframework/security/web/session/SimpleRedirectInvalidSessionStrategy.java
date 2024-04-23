@@ -18,9 +18,8 @@ package org.springframework.security.web.session;
 
 import java.io.IOException;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -52,7 +51,9 @@ public final class SimpleRedirectInvalidSessionStrategy implements InvalidSessio
 
 	@Override
 	public void onInvalidSessionDetected(HttpServletRequest request, HttpServletResponse response) throws IOException {
-		this.logger.debug("Starting new session (if required) and redirecting to '" + this.destinationUrl + "'");
+		if (this.logger.isDebugEnabled()) {
+			this.logger.debug("Starting new session (if required) and redirecting to '" + this.destinationUrl + "'");
+		}
 		if (this.createNewSession) {
 			request.getSession();
 		}

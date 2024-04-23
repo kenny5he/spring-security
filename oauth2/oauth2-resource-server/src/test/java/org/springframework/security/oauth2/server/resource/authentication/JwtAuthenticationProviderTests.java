@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,13 +18,14 @@ package org.springframework.security.oauth2.server.resource.authentication;
 
 import java.util.function.Predicate;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.jwt.BadJwtException;
@@ -32,7 +33,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.TestJwts;
-import org.springframework.security.oauth2.server.resource.BearerTokenAuthenticationToken;
 import org.springframework.security.oauth2.server.resource.BearerTokenErrorCodes;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,19 +44,20 @@ import static org.mockito.Mockito.mock;
  * Tests for {@link JwtAuthenticationProvider}
  *
  * @author Josh Cummings
+ * @author Jerome Wacongne ch4mp&#64;c4-soft.com
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class JwtAuthenticationProviderTests {
 
 	@Mock
-	Converter<Jwt, JwtAuthenticationToken> jwtAuthenticationConverter;
+	Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter;
 
 	@Mock
 	JwtDecoder jwtDecoder;
 
 	JwtAuthenticationProvider provider;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.provider = new JwtAuthenticationProvider(this.jwtDecoder);
 		this.provider.setJwtAuthenticationConverter(this.jwtAuthenticationConverter);
@@ -109,6 +110,17 @@ public class JwtAuthenticationProviderTests {
 	@Test
 	public void authenticateWhenConverterReturnsAuthenticationThenProviderPropagatesIt() {
 		BearerTokenAuthenticationToken token = this.authentication();
+		Jwt jwt = TestJwts.jwt().build();
+		JwtAuthenticationToken authentication = new JwtAuthenticationToken(jwt);
+		given(this.jwtDecoder.decode(token.getToken())).willReturn(jwt);
+		given(this.jwtAuthenticationConverter.convert(jwt)).willReturn(authentication);
+
+		assertThat(this.provider.authenticate(token)).isEqualTo(authentication);
+	}
+
+	@Test
+	public void authenticateWhenConverterDoesNotSetAuthenticationDetailsThenProviderSetsItWithTokenDetails() {
+		BearerTokenAuthenticationToken token = this.authentication();
 		Object details = mock(Object.class);
 		token.setDetails(details);
 		Jwt jwt = TestJwts.jwt().build();
@@ -118,7 +130,25 @@ public class JwtAuthenticationProviderTests {
 		// @formatter:off
 		assertThat(this.provider.authenticate(token))
 				.isEqualTo(authentication).hasFieldOrPropertyWithValue("details",
-				details);
+						details);
+		// @formatter:on
+	}
+
+	@Test
+	public void authenticateWhenConverterSetsAuthenticationDetailsThenProviderDoesNotOverwriteIt() {
+		BearerTokenAuthenticationToken token = this.authentication();
+		Object details = mock(Object.class);
+		token.setDetails(details);
+		Jwt jwt = TestJwts.jwt().build();
+		JwtAuthenticationToken authentication = new JwtAuthenticationToken(jwt);
+		Object expectedDetails = "To be kept as is";
+		authentication.setDetails(expectedDetails);
+		given(this.jwtDecoder.decode(token.getToken())).willReturn(jwt);
+		given(this.jwtAuthenticationConverter.convert(jwt)).willReturn(authentication);
+		// @formatter:off
+		assertThat(this.provider.authenticate(token))
+				.isEqualTo(authentication).hasFieldOrPropertyWithValue("details",
+						expectedDetails);
 		// @formatter:on
 	}
 

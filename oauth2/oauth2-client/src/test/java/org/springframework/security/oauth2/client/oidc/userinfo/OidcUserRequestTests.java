@@ -22,8 +22,8 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.TestClientRegistrations;
@@ -49,7 +49,7 @@ public class OidcUserRequestTests {
 
 	private Map<String, Object> additionalParameters;
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		this.clientRegistration = TestClientRegistrations.clientRegistration().build();
 		this.accessToken = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "access-token-1234", Instant.now(),
@@ -63,19 +63,19 @@ public class OidcUserRequestTests {
 	@Test
 	public void constructorWhenClientRegistrationIsNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new OidcUserRequest(null, this.accessToken, this.idToken));
+			.isThrownBy(() -> new OidcUserRequest(null, this.accessToken, this.idToken));
 	}
 
 	@Test
 	public void constructorWhenAccessTokenIsNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new OidcUserRequest(this.clientRegistration, null, this.idToken));
+			.isThrownBy(() -> new OidcUserRequest(this.clientRegistration, null, this.idToken));
 	}
 
 	@Test
 	public void constructorWhenIdTokenIsNullThenThrowIllegalArgumentException() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new OidcUserRequest(this.clientRegistration, this.accessToken, null));
+			.isThrownBy(() -> new OidcUserRequest(this.clientRegistration, this.accessToken, null));
 	}
 
 	@Test

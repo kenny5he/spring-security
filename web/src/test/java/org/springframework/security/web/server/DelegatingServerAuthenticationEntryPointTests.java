@@ -16,10 +16,10 @@
 
 package org.springframework.security.web.server;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 
 import org.springframework.http.HttpStatus;
@@ -34,13 +34,13 @@ import org.springframework.web.server.ServerWebExchange;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 /**
  * @author Rob Winch
  * @since 5.0
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class DelegatingServerAuthenticationEntryPointTests {
 
 	private ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/").build());
@@ -71,7 +71,7 @@ public class DelegatingServerAuthenticationEntryPointTests {
 				new DelegateEntry(this.matcher2, this.delegate2));
 		Mono<Void> actualResult = this.entryPoint.commence(this.exchange, this.e);
 		actualResult.block();
-		verifyZeroInteractions(this.delegate1);
+		verifyNoMoreInteractions(this.delegate1);
 		verify(this.delegate2).commence(this.exchange, this.e);
 	}
 
@@ -82,7 +82,7 @@ public class DelegatingServerAuthenticationEntryPointTests {
 				new DelegateEntry(this.matcher1, this.delegate1));
 		this.entryPoint.commence(this.exchange, this.e).block();
 		assertThat(this.exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-		verifyZeroInteractions(this.delegate1);
+		verifyNoMoreInteractions(this.delegate1);
 	}
 
 }

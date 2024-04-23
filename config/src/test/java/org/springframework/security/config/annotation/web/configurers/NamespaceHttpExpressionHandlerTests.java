@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,23 +18,27 @@ package org.springframework.security.config.annotation.web.configurers;
 
 import java.security.Principal;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.test.context.annotation.SecurityTestExecutionListeners;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.expression.DefaultWebSecurityExpressionHandler;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -53,12 +57,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Josh Cummings
  *
  */
-@RunWith(SpringJUnit4ClassRunner.class)
+@ExtendWith({ SpringExtension.class, SpringTestContextExtension.class })
 @SecurityTestExecutionListeners
 public class NamespaceHttpExpressionHandlerTests {
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired
 	MockMvc mvc;
@@ -75,24 +78,23 @@ public class NamespaceHttpExpressionHandlerTests {
 		return verify(this.spring.getContext().getBean(beanName, beanClass));
 	}
 
+	@Configuration
 	@EnableWebMvc
 	@EnableWebSecurity
-	private static class ExpressionHandlerConfig extends WebSecurityConfigurerAdapter {
+	static class ExpressionHandlerConfig {
 
-		ExpressionHandlerConfig() {
+		@Bean
+		UserDetailsService userDetailsService() {
+			UserDetails user = User.withDefaultPasswordEncoder()
+				.username("rod")
+				.password("password")
+				.roles("USER", "ADMIN")
+				.build();
+			return new InMemoryUserDetailsManager(user);
 		}
 
-		@Override
-		protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-			// @formatter:off
-			auth
-				.inMemoryAuthentication()
-					.withUser("rod").password("password").roles("USER", "ADMIN");
-			// @formatter:on
-		}
-
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			DefaultWebSecurityExpressionHandler handler = new DefaultWebSecurityExpressionHandler();
 			handler.setExpressionParser(expressionParser());
 			// @formatter:off
@@ -101,6 +103,7 @@ public class NamespaceHttpExpressionHandlerTests {
 					.expressionHandler(handler)
 					.anyRequest().access("hasRole('USER')");
 			// @formatter:on
+			return http.build();
 		}
 
 		@Bean

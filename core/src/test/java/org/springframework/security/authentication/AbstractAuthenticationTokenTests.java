@@ -18,8 +18,8 @@ package org.springframework.security.authentication;
 
 import java.util.List;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.core.AuthenticatedPrincipal;
 import org.springframework.security.core.GrantedAuthority;
@@ -42,7 +42,7 @@ public class AbstractAuthenticationTokenTests {
 
 	private List<GrantedAuthority> authorities = null;
 
-	@Before
+	@BeforeEach
 	public final void setUp() {
 		this.authorities = AuthorityUtils.createAuthorityList("ROLE_ONE", "ROLE_TWO");
 	}
@@ -53,7 +53,7 @@ public class AbstractAuthenticationTokenTests {
 		List<GrantedAuthority> gotAuthorities = (List<GrantedAuthority>) token.getAuthorities();
 		assertThat(gotAuthorities).isNotSameAs(this.authorities);
 		assertThatExceptionOfType(UnsupportedOperationException.class)
-				.isThrownBy(() -> gotAuthorities.set(0, new SimpleGrantedAuthority("ROLE_SUPER_USER")));
+			.isThrownBy(() -> gotAuthorities.set(0, new SimpleGrantedAuthority("ROLE_SUPER_USER")));
 	}
 
 	@Test

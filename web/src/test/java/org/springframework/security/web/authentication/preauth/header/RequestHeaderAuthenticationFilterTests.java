@@ -16,9 +16,9 @@
 
 package org.springframework.security.web.authentication.preauth.header;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.stubbing.Answer;
 
 import org.springframework.mock.web.MockFilterChain;
@@ -41,8 +41,8 @@ import static org.mockito.Mockito.mock;
  */
 public class RequestHeaderAuthenticationFilterTests {
 
-	@After
-	@Before
+	@AfterEach
+	@BeforeEach
 	public void clearContext() {
 		SecurityContextHolder.clearContext();
 	}
@@ -54,7 +54,7 @@ public class RequestHeaderAuthenticationFilterTests {
 		MockFilterChain chain = new MockFilterChain();
 		RequestHeaderAuthenticationFilter filter = new RequestHeaderAuthenticationFilter();
 		assertThatExceptionOfType(PreAuthenticatedCredentialsNotFoundException.class)
-				.isThrownBy(() -> filter.doFilter(request, response, chain));
+			.isThrownBy(() -> filter.doFilter(request, response, chain));
 	}
 
 	@Test
@@ -130,7 +130,7 @@ public class RequestHeaderAuthenticationFilterTests {
 		RequestHeaderAuthenticationFilter filter = new RequestHeaderAuthenticationFilter();
 		filter.setAuthenticationManager(createAuthenticationManager());
 		assertThatExceptionOfType(PreAuthenticatedCredentialsNotFoundException.class)
-				.isThrownBy(() -> filter.doFilter(request, response, chain));
+			.isThrownBy(() -> filter.doFilter(request, response, chain));
 	}
 
 	@Test
@@ -150,7 +150,7 @@ public class RequestHeaderAuthenticationFilterTests {
 	private AuthenticationManager createAuthenticationManager() {
 		AuthenticationManager am = mock(AuthenticationManager.class);
 		given(am.authenticate(any(Authentication.class)))
-				.willAnswer((Answer<Authentication>) (invocation) -> (Authentication) invocation.getArguments()[0]);
+			.willAnswer((Answer<Authentication>) (invocation) -> (Authentication) invocation.getArguments()[0]);
 		return am;
 	}
 

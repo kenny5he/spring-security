@@ -18,21 +18,22 @@ package org.springframework.security.config.http;
 
 import java.util.List;
 
-import javax.servlet.Filter;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.junit.Rule;
-import org.junit.Test;
+import jakarta.servlet.Filter;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.BeanIds;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -44,6 +45,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -55,12 +58,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Luke Taylor
  * @author Josh Cummings
  */
+@ExtendWith(SpringTestContextExtension.class)
 public class FormLoginConfigTests {
 
 	private static final String CONFIG_LOCATION_PREFIX = "classpath:org/springframework/security/config/http/FormLoginConfigTests";
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired
 	MockMvc mvc;
@@ -111,13 +114,13 @@ public class FormLoginConfigTests {
 	@Test
 	public void autowireWhenLoginPageIsMisconfiguredThenDetects() {
 		assertThatExceptionOfType(BeanCreationException.class)
-				.isThrownBy(() -> this.spring.configLocations(this.xml("NoLeadingSlashLoginPage")).autowire());
+			.isThrownBy(() -> this.spring.configLocations(this.xml("NoLeadingSlashLoginPage")).autowire());
 	}
 
 	@Test
 	public void autowireWhenDefaultTargetUrlIsMisconfiguredThenDetects() {
 		assertThatExceptionOfType(BeanCreationException.class)
-				.isThrownBy(() -> this.spring.configLocations(this.xml("NoLeadingSlashDefaultTargetUrl")).autowire());
+			.isThrownBy(() -> this.spring.configLocations(this.xml("NoLeadingSlashDefaultTargetUrl")).autowire());
 	}
 
 	@Test
@@ -143,7 +146,15 @@ public class FormLoginConfigTests {
 	public void authenticateWhenCustomUsernameAndPasswordParametersThenSucceeds() throws Exception {
 		this.spring.configLocations(this.xml("WithUsernameAndPasswordParameters")).autowire();
 		this.mvc.perform(post("/login").param("xname", "user").param("xpass", "password").with(csrf()))
-				.andExpect(redirectedUrl("/"));
+			.andExpect(redirectedUrl("/"));
+	}
+
+	@Test
+	public void authenticateWhenCustomSecurityContextHolderStrategyThenUses() throws Exception {
+		this.spring.configLocations(this.xml("WithCustomSecurityContextHolderStrategy")).autowire();
+		SecurityContextHolderStrategy strategy = this.spring.getContext().getBean(SecurityContextHolderStrategy.class);
+		this.mvc.perform(post("/login").with(csrf())).andExpect(redirectedUrl("/login?error"));
+		verify(strategy, atLeastOnce()).getContext();
 	}
 
 	/**

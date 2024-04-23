@@ -16,7 +16,7 @@
 
 package org.springframework.security.saml2.core;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.opensaml.core.config.ConfigurationService;
 import org.opensaml.core.xml.config.XMLObjectProviderRegistry;
 
@@ -38,8 +38,9 @@ public class OpenSamlInitializationServiceTests {
 		XMLObjectProviderRegistry registry = ConfigurationService.get(XMLObjectProviderRegistry.class);
 		assertThat(registry.getParserPool()).isNotNull();
 		assertThatExceptionOfType(Saml2Exception.class)
-				.isThrownBy(() -> OpenSamlInitializationService.requireInitialize((r) -> {
-				})).withMessageContaining("OpenSAML was already initialized previously");
+			.isThrownBy(() -> OpenSamlInitializationService.requireInitialize((r) -> {
+			}))
+			.withMessageContaining("OpenSAML was already initialized previously");
 	}
 
 }

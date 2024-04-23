@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,13 @@
 
 package org.springframework.security.authorization;
 
-import java.util.Arrays;
 import java.util.List;
 
 import reactor.core.publisher.Mono;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.util.Assert;
 
 /**
@@ -31,25 +31,26 @@ import org.springframework.util.Assert;
  *
  * @param <T> the type of object being authorized
  * @author Rob Winch
+ * @author Robbie Martinus
  * @since 5.0
  */
 public class AuthorityReactiveAuthorizationManager<T> implements ReactiveAuthorizationManager<T> {
 
-	private final List<String> authorities;
+	private final List<GrantedAuthority> authorities;
 
 	AuthorityReactiveAuthorizationManager(String... authorities) {
-		this.authorities = Arrays.asList(authorities);
+		this.authorities = AuthorityUtils.createAuthorityList(authorities);
 	}
 
 	@Override
 	public Mono<AuthorizationDecision> check(Mono<Authentication> authentication, T object) {
 		// @formatter:off
-		return authentication.filter((a) -> a.isAuthenticated())
+		return authentication.filter(Authentication::isAuthenticated)
 				.flatMapIterable(Authentication::getAuthorities)
 				.map(GrantedAuthority::getAuthority)
-				.any(this.authorities::contains)
-				.map(AuthorizationDecision::new)
-				.defaultIfEmpty(new AuthorizationDecision(false));
+				.any((grantedAuthority) -> this.authorities.stream().anyMatch((authority) -> authority.getAuthority().equals(grantedAuthority)))
+				.map((granted) -> ((AuthorizationDecision) new AuthorityAuthorizationDecision(granted, this.authorities)))
+				.defaultIfEmpty(new AuthorityAuthorizationDecision(false, this.authorities));
 		// @formatter:on
 	}
 
@@ -68,8 +69,6 @@ public class AuthorityReactiveAuthorizationManager<T> implements ReactiveAuthori
 	/**
 	 * Creates an instance of {@link AuthorityReactiveAuthorizationManager} with the
 	 * provided authorities.
-	 *
-	 * @author Robbie Martinus
 	 * @param authorities the authorities to check for
 	 * @param <T> the type of object being authorized
 	 * @return the new instance
@@ -97,8 +96,6 @@ public class AuthorityReactiveAuthorizationManager<T> implements ReactiveAuthori
 	/**
 	 * Creates an instance of {@link AuthorityReactiveAuthorizationManager} with the
 	 * provided authorities.
-	 *
-	 * @author Robbie Martinus
 	 * @param roles the authorities to check for prefixed with "ROLE_"
 	 * @param <T> the type of object being authorized
 	 * @return the new instance

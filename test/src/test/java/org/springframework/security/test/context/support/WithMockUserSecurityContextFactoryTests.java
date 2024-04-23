@@ -16,18 +16,18 @@
 
 package org.springframework.security.test.context.support;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.BDDMockito.given;
 
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class WithMockUserSecurityContextFactoryTests {
 
 	@Mock
@@ -35,7 +35,7 @@ public class WithMockUserSecurityContextFactoryTests {
 
 	private WithMockUserSecurityContextFactory factory;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.factory = new WithMockUserSecurityContextFactory();
 	}
@@ -52,7 +52,7 @@ public class WithMockUserSecurityContextFactoryTests {
 		given(this.withUser.roles()).willReturn(new String[] { "USER" });
 		given(this.withUser.authorities()).willReturn(new String[] {});
 		assertThat(this.factory.createSecurityContext(this.withUser).getAuthentication().getName())
-				.isEqualTo(this.withUser.value());
+			.isEqualTo(this.withUser.value());
 	}
 
 	@Test
@@ -62,7 +62,7 @@ public class WithMockUserSecurityContextFactoryTests {
 		given(this.withUser.roles()).willReturn(new String[] { "USER" });
 		given(this.withUser.authorities()).willReturn(new String[] {});
 		assertThat(this.factory.createSecurityContext(this.withUser).getAuthentication().getName())
-				.isEqualTo(this.withUser.username());
+			.isEqualTo(this.withUser.username());
 	}
 
 	@Test
@@ -72,7 +72,8 @@ public class WithMockUserSecurityContextFactoryTests {
 		given(this.withUser.roles()).willReturn(new String[] { "USER", "CUSTOM" });
 		given(this.withUser.authorities()).willReturn(new String[] {});
 		assertThat(this.factory.createSecurityContext(this.withUser).getAuthentication().getAuthorities())
-				.extracting("authority").containsOnly("ROLE_USER", "ROLE_CUSTOM");
+			.extracting("authority")
+			.containsOnly("ROLE_USER", "ROLE_CUSTOM");
 	}
 
 	@Test
@@ -82,7 +83,8 @@ public class WithMockUserSecurityContextFactoryTests {
 		given(this.withUser.roles()).willReturn(new String[] { "USER" });
 		given(this.withUser.authorities()).willReturn(new String[] { "USER", "CUSTOM" });
 		assertThat(this.factory.createSecurityContext(this.withUser).getAuthentication().getAuthorities())
-				.extracting("authority").containsOnly("USER", "CUSTOM");
+			.extracting("authority")
+			.containsOnly("USER", "CUSTOM");
 	}
 
 	@Test

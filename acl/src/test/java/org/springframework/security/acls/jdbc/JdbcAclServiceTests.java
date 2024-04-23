@@ -25,12 +25,12 @@ import java.util.UUID;
 
 import javax.sql.DataSource;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.RowMapper;
@@ -45,6 +45,7 @@ import org.springframework.security.acls.model.Sid;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -56,7 +57,7 @@ import static org.mockito.BDDMockito.given;
  *
  * @author Nena Raab
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class JdbcAclServiceTests {
 
 	private EmbeddedDatabase embeddedDatabase;
@@ -74,23 +75,20 @@ public class JdbcAclServiceTests {
 
 	private JdbcAclService aclService;
 
-	@Before
+	@BeforeEach
 	public void setUp() {
-		this.aclService = new JdbcAclService(this.jdbcOperations, this.lookupStrategy);
-		this.aclServiceIntegration = new JdbcAclService(this.embeddedDatabase, this.lookupStrategy);
-	}
-
-	@Before
-	public void setUpEmbeddedDatabase() {
 		// @formatter:off
 		this.embeddedDatabase = new EmbeddedDatabaseBuilder()
 			.addScript("createAclSchemaWithAclClassIdType.sql")
 			.addScript("db/sql/test_data_hierarchy.sql")
 			.build();
 		// @formatter:on
+
+		this.aclService = new JdbcAclService(this.jdbcOperations, this.lookupStrategy);
+		this.aclServiceIntegration = new JdbcAclService(this.embeddedDatabase, this.lookupStrategy);
 	}
 
-	@After
+	@AfterEach
 	public void tearDownEmbeddedDatabase() {
 		this.embeddedDatabase.shutdown();
 	}
@@ -103,7 +101,7 @@ public class JdbcAclServiceTests {
 		ObjectIdentity objectIdentity = new ObjectIdentityImpl(Object.class, 1);
 		List<Sid> sids = Arrays.<Sid>asList(new PrincipalSid("user"));
 		assertThatExceptionOfType(NotFoundException.class)
-				.isThrownBy(() -> this.aclService.readAclById(objectIdentity, sids));
+			.isThrownBy(() -> this.aclService.readAclById(objectIdentity, sids));
 	}
 
 	@Test
@@ -114,7 +112,7 @@ public class JdbcAclServiceTests {
 		given(this.jdbcOperations.query(anyString(), eq(args), any(RowMapper.class))).willReturn(result);
 		ObjectIdentity objectIdentity = new ObjectIdentityImpl(MockLongIdDomainObject.class, 1L);
 		List<ObjectIdentity> objectIdentities = this.aclService.findChildren(objectIdentity);
-		assertThat(objectIdentities.size()).isEqualTo(1);
+		assertThat(objectIdentities).hasSize(1);
 		assertThat(objectIdentities.get(0).getIdentifier()).isEqualTo("5577");
 	}
 
@@ -129,7 +127,7 @@ public class JdbcAclServiceTests {
 	public void findChildrenWithoutIdType() {
 		ObjectIdentity objectIdentity = new ObjectIdentityImpl(MockLongIdDomainObject.class, 4711L);
 		List<ObjectIdentity> objectIdentities = this.aclServiceIntegration.findChildren(objectIdentity);
-		assertThat(objectIdentities.size()).isEqualTo(1);
+		assertThat(objectIdentities).hasSize(1);
 		assertThat(objectIdentities.get(0).getType()).isEqualTo(MockUntypedIdDomainObject.class.getName());
 		assertThat(objectIdentities.get(0).getIdentifier()).isEqualTo(5000L);
 	}
@@ -145,7 +143,7 @@ public class JdbcAclServiceTests {
 	public void findChildrenOfIdTypeLong() {
 		ObjectIdentity objectIdentity = new ObjectIdentityImpl("location", "US-PAL");
 		List<ObjectIdentity> objectIdentities = this.aclServiceIntegration.findChildren(objectIdentity);
-		assertThat(objectIdentities.size()).isEqualTo(2);
+		assertThat(objectIdentities).hasSize(2);
 		assertThat(objectIdentities.get(0).getType()).isEqualTo(MockLongIdDomainObject.class.getName());
 		assertThat(objectIdentities.get(0).getIdentifier()).isEqualTo(4711L);
 		assertThat(objectIdentities.get(1).getType()).isEqualTo(MockLongIdDomainObject.class.getName());
@@ -157,7 +155,7 @@ public class JdbcAclServiceTests {
 		ObjectIdentity objectIdentity = new ObjectIdentityImpl("location", "US");
 		this.aclServiceIntegration.setAclClassIdSupported(true);
 		List<ObjectIdentity> objectIdentities = this.aclServiceIntegration.findChildren(objectIdentity);
-		assertThat(objectIdentities.size()).isEqualTo(1);
+		assertThat(objectIdentities).hasSize(1);
 		assertThat(objectIdentities.get(0).getType()).isEqualTo("location");
 		assertThat(objectIdentities.get(0).getIdentifier()).isEqualTo("US-PAL");
 	}
@@ -167,10 +165,30 @@ public class JdbcAclServiceTests {
 		ObjectIdentity objectIdentity = new ObjectIdentityImpl(MockUntypedIdDomainObject.class, 5000L);
 		this.aclServiceIntegration.setAclClassIdSupported(true);
 		List<ObjectIdentity> objectIdentities = this.aclServiceIntegration.findChildren(objectIdentity);
-		assertThat(objectIdentities.size()).isEqualTo(1);
+		assertThat(objectIdentities).hasSize(1);
 		assertThat(objectIdentities.get(0).getType()).isEqualTo("costcenter");
 		assertThat(objectIdentities.get(0).getIdentifier())
-				.isEqualTo(UUID.fromString("25d93b3f-c3aa-4814-9d5e-c7c96ced7762"));
+			.isEqualTo(UUID.fromString("25d93b3f-c3aa-4814-9d5e-c7c96ced7762"));
+	}
+
+	@Test
+	public void setObjectIdentityGeneratorWhenNullThenThrowsIllegalArgumentException() {
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> this.aclServiceIntegration.setObjectIdentityGenerator(null))
+			.withMessage("objectIdentityGenerator cannot be null");
+	}
+
+	@Test
+	public void findChildrenWhenObjectIdentityGeneratorSetThenUsed() {
+		this.aclServiceIntegration
+			.setObjectIdentityGenerator((id, type) -> new ObjectIdentityImpl(type, "prefix:" + id));
+
+		ObjectIdentity objectIdentity = new ObjectIdentityImpl("location", "US");
+		this.aclServiceIntegration.setAclClassIdSupported(true);
+		List<ObjectIdentity> objectIdentities = this.aclServiceIntegration.findChildren(objectIdentity);
+		assertThat(objectIdentities).hasSize(1);
+		assertThat(objectIdentities.get(0).getType()).isEqualTo("location");
+		assertThat(objectIdentities.get(0).getIdentifier()).isEqualTo("prefix:US-PAL");
 	}
 
 	class MockLongIdDomainObject {

@@ -21,28 +21,32 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.internal.stubbing.answers.Returns;
 import org.mockito.invocation.InvocationOnMock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.security.core.context.MockSecurityContextHolderStrategy;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 /**
  * @author Rob Winch
  * @since 3.2
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class DelegatingSecurityContextCallableTests {
 
 	@Mock
@@ -60,22 +64,30 @@ public class DelegatingSecurityContextCallableTests {
 
 	private SecurityContext originalSecurityContext;
 
-	@Before
+	@BeforeEach
 	@SuppressWarnings("serial")
 	public void setUp() throws Exception {
 		this.originalSecurityContext = SecurityContextHolder.createEmptyContext();
-		given(this.delegate.call()).willAnswer(new Returns(this.callableResult) {
-			@Override
-			public Object answer(InvocationOnMock invocation) throws Throwable {
-				assertThat(SecurityContextHolder.getContext())
-						.isEqualTo(DelegatingSecurityContextCallableTests.this.securityContext);
-				return super.answer(invocation);
-			}
-		});
 		this.executor = Executors.newFixedThreadPool(1);
 	}
 
-	@After
+	private void givenDelegateCallWillAnswerWithCurrentSecurityContext() throws Exception {
+		givenDelegateCallWillAnswerWithCurrentSecurityContext(SecurityContextHolder.getContextHolderStrategy());
+	}
+
+	private void givenDelegateCallWillAnswerWithCurrentSecurityContext(SecurityContextHolderStrategy strategy)
+			throws Exception {
+		given(this.delegate.call()).willAnswer(new Returns(this.callableResult) {
+			@Override
+			public Object answer(InvocationOnMock invocation) throws Throwable {
+				assertThat(strategy.getContext())
+					.isEqualTo(DelegatingSecurityContextCallableTests.this.securityContext);
+				return super.answer(invocation);
+			}
+		});
+	}
+
+	@AfterEach
 	public void tearDown() {
 		SecurityContextHolder.clearContext();
 	}
@@ -88,7 +100,7 @@ public class DelegatingSecurityContextCallableTests {
 	@Test
 	public void constructorNullDelegateNonNullSecurityContext() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new DelegatingSecurityContextCallable<>(null, this.securityContext));
+			.isThrownBy(() -> new DelegatingSecurityContextCallable<>(null, this.securityContext));
 	}
 
 	@Test
@@ -99,17 +111,19 @@ public class DelegatingSecurityContextCallableTests {
 	@Test
 	public void constructorNullSecurityContext() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new DelegatingSecurityContextCallable<>(this.delegate, null));
+			.isThrownBy(() -> new DelegatingSecurityContextCallable<>(this.delegate, null));
 	}
 
 	@Test
 	public void call() throws Exception {
+		givenDelegateCallWillAnswerWithCurrentSecurityContext();
 		this.callable = new DelegatingSecurityContextCallable<>(this.delegate, this.securityContext);
 		assertWrapped(this.callable);
 	}
 
 	@Test
 	public void callDefaultSecurityContext() throws Exception {
+		givenDelegateCallWillAnswerWithCurrentSecurityContext();
 		SecurityContextHolder.setContext(this.securityContext);
 		this.callable = new DelegatingSecurityContextCallable<>(this.delegate);
 		// ensure callable is what sets up the SecurityContextHolder
@@ -117,9 +131,24 @@ public class DelegatingSecurityContextCallableTests {
 		assertWrapped(this.callable);
 	}
 
+	@Test
+	public void callDefaultSecurityContextWithCustomSecurityContextHolderStrategy() throws Exception {
+		SecurityContextHolderStrategy securityContextHolderStrategy = spy(new MockSecurityContextHolderStrategy());
+		givenDelegateCallWillAnswerWithCurrentSecurityContext(securityContextHolderStrategy);
+		securityContextHolderStrategy.setContext(this.securityContext);
+		DelegatingSecurityContextCallable<Object> callable = new DelegatingSecurityContextCallable<>(this.delegate);
+		callable.setSecurityContextHolderStrategy(securityContextHolderStrategy);
+		this.callable = callable;
+		// ensure callable is what sets up the SecurityContextHolder
+		securityContextHolderStrategy.clearContext();
+		assertWrapped(this.callable);
+		verify(securityContextHolderStrategy, atLeastOnce()).getContext();
+	}
+
 	// SEC-3031
 	@Test
 	public void callOnSameThread() throws Exception {
+		givenDelegateCallWillAnswerWithCurrentSecurityContext();
 		this.originalSecurityContext = this.securityContext;
 		SecurityContextHolder.setContext(this.originalSecurityContext);
 		this.callable = new DelegatingSecurityContextCallable<>(this.delegate, this.securityContext);
@@ -129,7 +158,7 @@ public class DelegatingSecurityContextCallableTests {
 	@Test
 	public void createNullDelegate() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> DelegatingSecurityContextCallable.create(null, this.securityContext));
+			.isThrownBy(() -> DelegatingSecurityContextCallable.create(null, this.securityContext));
 	}
 
 	@Test
@@ -139,6 +168,7 @@ public class DelegatingSecurityContextCallableTests {
 
 	@Test
 	public void createNullSecurityContext() throws Exception {
+		givenDelegateCallWillAnswerWithCurrentSecurityContext();
 		SecurityContextHolder.setContext(this.securityContext);
 		this.callable = DelegatingSecurityContextCallable.create(this.delegate, null);
 		// ensure callable is what sets up the SecurityContextHolder
@@ -148,6 +178,7 @@ public class DelegatingSecurityContextCallableTests {
 
 	@Test
 	public void create() throws Exception {
+		givenDelegateCallWillAnswerWithCurrentSecurityContext();
 		this.callable = DelegatingSecurityContextCallable.create(this.delegate, this.securityContext);
 		assertWrapped(this.callable);
 	}

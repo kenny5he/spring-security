@@ -19,19 +19,16 @@ package org.springframework.security.test.web.servlet.request;
 import java.util.Arrays;
 import java.util.List;
 
-import javax.servlet.http.HttpServletResponse;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import jakarta.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.powermock.api.mockito.PowerMockito;
-import org.powermock.core.classloader.annotations.PowerMockIgnore;
-import org.powermock.core.classloader.annotations.PrepareOnlyThisForTest;
-import org.powermock.modules.junit4.PowerMockRunner;
+import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -48,10 +45,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
-@RunWith(PowerMockRunner.class)
-@PrepareOnlyThisForTest(WebTestUtils.class)
-@PowerMockIgnore({ "javax.security.auth.*", "org.w3c.dom.*", "org.xml.sax.*", "org.apache.xerces.*",
-		"javax.xml.parsers.*" })
+@ExtendWith(MockitoExtension.class)
 public class SecurityMockMvcRequestPostProcessorsUserTests {
 
 	@Captor
@@ -68,13 +62,17 @@ public class SecurityMockMvcRequestPostProcessorsUserTests {
 	@Mock
 	private GrantedAuthority authority2;
 
-	@Before
+	@Mock
+	private MockedStatic<WebTestUtils> webTestUtils;
+
+	@BeforeEach
 	public void setup() {
 		this.request = new MockHttpServletRequest();
-		mockWebTestUtils();
+		this.webTestUtils.when(() -> WebTestUtils.getSecurityContextRepository(this.request))
+			.thenReturn(this.repository);
 	}
 
-	@After
+	@AfterEach
 	public void cleanup() {
 		TestSecurityContextHolder.clearContext();
 	}
@@ -102,8 +100,8 @@ public class SecurityMockMvcRequestPostProcessorsUserTests {
 		assertThat(context.getAuthentication()).isInstanceOf(UsernamePasswordAuthenticationToken.class);
 		assertThat(context.getAuthentication().getName()).isEqualTo(username);
 		assertThat(context.getAuthentication().getCredentials()).isEqualTo("newpass");
-		assertThat(context.getAuthentication().getAuthorities()).extracting("authority").containsOnly("ROLE_CUSTOM",
-				"ROLE_ADMIN");
+		assertThat(context.getAuthentication().getAuthorities()).extracting("authority")
+			.containsOnly("ROLE_CUSTOM", "ROLE_ADMIN");
 	}
 
 	@Test
@@ -120,7 +118,7 @@ public class SecurityMockMvcRequestPostProcessorsUserTests {
 	@Test
 	public void userRolesWithRolePrefixErrors() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> user("user").roles("ROLE_INVALID").postProcessRequest(this.request));
+			.isThrownBy(() -> user("user").roles("ROLE_INVALID").postProcessRequest(this.request));
 	}
 
 	@Test
@@ -132,11 +130,6 @@ public class SecurityMockMvcRequestPostProcessorsUserTests {
 		SecurityContext context = this.contextCaptor.getValue();
 		assertThat((List<GrantedAuthority>) context.getAuthentication().getAuthorities()).containsOnly(this.authority1,
 				this.authority2);
-	}
-
-	private void mockWebTestUtils() {
-		PowerMockito.spy(WebTestUtils.class);
-		PowerMockito.when(WebTestUtils.getSecurityContextRepository(this.request)).thenReturn(this.repository);
 	}
 
 }

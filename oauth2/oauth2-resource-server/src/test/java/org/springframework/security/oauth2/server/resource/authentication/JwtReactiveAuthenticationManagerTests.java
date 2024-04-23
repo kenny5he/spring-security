@@ -16,11 +16,11 @@
 
 package org.springframework.security.oauth2.server.resource.authentication;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 
 import org.springframework.security.authentication.TestingAuthenticationToken;
@@ -33,7 +33,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.TestJwts;
-import org.springframework.security.oauth2.server.resource.BearerTokenAuthenticationToken;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -45,7 +44,7 @@ import static org.mockito.BDDMockito.given;
  * @author Rob Winch
  * @since 5.1
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class JwtReactiveAuthenticationManagerTests {
 
 	@Mock
@@ -55,7 +54,7 @@ public class JwtReactiveAuthenticationManagerTests {
 
 	private Jwt jwt;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.manager = new JwtReactiveAuthenticationManager(this.jwtDecoder);
 		// @formatter:off
@@ -92,7 +91,7 @@ public class JwtReactiveAuthenticationManagerTests {
 		BearerTokenAuthenticationToken token = new BearerTokenAuthenticationToken("token-1");
 		given(this.jwtDecoder.decode(any())).willReturn(Mono.error(new BadJwtException("Oops")));
 		assertThatExceptionOfType(OAuth2AuthenticationException.class)
-				.isThrownBy(() -> this.manager.authenticate(token).block());
+			.isThrownBy(() -> this.manager.authenticate(token).block());
 	}
 
 	// gh-7549

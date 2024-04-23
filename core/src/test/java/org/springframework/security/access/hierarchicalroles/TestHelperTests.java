@@ -21,7 +21,7 @@ import java.util.Collection;
 import java.util.List;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -79,19 +79,19 @@ public class TestHelperTests {
 		authoritiesStrings5.add("ROLE_A");
 		assertThat(CollectionUtils.isEqualCollection(
 				HierarchicalRolesTestHelper.toCollectionOfAuthorityStrings(authorities1), authoritiesStrings1))
-						.isTrue();
+			.isTrue();
 		assertThat(CollectionUtils.isEqualCollection(
 				HierarchicalRolesTestHelper.toCollectionOfAuthorityStrings(authorities2), authoritiesStrings2))
-						.isTrue();
+			.isTrue();
 		assertThat(CollectionUtils.isEqualCollection(
 				HierarchicalRolesTestHelper.toCollectionOfAuthorityStrings(authorities3), authoritiesStrings3))
-						.isTrue();
+			.isTrue();
 		assertThat(CollectionUtils.isEqualCollection(
 				HierarchicalRolesTestHelper.toCollectionOfAuthorityStrings(authorities4), authoritiesStrings4))
-						.isTrue();
+			.isTrue();
 		assertThat(CollectionUtils.isEqualCollection(
 				HierarchicalRolesTestHelper.toCollectionOfAuthorityStrings(authorities5), authoritiesStrings5))
-						.isTrue();
+			.isTrue();
 	}
 
 	// SEC-863
@@ -121,7 +121,8 @@ public class TestHelperTests {
 		List<GrantedAuthority> authorities1 = HierarchicalRolesTestHelper.createAuthorityList("ROLE_A", "ROLE_B");
 		List<GrantedAuthority> authorities2 = AuthorityUtils.createAuthorityList("ROLE_A", "ROLE_B");
 		assertThat(HierarchicalRolesTestHelper.containTheSameGrantedAuthoritiesCompareByAuthorityString(authorities1,
-				authorities2)).isTrue();
+				authorities2))
+			.isTrue();
 	}
 
 	// SEC-863

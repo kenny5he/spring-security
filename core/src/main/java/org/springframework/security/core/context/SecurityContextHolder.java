@@ -17,7 +17,9 @@
 package org.springframework.security.core.context;
 
 import java.lang.reflect.Constructor;
+import java.util.function.Supplier;
 
+import org.springframework.util.Assert;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
@@ -45,6 +47,7 @@ import org.springframework.util.StringUtils;
  * {@link #MODE_GLOBAL} is definitely inappropriate for server use).
  *
  * @author Ben Alex
+ * @author Rob Winch
  *
  */
 public class SecurityContextHolder {
@@ -54,6 +57,8 @@ public class SecurityContextHolder {
 	public static final String MODE_INHERITABLETHREADLOCAL = "MODE_INHERITABLETHREADLOCAL";
 
 	public static final String MODE_GLOBAL = "MODE_GLOBAL";
+
+	private static final String MODE_PRE_INITIALIZED = "MODE_PRE_INITIALIZED";
 
 	public static final String SYSTEM_PROPERTY = "spring.security.strategy";
 
@@ -68,31 +73,41 @@ public class SecurityContextHolder {
 	}
 
 	private static void initialize() {
+		initializeStrategy();
+		initializeCount++;
+	}
+
+	private static void initializeStrategy() {
+		if (MODE_PRE_INITIALIZED.equals(strategyName)) {
+			Assert.state(strategy != null, "When using " + MODE_PRE_INITIALIZED
+					+ ", setContextHolderStrategy must be called with the fully constructed strategy");
+			return;
+		}
 		if (!StringUtils.hasText(strategyName)) {
 			// Set default
 			strategyName = MODE_THREADLOCAL;
 		}
 		if (strategyName.equals(MODE_THREADLOCAL)) {
 			strategy = new ThreadLocalSecurityContextHolderStrategy();
+			return;
 		}
-		else if (strategyName.equals(MODE_INHERITABLETHREADLOCAL)) {
+		if (strategyName.equals(MODE_INHERITABLETHREADLOCAL)) {
 			strategy = new InheritableThreadLocalSecurityContextHolderStrategy();
+			return;
 		}
-		else if (strategyName.equals(MODE_GLOBAL)) {
+		if (strategyName.equals(MODE_GLOBAL)) {
 			strategy = new GlobalSecurityContextHolderStrategy();
+			return;
 		}
-		else {
-			// Try to load a custom strategy
-			try {
-				Class<?> clazz = Class.forName(strategyName);
-				Constructor<?> customStrategy = clazz.getConstructor();
-				strategy = (SecurityContextHolderStrategy) customStrategy.newInstance();
-			}
-			catch (Exception ex) {
-				ReflectionUtils.handleReflectionException(ex);
-			}
+		// Try to load a custom strategy
+		try {
+			Class<?> clazz = Class.forName(strategyName);
+			Constructor<?> customStrategy = clazz.getConstructor();
+			strategy = (SecurityContextHolderStrategy) customStrategy.newInstance();
 		}
-		initializeCount++;
+		catch (Exception ex) {
+			ReflectionUtils.handleReflectionException(ex);
+		}
 	}
 
 	/**
@@ -111,10 +126,22 @@ public class SecurityContextHolder {
 	}
 
 	/**
+	 * Obtains a {@link Supplier} that returns the current context.
+	 * @return a {@link Supplier} that returns the current context (never
+	 * <code>null</code> - create a default implementation if necessary)
+	 * @since 5.8
+	 */
+	public static Supplier<SecurityContext> getDeferredContext() {
+		return strategy.getDeferredContext();
+	}
+
+	/**
 	 * Primarily for troubleshooting purposes, this method shows how many times the class
 	 * has re-initialized its <code>SecurityContextHolderStrategy</code>.
 	 * @return the count (should be one unless you've called
-	 * {@link #setStrategyName(String)} to switch to an alternate strategy.
+	 * {@link #setStrategyName(String)} or
+	 * {@link #setContextHolderStrategy(SecurityContextHolderStrategy)} to switch to an
+	 * alternate strategy).
 	 */
 	public static int getInitializeCount() {
 		return initializeCount;
@@ -129,6 +156,16 @@ public class SecurityContextHolder {
 	}
 
 	/**
+	 * Sets a {@link Supplier} that will return the current context. Implementations can
+	 * override the default to avoid invoking {@link Supplier#get()}.
+	 * @param deferredContext a {@link Supplier} that returns the {@link SecurityContext}
+	 * @since 5.8
+	 */
+	public static void setDeferredContext(Supplier<SecurityContext> deferredContext) {
+		strategy.setDeferredContext(deferredContext);
+	}
+
+	/**
 	 * Changes the preferred strategy. Do <em>NOT</em> call this method more than once for
 	 * a given JVM, as it will re-initialize the strategy and adversely affect any
 	 * existing threads using the old strategy.
@@ -137,6 +174,41 @@ public class SecurityContextHolder {
 	 */
 	public static void setStrategyName(String strategyName) {
 		SecurityContextHolder.strategyName = strategyName;
+		initialize();
+	}
+
+	/**
+	 * Use this {@link SecurityContextHolderStrategy}.
+	 *
+	 * Call either {@link #setStrategyName(String)} or this method, but not both.
+	 *
+	 * This method is not thread safe. Changing the strategy while requests are in-flight
+	 * may cause race conditions.
+	 *
+	 * {@link SecurityContextHolder} maintains a static reference to the provided
+	 * {@link SecurityContextHolderStrategy}. This means that the strategy and its members
+	 * will not be garbage collected until you remove your strategy.
+	 *
+	 * To ensure garbage collection, remember the original strategy like so:
+	 *
+	 * <pre>
+	 *     SecurityContextHolderStrategy original = SecurityContextHolder.getContextHolderStrategy();
+	 *     SecurityContextHolder.setContextHolderStrategy(myStrategy);
+	 * </pre>
+	 *
+	 * And then when you are ready for {@code myStrategy} to be garbage collected you can
+	 * do:
+	 *
+	 * <pre>
+	 *     SecurityContextHolder.setContextHolderStrategy(original);
+	 * </pre>
+	 * @param strategy the {@link SecurityContextHolderStrategy} to use
+	 * @since 5.6
+	 */
+	public static void setContextHolderStrategy(SecurityContextHolderStrategy strategy) {
+		Assert.notNull(strategy, "securityContextHolderStrategy cannot be null");
+		SecurityContextHolder.strategyName = MODE_PRE_INITIALIZED;
+		SecurityContextHolder.strategy = strategy;
 		initialize();
 	}
 
@@ -157,7 +229,8 @@ public class SecurityContextHolder {
 
 	@Override
 	public String toString() {
-		return "SecurityContextHolder[strategy='" + strategyName + "'; initializeCount=" + initializeCount + "]";
+		return "SecurityContextHolder[strategy='" + strategy.getClass().getSimpleName() + "'; initializeCount="
+				+ initializeCount + "]";
 	}
 
 }

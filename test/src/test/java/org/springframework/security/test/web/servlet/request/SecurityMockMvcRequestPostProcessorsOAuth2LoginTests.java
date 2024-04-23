@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,15 +22,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -42,8 +42,9 @@ import org.springframework.security.oauth2.client.registration.TestClientRegistr
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -66,7 +67,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Josh Cummings
  * @since 5.3
  */
-@RunWith(SpringJUnit4ClassRunner.class)
+@ExtendWith(SpringExtension.class)
 @ContextConfiguration
 @WebAppConfiguration
 public class SecurityMockMvcRequestPostProcessorsOAuth2LoginTests {
@@ -76,7 +77,7 @@ public class SecurityMockMvcRequestPostProcessorsOAuth2LoginTests {
 
 	MockMvc mvc;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		// @formatter:off
 		this.mvc = MockMvcBuilders
@@ -99,16 +100,17 @@ public class SecurityMockMvcRequestPostProcessorsOAuth2LoginTests {
 
 	@Test
 	public void oauth2LoginWhenAuthoritiesSpecifiedThenGrantsAccess() throws Exception {
-		this.mvc.perform(
-				get("/admin/scopes").with(oauth2Login().authorities(new SimpleGrantedAuthority("SCOPE_admin"))))
-				.andExpect(content().string("[\"SCOPE_admin\"]"));
+		this.mvc
+			.perform(get("/admin/scopes").with(oauth2Login().authorities(new SimpleGrantedAuthority("SCOPE_admin"))))
+			.andExpect(content().string("[\"SCOPE_admin\"]"));
 	}
 
 	@Test
 	public void oauth2LoginWhenAttributeSpecifiedThenUserHasAttribute() throws Exception {
-		this.mvc.perform(
-				get("/attributes/iss").with(oauth2Login().attributes((a) -> a.put("iss", "https://idp.example.org"))))
-				.andExpect(content().string("https://idp.example.org"));
+		this.mvc
+			.perform(get("/attributes/iss")
+				.with(oauth2Login().attributes((a) -> a.put("iss", "https://idp.example.org"))))
+			.andExpect(content().string("https://idp.example.org"));
 	}
 
 	@Test
@@ -116,44 +118,50 @@ public class SecurityMockMvcRequestPostProcessorsOAuth2LoginTests {
 		OAuth2User oauth2User = new DefaultOAuth2User(AuthorityUtils.commaSeparatedStringToAuthorityList("SCOPE_read"),
 				Collections.singletonMap("custom-attribute", "test-subject"), "custom-attribute");
 		this.mvc.perform(get("/attributes/custom-attribute").with(oauth2Login().oauth2User(oauth2User)))
-				.andExpect(content().string("test-subject"));
+			.andExpect(content().string("test-subject"));
 		this.mvc.perform(get("/name").with(oauth2Login().oauth2User(oauth2User)))
-				.andExpect(content().string("test-subject"));
+			.andExpect(content().string("test-subject"));
 		this.mvc.perform(get("/client-name").with(oauth2Login().oauth2User(oauth2User)))
-				.andExpect(content().string("test-subject"));
+			.andExpect(content().string("test-subject"));
 	}
 
 	@Test
 	public void oauth2LoginWhenClientRegistrationSpecifiedThenUses() throws Exception {
-		this.mvc.perform(get("/client-id")
+		this.mvc
+			.perform(get("/client-id")
 				.with(oauth2Login().clientRegistration(TestClientRegistrations.clientRegistration().build())))
-				.andExpect(content().string("client-id"));
+			.andExpect(content().string("client-id"));
 	}
 
 	@Test
 	public void oauth2LoginWhenOAuth2UserSpecifiedThenLastCalledTakesPrecedence() throws Exception {
 		OAuth2User oauth2User = new DefaultOAuth2User(AuthorityUtils.createAuthorityList("SCOPE_read"),
 				Collections.singletonMap("username", "user"), "username");
-		this.mvc.perform(get("/attributes/sub")
+		this.mvc
+			.perform(get("/attributes/sub")
 				.with(oauth2Login().attributes((a) -> a.put("sub", "bar")).oauth2User(oauth2User)))
-				.andExpect(status().isOk()).andExpect(content().string("no-attribute"));
-		this.mvc.perform(get("/attributes/sub")
+			.andExpect(status().isOk())
+			.andExpect(content().string("no-attribute"));
+		this.mvc
+			.perform(get("/attributes/sub")
 				.with(oauth2Login().oauth2User(oauth2User).attributes((a) -> a.put("sub", "bar"))))
-				.andExpect(content().string("bar"));
+			.andExpect(content().string("bar"));
 	}
 
+	@Configuration
 	@EnableWebSecurity
 	@EnableWebMvc
-	static class OAuth2LoginConfig extends WebSecurityConfigurerAdapter {
+	static class OAuth2LoginConfig {
 
-		@Override
-		protected void configure(HttpSecurity http) throws Exception {
+		@Bean
+		SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 			// @formatter:off
 			http
 				.authorizeRequests((authorize) -> authorize
-					.mvcMatchers("/admin/**").hasAuthority("SCOPE_admin")
+					.requestMatchers("/admin/**").hasAuthority("SCOPE_admin")
 					.anyRequest().hasAuthority("SCOPE_read")
 				).oauth2Login();
+			return http.build();
 			// @formatter:on
 		}
 

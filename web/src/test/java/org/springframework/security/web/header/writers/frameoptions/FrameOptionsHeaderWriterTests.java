@@ -16,11 +16,11 @@
 
 package org.springframework.security.web.header.writers.frameoptions;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -34,7 +34,7 @@ import static org.mockito.BDDMockito.given;
  * @author Rob Winch
  *
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class FrameOptionsHeaderWriterTests {
 
 	@Mock
@@ -46,7 +46,7 @@ public class FrameOptionsHeaderWriterTests {
 
 	private XFrameOptionsHeaderWriter writer;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.request = new MockHttpServletRequest();
 		this.response = new MockHttpServletResponse();
@@ -60,7 +60,7 @@ public class FrameOptionsHeaderWriterTests {
 	@Test
 	public void constructorAllowFromNoAllowFromStrategy() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> new XFrameOptionsHeaderWriter(XFrameOptionsMode.ALLOW_FROM));
+			.isThrownBy(() -> new XFrameOptionsHeaderWriter(XFrameOptionsMode.ALLOW_FROM));
 	}
 
 	@Test
@@ -72,7 +72,7 @@ public class FrameOptionsHeaderWriterTests {
 	public void writeHeadersAllowFromReturnsNull() {
 		this.writer = new XFrameOptionsHeaderWriter(this.strategy);
 		this.writer.writeHeaders(this.request, this.response);
-		assertThat(this.response.getHeaderNames().isEmpty()).isTrue();
+		assertThat(this.response.getHeaderNames()).isEmpty();
 	}
 
 	@Test
@@ -83,7 +83,7 @@ public class FrameOptionsHeaderWriterTests {
 		this.writer.writeHeaders(this.request, this.response);
 		assertThat(this.response.getHeaderNames()).hasSize(1);
 		assertThat(this.response.getHeader(XFrameOptionsHeaderWriter.XFRAME_OPTIONS_HEADER))
-				.isEqualTo("ALLOW-FROM " + allowFromValue);
+			.isEqualTo("ALLOW-FROM " + allowFromValue);
 	}
 
 	@Test

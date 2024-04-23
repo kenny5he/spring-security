@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2020 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,22 +35,10 @@ public final class ClientAuthenticationMethod implements Serializable {
 	private static final long serialVersionUID = SpringSecurityCoreVersion.SERIAL_VERSION_UID;
 
 	/**
-	 * @deprecated Use {@link #CLIENT_SECRET_BASIC}
-	 */
-	@Deprecated
-	public static final ClientAuthenticationMethod BASIC = new ClientAuthenticationMethod("basic");
-
-	/**
 	 * @since 5.5
 	 */
 	public static final ClientAuthenticationMethod CLIENT_SECRET_BASIC = new ClientAuthenticationMethod(
 			"client_secret_basic");
-
-	/**
-	 * @deprecated Use {@link #CLIENT_SECRET_POST}
-	 */
-	@Deprecated
-	public static final ClientAuthenticationMethod POST = new ClientAuthenticationMethod("post");
 
 	/**
 	 * @since 5.5
@@ -59,9 +47,31 @@ public final class ClientAuthenticationMethod implements Serializable {
 			"client_secret_post");
 
 	/**
+	 * @since 5.5
+	 */
+	public static final ClientAuthenticationMethod CLIENT_SECRET_JWT = new ClientAuthenticationMethod(
+			"client_secret_jwt");
+
+	/**
+	 * @since 5.5
+	 */
+	public static final ClientAuthenticationMethod PRIVATE_KEY_JWT = new ClientAuthenticationMethod("private_key_jwt");
+
+	/**
 	 * @since 5.2
 	 */
 	public static final ClientAuthenticationMethod NONE = new ClientAuthenticationMethod("none");
+
+	/**
+	 * @since 6.3
+	 */
+	public static final ClientAuthenticationMethod TLS_CLIENT_AUTH = new ClientAuthenticationMethod("tls_client_auth");
+
+	/**
+	 * @since 6.3
+	 */
+	public static final ClientAuthenticationMethod SELF_SIGNED_TLS_CLIENT_AUTH = new ClientAuthenticationMethod(
+			"self_signed_tls_client_auth");
 
 	private final String value;
 
@@ -91,12 +101,17 @@ public final class ClientAuthenticationMethod implements Serializable {
 			return false;
 		}
 		ClientAuthenticationMethod that = (ClientAuthenticationMethod) obj;
-		return this.getValue().equalsIgnoreCase(that.getValue());
+		return getValue().equals(that.getValue());
 	}
 
 	@Override
 	public int hashCode() {
-		return this.getValue().hashCode();
+		return getValue().hashCode();
+	}
+
+	@Override
+	public String toString() {
+		return this.value;
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,17 @@
 
 package org.springframework.security.config.annotation.authentication;
 
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 import org.springframework.security.core.userdetails.PasswordEncodedUser;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
@@ -37,10 +38,10 @@ import static org.springframework.security.test.web.servlet.response.SecurityMoc
 /**
  * @author Rob Winch
  */
+@ExtendWith(SpringTestContextExtension.class)
 public class NamespaceAuthenticationProviderTests {
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -59,11 +60,12 @@ public class NamespaceAuthenticationProviderTests {
 		this.mockMvc.perform(formLogin()).andExpect(authenticated().withUsername("user"));
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class AuthenticationProviderRefConfig extends WebSecurityConfigurerAdapter {
+	static class AuthenticationProviderRefConfig {
 
-		@Override
-		protected void configure(AuthenticationManagerBuilder auth) {
+		@Autowired
+		void configure(AuthenticationManagerBuilder auth) {
 			// @formatter:off
 			auth
 				.authenticationProvider(authenticationProvider());
@@ -79,20 +81,20 @@ public class NamespaceAuthenticationProviderTests {
 
 	}
 
+	@Configuration
 	@EnableWebSecurity
-	static class UserServiceRefConfig extends WebSecurityConfigurerAdapter {
+	static class UserServiceRefConfig {
 
-		@Override
-		protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+		@Autowired
+		void configure(AuthenticationManagerBuilder auth) throws Exception {
 			// @formatter:off
 			auth
 				.userDetailsService(userDetailsService());
 			// @formatter:on
 		}
 
-		@Override
 		@Bean
-		public UserDetailsService userDetailsService() {
+		UserDetailsService userDetailsService() {
 			return new InMemoryUserDetailsManager(PasswordEncodedUser.user());
 		}
 

@@ -16,9 +16,8 @@
 
 package org.springframework.security.web.access.channel;
 
-import javax.servlet.FilterChain;
-
-import org.junit.Test;
+import jakarta.servlet.FilterChain;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -93,7 +92,7 @@ public class InsecureChannelProcessorTests {
 		InsecureChannelProcessor processor = new InsecureChannelProcessor();
 		processor.setEntryPoint(null);
 		assertThatIllegalArgumentException().isThrownBy(processor::afterPropertiesSet)
-				.withMessage("entryPoint required");
+			.withMessage("entryPoint required");
 	}
 
 	@Test
@@ -101,10 +100,10 @@ public class InsecureChannelProcessorTests {
 		InsecureChannelProcessor processor = new InsecureChannelProcessor();
 		processor.setInsecureKeyword(null);
 		assertThatIllegalArgumentException().isThrownBy(processor::afterPropertiesSet)
-				.withMessage("insecureKeyword required");
+			.withMessage("insecureKeyword required");
 		processor.setInsecureKeyword("");
 		assertThatIllegalArgumentException().isThrownBy(processor::afterPropertiesSet)
-				.withMessage("insecureKeyword required");
+			.withMessage("insecureKeyword required");
 	}
 
 	@Test

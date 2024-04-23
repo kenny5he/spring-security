@@ -16,9 +16,8 @@
 
 package org.springframework.security.web.header.writers;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -82,7 +81,6 @@ public final class HstsHeaderWriter implements HeaderWriter {
 	 * @param includeSubDomains maps to {@link #setIncludeSubDomains(boolean)}
 	 * @param preload maps to {@link #setPreload(boolean)}
 	 * @since 5.2.0
-	 * @author Ankur Pathak
 	 */
 	public HstsHeaderWriter(RequestMatcher requestMatcher, long maxAgeInSeconds, boolean includeSubDomains,
 			boolean preload) {
@@ -109,7 +107,6 @@ public final class HstsHeaderWriter implements HeaderWriter {
 	 * @param includeSubDomains maps to {@link #setIncludeSubDomains(boolean)}
 	 * @param preload maps to {@link #setPreload(boolean)}
 	 * @since 5.2.0
-	 * @author Ankur Pathak
 	 */
 	public HstsHeaderWriter(long maxAgeInSeconds, boolean includeSubDomains, boolean preload) {
 		this(new SecureRequestMatcher(), maxAgeInSeconds, includeSubDomains, preload);
@@ -222,7 +219,6 @@ public final class HstsHeaderWriter implements HeaderWriter {
 	 * </p>
 	 * @param preload true to include preload, else false
 	 * @since 5.2.0
-	 * @author Ankur Pathak
 	 */
 	public void setPreload(boolean preload) {
 		this.preload = preload;

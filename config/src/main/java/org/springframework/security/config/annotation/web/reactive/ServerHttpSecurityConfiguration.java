@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 
 package org.springframework.security.config.annotation.web.reactive;
 
+import io.micrometer.observation.ObservationRegistry;
+
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -27,8 +29,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.expression.BeanFactoryResolver;
 import org.springframework.core.ReactiveAdapterRegistry;
+import org.springframework.security.authentication.ObservationReactiveAuthenticationManager;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.authentication.UserDetailsRepositoryReactiveAuthenticationManager;
+import org.springframework.security.authentication.password.ReactiveCompromisedPasswordChecker;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsPasswordService;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
@@ -60,6 +64,10 @@ class ServerHttpSecurityConfiguration {
 
 	private ReactiveUserDetailsPasswordService userDetailsPasswordService;
 
+	private ReactiveCompromisedPasswordChecker compromisedPasswordChecker;
+
+	private ObservationRegistry observationRegistry = ObservationRegistry.NOOP;
+
 	@Autowired(required = false)
 	private BeanFactory beanFactory;
 
@@ -88,8 +96,18 @@ class ServerHttpSecurityConfiguration {
 		this.userDetailsPasswordService = userDetailsPasswordService;
 	}
 
+	@Autowired(required = false)
+	void setObservationRegistry(ObservationRegistry observationRegistry) {
+		this.observationRegistry = observationRegistry;
+	}
+
+	@Autowired(required = false)
+	void setCompromisedPasswordChecker(ReactiveCompromisedPasswordChecker compromisedPasswordChecker) {
+		this.compromisedPasswordChecker = compromisedPasswordChecker;
+	}
+
 	@Bean
-	WebFluxConfigurer authenticationPrincipalArgumentResolverConfigurer(
+	static WebFluxConfigurer authenticationPrincipalArgumentResolverConfigurer(
 			ObjectProvider<AuthenticationPrincipalArgumentResolver> authenticationPrincipalArgumentResolver) {
 		return new WebFluxConfigurer() {
 
@@ -143,6 +161,10 @@ class ServerHttpSecurityConfiguration {
 				manager.setPasswordEncoder(this.passwordEncoder);
 			}
 			manager.setUserDetailsPasswordService(this.userDetailsPasswordService);
+			manager.setCompromisedPasswordChecker(this.compromisedPasswordChecker);
+			if (!this.observationRegistry.isNoop()) {
+				return new ObservationReactiveAuthenticationManager(this.observationRegistry, manager);
+			}
 			return manager;
 		}
 		return null;

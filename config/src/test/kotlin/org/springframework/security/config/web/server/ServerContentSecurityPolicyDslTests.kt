@@ -16,13 +16,15 @@
 
 package org.springframework.security.config.web.server
 
-import org.junit.Rule
-import org.junit.Test
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity
-import org.springframework.security.config.test.SpringTestRule
+import org.springframework.security.config.test.SpringTestContext
+import org.springframework.security.config.test.SpringTestContextExtension
 import org.springframework.security.web.server.SecurityWebFilterChain
 import org.springframework.security.web.server.header.ContentSecurityPolicyServerHttpHeadersWriter
 import org.springframework.test.web.reactive.server.WebTestClient
@@ -33,10 +35,10 @@ import org.springframework.web.reactive.config.EnableWebFlux
  *
  * @author Eleftheria Stein
  */
+@ExtendWith(SpringTestContextExtension::class)
 class ServerContentSecurityPolicyDslTests {
-    @Rule
     @JvmField
-    val spring = SpringTestRule()
+    val spring = SpringTestContext(this)
 
     private lateinit var client: WebTestClient
 
@@ -58,6 +60,7 @@ class ServerContentSecurityPolicyDslTests {
                 .expectHeader().valueEquals(ContentSecurityPolicyServerHttpHeadersWriter.CONTENT_SECURITY_POLICY, "default-src 'self'")
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class ContentSecurityPolicyConfig {
@@ -81,6 +84,7 @@ class ServerContentSecurityPolicyDslTests {
                 .expectHeader().valueEquals(ContentSecurityPolicyServerHttpHeadersWriter.CONTENT_SECURITY_POLICY, "default-src 'self'; script-src trustedscripts.example.com")
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class CustomPolicyDirectivesConfig {
@@ -106,6 +110,7 @@ class ServerContentSecurityPolicyDslTests {
                 .expectHeader().valueEquals(ContentSecurityPolicyServerHttpHeadersWriter.CONTENT_SECURITY_POLICY_REPORT_ONLY, "default-src 'self'")
     }
 
+    @Configuration
     @EnableWebFluxSecurity
     @EnableWebFlux
     open class ReportOnlyConfig {

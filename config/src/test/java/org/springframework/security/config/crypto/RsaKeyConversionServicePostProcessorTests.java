@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,9 @@ package org.springframework.security.config.crypto;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
@@ -35,7 +35,8 @@ import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.test.SpringTestRule;
+import org.springframework.security.config.test.SpringTestContext;
+import org.springframework.security.config.test.SpringTestContextExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -43,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 /**
  * Tests for {@link RsaKeyConversionServicePostProcessor}
  */
+@ExtendWith(SpringTestContextExtension.class)
 public class RsaKeyConversionServicePostProcessorTests {
 
 	// @formatter:off
@@ -91,10 +93,9 @@ public class RsaKeyConversionServicePostProcessorTests {
 	@Value("custom:simple.pub")
 	RSAPublicKey samePublicKey;
 
-	@Rule
-	public final SpringTestRule spring = new SpringTestRule();
+	public final SpringTestContext spring = new SpringTestContext(this);
 
-	@Before
+	@BeforeEach
 	public void setUp() {
 		ConfigurableListableBeanFactory beanFactory = new DefaultListableBeanFactory();
 		beanFactory.setConversionService(new GenericConversionService());
@@ -134,11 +135,13 @@ public class RsaKeyConversionServicePostProcessorTests {
 
 	@Test
 	public void valueWhenOverridingConversionServiceThenUsed() {
-		assertThatExceptionOfType(Exception.class).isThrownBy(
-				() -> this.spring.register(OverrideConversionServiceConfig.class, DefaultConfig.class).autowire())
-				.withRootCauseInstanceOf(IllegalArgumentException.class);
+		assertThatExceptionOfType(Exception.class)
+			.isThrownBy(
+					() -> this.spring.register(OverrideConversionServiceConfig.class, DefaultConfig.class).autowire())
+			.withRootCauseInstanceOf(IllegalArgumentException.class);
 	}
 
+	@Configuration
 	@EnableWebSecurity
 	static class DefaultConfig {
 
@@ -150,7 +153,7 @@ public class RsaKeyConversionServicePostProcessorTests {
 		@Bean
 		BeanFactoryPostProcessor conversionServiceCustomizer() {
 			return (beanFactory) -> beanFactory.getBean(RsaKeyConversionServicePostProcessor.class)
-					.setResourceLoader(new CustomResourceLoader());
+				.setResourceLoader(new CustomResourceLoader());
 		}
 
 	}

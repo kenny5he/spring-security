@@ -19,11 +19,11 @@ package org.springframework.security.messaging.web.csrf;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -37,7 +37,7 @@ import org.springframework.security.web.csrf.MissingCsrfTokenException;
 
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class CsrfChannelInterceptorTests {
 
 	@Mock
@@ -49,7 +49,7 @@ public class CsrfChannelInterceptorTests {
 
 	CsrfChannelInterceptor interceptor;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.token = new DefaultCsrfToken("header", "param", "token");
 		this.interceptor = new CsrfChannelInterceptor();
@@ -116,28 +116,28 @@ public class CsrfChannelInterceptorTests {
 	public void preSendNoToken() {
 		this.messageHeaders.removeNativeHeader(this.token.getHeaderName());
 		assertThatExceptionOfType(InvalidCsrfTokenException.class)
-				.isThrownBy(() -> this.interceptor.preSend(message(), this.channel));
+			.isThrownBy(() -> this.interceptor.preSend(message(), this.channel));
 	}
 
 	@Test
 	public void preSendInvalidToken() {
 		this.messageHeaders.setNativeHeader(this.token.getHeaderName(), this.token.getToken() + "invalid");
 		assertThatExceptionOfType(InvalidCsrfTokenException.class)
-				.isThrownBy(() -> this.interceptor.preSend(message(), this.channel));
+			.isThrownBy(() -> this.interceptor.preSend(message(), this.channel));
 	}
 
 	@Test
 	public void preSendMissingToken() {
 		this.messageHeaders.getSessionAttributes().clear();
 		assertThatExceptionOfType(MissingCsrfTokenException.class)
-				.isThrownBy(() -> this.interceptor.preSend(message(), this.channel));
+			.isThrownBy(() -> this.interceptor.preSend(message(), this.channel));
 	}
 
 	@Test
 	public void preSendMissingTokenNullSessionAttributes() {
 		this.messageHeaders.setSessionAttributes(null);
 		assertThatExceptionOfType(MissingCsrfTokenException.class)
-				.isThrownBy(() -> this.interceptor.preSend(message(), this.channel));
+			.isThrownBy(() -> this.interceptor.preSend(message(), this.channel));
 	}
 
 	private Message<String> message() {

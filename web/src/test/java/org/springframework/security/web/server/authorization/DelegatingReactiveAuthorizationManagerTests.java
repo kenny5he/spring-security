@@ -16,8 +16,8 @@
 
 package org.springframework.security.web.server.authorization;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import reactor.core.publisher.Mono;
@@ -35,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 /**
  * @author Rob Winch
@@ -65,12 +65,13 @@ public class DelegatingReactiveAuthorizationManagerTests {
 
 	DelegatingReactiveAuthorizationManager manager;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		MockitoAnnotations.initMocks(this);
 		this.manager = DelegatingReactiveAuthorizationManager.builder()
-				.add(new ServerWebExchangeMatcherEntry<>(this.match1, this.delegate1))
-				.add(new ServerWebExchangeMatcherEntry<>(this.match2, this.delegate2)).build();
+			.add(new ServerWebExchangeMatcherEntry<>(this.match1, this.delegate1))
+			.add(new ServerWebExchangeMatcherEntry<>(this.match2, this.delegate2))
+			.build();
 		MockServerHttpRequest request = MockServerHttpRequest.get("/test").build();
 		this.exchange = MockServerWebExchange.from(request);
 	}
@@ -79,9 +80,9 @@ public class DelegatingReactiveAuthorizationManagerTests {
 	public void checkWhenFirstMatchesThenNoMoreMatchersAndNoMoreDelegatesInvoked() {
 		given(this.match1.matches(any())).willReturn(ServerWebExchangeMatcher.MatchResult.match());
 		given(this.delegate1.check(eq(this.authentication), any(AuthorizationContext.class)))
-				.willReturn(Mono.just(this.decision));
+			.willReturn(Mono.just(this.decision));
 		assertThat(this.manager.check(this.authentication, this.exchange).block()).isEqualTo(this.decision);
-		verifyZeroInteractions(this.match2, this.delegate2);
+		verifyNoMoreInteractions(this.match2, this.delegate2);
 	}
 
 	@Test
@@ -89,9 +90,9 @@ public class DelegatingReactiveAuthorizationManagerTests {
 		given(this.match1.matches(any())).willReturn(ServerWebExchangeMatcher.MatchResult.notMatch());
 		given(this.match2.matches(any())).willReturn(ServerWebExchangeMatcher.MatchResult.match());
 		given(this.delegate2.check(eq(this.authentication), any(AuthorizationContext.class)))
-				.willReturn(Mono.just(this.decision));
+			.willReturn(Mono.just(this.decision));
 		assertThat(this.manager.check(this.authentication, this.exchange).block()).isEqualTo(this.decision);
-		verifyZeroInteractions(this.delegate1);
+		verifyNoMoreInteractions(this.delegate1);
 	}
 
 }

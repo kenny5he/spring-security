@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2013 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,10 @@
 
 package org.springframework.security.config.http;
 
-import java.lang.reflect.Method;
-
-import javax.servlet.Filter;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.Mock;
-import org.powermock.core.classloader.annotations.PowerMockIgnore;
-import org.powermock.core.classloader.annotations.PrepareForTest;
-import org.powermock.modules.junit4.PowerMockRunner;
+import jakarta.servlet.Filter;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.mock.web.MockFilterChain;
@@ -38,7 +30,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.security.web.context.HttpRequestResponseHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import org.springframework.util.ReflectionUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -46,9 +37,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Rob Winch
  *
  */
-@RunWith(PowerMockRunner.class)
-@PrepareForTest({ ReflectionUtils.class, Method.class })
-@PowerMockIgnore({ "org.w3c.dom.*", "org.xml.sax.*", "org.apache.xerces.*", "javax.xml.parsers.*" })
 public class SessionManagementConfigServlet31Tests {
 
 	// @formatter:off
@@ -61,9 +49,6 @@ public class SessionManagementConfigServlet31Tests {
 			+ "</authentication-manager>";
 	// @formatter:on
 
-	@Mock
-	Method method;
-
 	MockHttpServletRequest request;
 
 	MockHttpServletResponse response;
@@ -74,14 +59,14 @@ public class SessionManagementConfigServlet31Tests {
 
 	Filter springSecurityFilterChain;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		this.request = new MockHttpServletRequest("GET", "");
 		this.response = new MockHttpServletResponse();
 		this.chain = new MockFilterChain();
 	}
 
-	@After
+	@AfterEach
 	public void teardown() {
 		if (this.context != null) {
 			this.context.close();
@@ -100,6 +85,7 @@ public class SessionManagementConfigServlet31Tests {
 		String id = request.getSession().getId();
 		// @formatter:off
 		loadContext("<http>\n"
+				+ "        <intercept-url pattern=\"/**\" access=\"authenticated\"/>\n"
 				+ "        <form-login/>\n"
 				+ "        <session-management/>\n"
 				+ "        <csrf disabled='true'/>\n"
@@ -122,6 +108,7 @@ public class SessionManagementConfigServlet31Tests {
 		String id = request.getSession().getId();
 		// @formatter:off
 		loadContext("<http>\n"
+				+ "        <intercept-url pattern=\"/**\" access=\"authenticated\"/>\n"
 				+ "        <form-login/>\n"
 				+ "        <session-management session-fixation-protection='changeSessionId'/>\n"
 				+ "        <csrf disabled='true'/>\n"

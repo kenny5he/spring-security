@@ -18,10 +18,9 @@ package org.springframework.security.web.authentication;
 
 import java.util.LinkedHashMap;
 
-import javax.servlet.http.HttpServletRequest;
-
-import org.junit.Before;
-import org.junit.Test;
+import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -49,7 +48,7 @@ public class DelegatingAuthenticationEntryPointTests {
 
 	private HttpServletRequest request = new MockHttpServletRequest();
 
-	@Before
+	@BeforeEach
 	public void before() {
 		this.defaultEntryPoint = mock(AuthenticationEntryPoint.class);
 		this.entryPoints = new LinkedHashMap<>();

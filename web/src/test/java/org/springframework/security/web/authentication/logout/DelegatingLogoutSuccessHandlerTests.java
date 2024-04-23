@@ -18,13 +18,12 @@ package org.springframework.security.web.authentication.logout;
 
 import java.util.LinkedHashMap;
 
-import javax.servlet.http.HttpServletRequest;
-
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
@@ -32,7 +31,7 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 /**
  * DelegatingLogoutSuccessHandlerTests Tests
@@ -40,7 +39,7 @@ import static org.mockito.Mockito.verifyZeroInteractions;
  * @author Shazin Sadakath
  * @author Rob Winch
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class DelegatingLogoutSuccessHandlerTests {
 
 	@Mock
@@ -69,7 +68,7 @@ public class DelegatingLogoutSuccessHandlerTests {
 
 	DelegatingLogoutSuccessHandler delegatingHandler;
 
-	@Before
+	@BeforeEach
 	public void setup() {
 		LinkedHashMap<RequestMatcher, LogoutSuccessHandler> matcherToHandler = new LinkedHashMap<>();
 		matcherToHandler.put(this.matcher, this.handler);
@@ -83,7 +82,7 @@ public class DelegatingLogoutSuccessHandlerTests {
 		given(this.matcher.matches(this.request)).willReturn(true);
 		this.delegatingHandler.onLogoutSuccess(this.request, this.response, this.authentication);
 		verify(this.handler).onLogoutSuccess(this.request, this.response, this.authentication);
-		verifyZeroInteractions(this.matcher2, this.handler2, this.defaultHandler);
+		verifyNoMoreInteractions(this.matcher2, this.handler2, this.defaultHandler);
 	}
 
 	@Test
@@ -92,7 +91,7 @@ public class DelegatingLogoutSuccessHandlerTests {
 		given(this.matcher2.matches(this.request)).willReturn(true);
 		this.delegatingHandler.onLogoutSuccess(this.request, this.response, this.authentication);
 		verify(this.handler2).onLogoutSuccess(this.request, this.response, this.authentication);
-		verifyZeroInteractions(this.handler, this.defaultHandler);
+		verifyNoMoreInteractions(this.handler, this.defaultHandler);
 	}
 
 	@Test
@@ -100,13 +99,13 @@ public class DelegatingLogoutSuccessHandlerTests {
 		this.delegatingHandler.setDefaultLogoutSuccessHandler(this.defaultHandler);
 		this.delegatingHandler.onLogoutSuccess(this.request, this.response, this.authentication);
 		verify(this.defaultHandler).onLogoutSuccess(this.request, this.response, this.authentication);
-		verifyZeroInteractions(this.handler, this.handler2);
+		verifyNoMoreInteractions(this.handler, this.handler2);
 	}
 
 	@Test
 	public void onLogoutSuccessNoMatchDefaultNull() throws Exception {
 		this.delegatingHandler.onLogoutSuccess(this.request, this.response, this.authentication);
-		verifyZeroInteractions(this.handler, this.handler2, this.defaultHandler);
+		verifyNoMoreInteractions(this.handler, this.handler2, this.defaultHandler);
 	}
 
 }
